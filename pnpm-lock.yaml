@@ -12,6 +12,10 @@ importers:
         specifier: ^2.109.1
         version: 2.109.1
 
+  apps/web: {}
+
+  packages/shared-types: {}
+
 packages:
 
   '@ecies/ciphers@0.2.6':
