@@ -18,12 +18,13 @@ jobs:
       - name: Touch the database via PostgREST
         env:
           SUPABASE_URL: https://mytqfzvgakkcihfdupop.supabase.co
-          # The anon/publishable key is not sensitive — it's the same key
-          # shipped to every browser in the deployed app's JS bundle.
-          SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15dHFmenZnYWtrY2loZmR1cG9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2OTMxMTEsImV4cCI6MjA5OTI2OTExMX0.OcbZ8afYdY6y3iiYbBW7ODEwZvhYrt3UguVFAfEQLNw
+          # The publishable key is not sensitive — it's the same key shipped
+          # to every browser in the deployed app's JS bundle. Prefer it over
+          # the legacy anon (JWT) key per Supabase's current guidance.
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_J69G8e0tuFRwBQ9CAI2ZzQ_Rauv1z0F
         run: |
           http_status=$(curl -s -o /tmp/response.json -w '%{http_code}' \
-            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
             "$SUPABASE_URL/rest/v1/_heartbeat?select=*&limit=1")
           echo "PostgREST responded with HTTP $http_status"
           cat /tmp/response.json
