@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  # Not sensitive — the publishable key is the same one shipped in the
+  # deployed app's JS bundle. Needed at build time because
+  # supabaseClient.ts imports it via $env/static/public, which fails the
+  # build outright if the var isn't defined (verified locally).
+  PUBLIC_SUPABASE_URL: https://mytqfzvgakkcihfdupop.supabase.co
+  PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_J69G8e0tuFRwBQ9CAI2ZzQ_Rauv1z0F
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run format:check
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web run check
+      - run: pnpm --filter @emgc-calcutta/shared-types run check
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web run build
