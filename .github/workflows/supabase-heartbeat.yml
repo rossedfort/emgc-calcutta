@@ -1,0 +1,41 @@
+name: Supabase heartbeat
+
+# Supabase pauses free-tier projects after 7 days with no database activity
+# (see .claude/emgc-calcutta-app-spec.md section 6.4). This app's real usage
+# pattern is bursty (CSV import, a week of bidding, one live event, then
+# dormant for ~11 months), so a paused project is a real risk, not a
+# theoretical one. Running daily keeps a comfortable margin under the 7-day
+# threshold.
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch the database via PostgREST
+        env:
+          SUPABASE_URL: https://mytqfzvgakkcihfdupop.supabase.co
+          # The publishable key is not sensitive — it's the same key shipped
+          # to every browser in the deployed app's JS bundle. Prefer it over
+          # the legacy anon (JWT) key per Supabase's current guidance.
+          SUPABASE_PUBLISHABLE_KEY: sb_publishable_J69G8e0tuFRwBQ9CAI2ZzQ_Rauv1z0F
+        run: |
+          http_status=$(curl -s -o /tmp/response.json -w '%{http_code}' \
+            -H "apikey: $SUPABASE_PUBLISHABLE_KEY" \
+            "$SUPABASE_URL/rest/v1/_heartbeat?select=*&limit=1")
+          echo "PostgREST responded with HTTP $http_status"
+          cat /tmp/response.json
+          echo
+          # 200 = a real table happened to exist and returned rows.
+          # 404 = PostgREST reached Postgres, resolved the schema cache, and
+          #   correctly reported the table doesn't exist — still a live
+          #   round-trip to the database, which is all the heartbeat needs.
+          # Anything else (network failure, 401, 5xx) means the request
+          # never made it to the database and the heartbeat failed.
+          if [ "$http_status" != "200" ] && [ "$http_status" != "404" ]; then
+            echo "Heartbeat failed: unexpected HTTP status $http_status"
+            exit 1
+          fi

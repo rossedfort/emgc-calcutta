@@ -1,0 +1,15 @@
+{
+	"name": "@emgc-calcutta/shared-types",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"description": "Realtime event payload shapes and Edge Function request/response contracts, complementing the Supabase-generated DB types",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
+	"scripts": {
+		"check": "tsc --noEmit"
+	},
+	"devDependencies": {
+		"typescript": "^6.0.3"
+	}
+}
