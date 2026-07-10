@@ -6,3 +6,8 @@
 .env.keys
 .env.local
 .env.*.local
+
+# Force-track migrations/seed SQL even if a global gitignore (e.g. a
+# blanket *.sql rule) would otherwise exclude them.
+!migrations/*.sql
+!seed.sql
