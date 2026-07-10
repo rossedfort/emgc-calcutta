@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { supabase } from '$lib/supabaseClient';
+	import { Button } from '$lib/components/ui/button';
 
 	let authStatus: 'pending' | 'ok' | 'error' = $state('pending');
 	let dbStatus: 'pending' | 'ok' | 'error' = $state('pending');
 	let dbDetail = $state('');
 
-	onMount(async () => {
+	async function runCheck() {
+		authStatus = 'pending';
+		dbStatus = 'pending';
+		dbDetail = '';
+
 		const { error: authError } = await supabase.auth.getSession();
 		authStatus = authError ? 'error' : 'ok';
 
@@ -21,12 +26,17 @@
 			dbStatus = 'error';
 			dbDetail = dbError.message;
 		}
-	});
+	}
+
+	onMount(runCheck);
 </script>
 
-<h1>emgc-calcutta</h1>
-<p>Supabase connectivity check:</p>
-<ul>
-	<li>Auth: {authStatus}</li>
-	<li>Database: {dbStatus} {dbDetail}</li>
-</ul>
+<div class="mx-auto flex max-w-md flex-col gap-4 p-8">
+	<h1 class="text-2xl font-semibold text-foreground">emgc-calcutta</h1>
+	<p class="text-sm text-muted-foreground">Supabase connectivity check:</p>
+	<ul class="flex flex-col gap-1 text-sm">
+		<li>Auth: <span class="font-medium">{authStatus}</span></li>
+		<li>Database: <span class="font-medium">{dbStatus}</span> {dbDetail}</li>
+	</ul>
+	<Button onclick={runCheck} class="w-fit">Re-run check</Button>
+</div>

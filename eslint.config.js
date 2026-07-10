@@ -33,5 +33,16 @@ export default ts.config(
 				extraFileExtensions: ['.svelte']
 			}
 		}
+	},
+	{
+		// shadcn-svelte components are vendored from the registry via its CLI
+		// (see .claude/skills/emgc-calcutta-task-workflow) — don't hand-edit
+		// them to satisfy app-level rules like requiring resolve() on every
+		// href, since their `href` props are generic pass-throughs, not
+		// internal SvelteKit links.
+		files: ['apps/web/src/lib/components/ui/**'],
+		rules: {
+			'svelte/no-navigation-without-resolve': 'off'
+		}
 	}
 );
