@@ -34,9 +34,9 @@
 
 	onMount(runCheck);
 
-	async function signInWithGoogle() {
+	async function signInWith(provider: 'google' | 'azure') {
 		await supabase.auth.signInWithOAuth({
-			provider: 'google',
+			provider,
 			options: { redirectTo: `${window.location.origin}/auth/callback` }
 		});
 	}
@@ -56,7 +56,10 @@
 			<Button onclick={signOut} variant="outline" class="w-fit">Sign out</Button>
 		{:else}
 			<p>Not signed in</p>
-			<Button onclick={signInWithGoogle} class="w-fit">Sign in with Google</Button>
+			<div class="flex gap-2">
+				<Button onclick={() => signInWith('google')} class="w-fit">Sign in with Google</Button>
+				<Button onclick={() => signInWith('azure')} class="w-fit">Sign in with Microsoft</Button>
+			</div>
 		{/if}
 	</div>
 
