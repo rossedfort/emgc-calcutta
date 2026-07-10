@@ -1,17 +1,13 @@
 {
-	"extends": "./.svelte-kit/tsconfig.json",
+	"extends": ["./.svelte-kit/tsconfig.json", "../../tsconfig.base.json"],
 	"compilerOptions": {
 		"rewriteRelativeImportExtensions": true,
 		"allowJs": true,
-		"checkJs": true,
-		"esModuleInterop": true,
-		"forceConsistentCasingInFileNames": true,
-		"resolveJsonModule": true,
-		"skipLibCheck": true,
-		"sourceMap": true,
-		"strict": true,
-		"moduleResolution": "bundler"
+		"checkJs": true
 	}
+	// Shared strict/module-resolution options live in the workspace's
+	// tsconfig.base.json (see ../../tsconfig.base.json).
+	//
 	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
 	// except $lib which is handled by https://svelte.dev/docs/kit/configuration#files
 	//

@@ -1,10 +1,25 @@
 {
-  "name": "emgc-calcutta",
-  "version": "1.0.0",
-  "private": true,
-  "description": "",
-  "license": "ISC",
-  "devDependencies": {
-    "supabase": "^2.109.1"
-  }
+	"name": "emgc-calcutta",
+	"version": "1.0.0",
+	"private": true,
+	"description": "",
+	"license": "ISC",
+	"type": "module",
+	"scripts": {
+		"lint": "eslint .",
+		"format": "prettier --write .",
+		"format:check": "prettier --check ."
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"eslint": "^10.6.0",
+		"eslint-config-prettier": "^10.1.8",
+		"eslint-plugin-svelte": "^3.20.0",
+		"globals": "^17.7.0",
+		"prettier": "^3.9.5",
+		"prettier-plugin-svelte": "^4.1.1",
+		"supabase": "^2.109.1",
+		"svelte-eslint-parser": "^1.8.0",
+		"typescript-eslint": "^8.63.0"
+	}
 }
