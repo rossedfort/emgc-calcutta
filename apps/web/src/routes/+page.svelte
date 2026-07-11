@@ -34,13 +34,6 @@
 
 	onMount(runCheck);
 
-	async function signInWith(provider: 'google' | 'azure') {
-		await supabase.auth.signInWithOAuth({
-			provider,
-			options: { redirectTo: `${window.location.origin}/auth/callback` }
-		});
-	}
-
 	async function signOut() {
 		await supabase.auth.signOut();
 	}
@@ -49,19 +42,13 @@
 <div class="mx-auto flex max-w-md flex-col gap-4 p-8">
 	<h1 class="text-2xl font-semibold text-foreground">emgc-calcutta</h1>
 
-	<div class="flex flex-col gap-1 text-sm">
-		<p class="text-muted-foreground">Auth session:</p>
-		{#if session}
+	{#if session}
+		<div class="flex flex-col gap-1 text-sm">
+			<p class="text-muted-foreground">Auth session:</p>
 			<p>Signed in as <span class="font-medium">{session.user.email}</span></p>
 			<Button onclick={signOut} variant="outline" class="w-fit">Sign out</Button>
-		{:else}
-			<p>Not signed in</p>
-			<div class="flex gap-2">
-				<Button onclick={() => signInWith('google')} class="w-fit">Sign in with Google</Button>
-				<Button onclick={() => signInWith('azure')} class="w-fit">Sign in with Microsoft</Button>
-			</div>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	<div class="flex flex-col gap-1 text-sm">
 		<p class="text-muted-foreground">Supabase connectivity check:</p>

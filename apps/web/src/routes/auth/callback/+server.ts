@@ -20,5 +20,5 @@ export const GET: RequestHandler = async ({ url, locals: { supabase } }) => {
 		}
 	}
 
-	redirect(303, '/?auth_error=1');
+	redirect(303, '/login?auth_error=1');
 };
