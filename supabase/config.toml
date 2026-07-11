@@ -155,12 +155,17 @@ max_indexes = 5
 [auth]
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
-# in emails.
-site_url = "http://127.0.0.1:3000"
+# in emails. Matches apps/web's actual local dev server (SvelteKit on 5173, not
+# the sv-create default of 3000) — see auth.additional_redirect_urls below.
+site_url = "http://localhost:5173"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
-# external_url = ""
+# Explicitly set to "localhost" (not the default 127.0.0.1) because Microsoft's
+# consumer-account (personal MSA) login layer rejects the loopback IP as a
+# registered redirect_uri even when the exact same URI with "localhost" swapped
+# in is registered in the Azure app — see .claude/CLAUDE.md Known quirks.
+external_url = "http://localhost:54321/auth/v1"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+additional_redirect_urls = ["http://localhost:5173/auth/callback"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -403,8 +408,8 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[edge_runtime.secrets]
+OWNER_EMAIL = "env(OWNER_EMAIL)"
 
 [analytics]
 enabled = true
@@ -433,3 +438,17 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+[functions.bootstrap-owner]
+enabled = true
+# This function requires auth: "user" (a valid caller JWT), so the
+# platform-level JWT check stays on — see docs on auth modes in
+# @supabase/server: verify_jwt = false is only for publishable/secret/none.
+verify_jwt = true
+import_map = "./functions/bootstrap-owner/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/bootstrap-owner/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/bootstrap-owner/*.html" ]

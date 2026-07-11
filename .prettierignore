@@ -5,3 +5,6 @@ pnpm-lock.yaml
 apps/web/.svelte-kit/**
 apps/web/.vercel/**
 supabase/.temp/**
+# Deno code — formatted separately via `deno fmt`, not Prettier (see
+# eslint.config.js for the matching lint exclusion).
+supabase/functions/**
