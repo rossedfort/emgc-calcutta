@@ -7,59 +7,14 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
-// No generated Supabase types in this project yet (see spec 6.8) — this is
-// just enough of the shape for the one table/column this function touches.
-interface Database {
-  public: {
-    Tables: {
-      users: {
-        Row: { id: string; role: string };
-        Insert: { id: string; role?: string };
-        Update: { role?: string };
-        Relationships: [];
-      };
-    };
-    Views: Record<string, never>;
-    Functions: Record<string, never>;
-    Enums: Record<string, never>;
-    CompositeTypes: Record<string, never>;
-  };
-}
-
-// Local `supabase start` only exposes the new-style secret/publishable keys
-// under SUPABASE_INTERNAL_*-prefixed names (it exposes the legacy anon/
-// service-role keys unprefixed, but @supabase/server@1 doesn't fall back to
-// those). The hosted Edge Functions platform auto-provisions the unprefixed
-// SUPABASE_SECRET_KEY/SUPABASE_PUBLISHABLE_KEY directly, so this fallback
-// chain covers both environments. See .claude/CLAUDE.md Known quirks.
-function resolveKey(...names: string[]): string {
-  for (const name of names) {
-    const value = Deno.env.get(name);
-    if (value) return value;
-  }
-  return "";
-}
+import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
+import type { Database } from "../_shared/database.ts";
 
 export default {
   fetch: withSupabase<Database>(
     {
       auth: "user",
-      env: {
-        secretKeys: {
-          default: resolveKey(
-            "SUPABASE_SECRET_KEY",
-            "SUPABASE_INTERNAL_SECRET_KEY",
-            "SUPABASE_SERVICE_ROLE_KEY",
-          ),
-        },
-        publishableKeys: {
-          default: resolveKey(
-            "SUPABASE_PUBLISHABLE_KEY",
-            "SUPABASE_INTERNAL_PUBLISHABLE_KEY",
-            "SUPABASE_ANON_KEY",
-          ),
-        },
-      },
+      env: resolveSupabaseEnv(),
     },
     async (_req, ctx) => {
       const ownerEmail = Deno.env.get("OWNER_EMAIL");

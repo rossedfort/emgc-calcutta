@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 
 	let { data } = $props();
@@ -46,7 +47,12 @@
 		<div class="flex flex-col gap-1 text-sm">
 			<p class="text-muted-foreground">Auth session:</p>
 			<p>Signed in as <span class="font-medium">{session.user.email}</span></p>
-			<Button onclick={signOut} variant="outline" class="w-fit">Sign out</Button>
+			<div class="flex gap-2">
+				<Button onclick={signOut} variant="outline" class="w-fit">Sign out</Button>
+				{#if data.isAdmin}
+					<Button href={resolve('/admin/users')} variant="outline" class="w-fit">Admin</Button>
+				{/if}
+			</div>
 		</div>
 	{/if}
 
