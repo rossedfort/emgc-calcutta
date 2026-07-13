@@ -50,6 +50,32 @@
 		{#if errors.name}<p class="text-sm text-destructive">{errors.name}</p>{/if}
 	</div>
 
+	<div class="flex flex-col gap-1.5">
+		<Label>Type</Label>
+		<div class="flex gap-4 text-sm">
+			<label class="flex items-center gap-2">
+				<input
+					type="radio"
+					name="kind"
+					value="production"
+					checked={values.kind !== 'dry_run'}
+					class="accent-brass"
+				/>
+				Production
+			</label>
+			<label class="flex items-center gap-2">
+				<input
+					type="radio"
+					name="kind"
+					value="dry_run"
+					checked={values.kind === 'dry_run'}
+					class="accent-brass"
+				/>
+				Dry run
+			</label>
+		</div>
+	</div>
+
 	<div class="grid grid-cols-2 gap-4">
 		<div class="flex flex-col gap-1.5">
 			<Label for="silent_auction_start">Silent auction start</Label>

@@ -28,6 +28,7 @@
 
 	let defaultValues = $derived<TournamentFormValues>({
 		name: data.tournament.name,
+		kind: data.tournament.kind,
 		silent_auction_start: toLocalInput(data.tournament.silent_auction_start),
 		silent_auction_end: toLocalInput(data.tournament.silent_auction_end),
 		threshold_amount: String(data.tournament.threshold_amount),

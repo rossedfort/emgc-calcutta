@@ -19,6 +19,7 @@ export interface Tournament {
 
 export interface TournamentFormValues {
 	name: string;
+	kind: 'production' | 'dry_run';
 	silent_auction_start: string;
 	silent_auction_end: string;
 	threshold_amount: string;
@@ -44,6 +45,7 @@ export function statusBadgeVariant(status: Tournament['status']): BadgeVariant {
 
 export interface ParsedTournament {
 	name: string;
+	kind: 'production' | 'dry_run';
 	silent_auction_start: string;
 	silent_auction_end: string;
 	threshold_amount: number;
@@ -66,6 +68,9 @@ export function parseTournamentForm(formData: FormData): {
 
 	const name = String(formData.get('name') ?? '').trim();
 	if (!name) errors.name = 'Name is required';
+
+	const kindRaw = String(formData.get('kind') ?? 'production');
+	const kind: 'production' | 'dry_run' = kindRaw === 'dry_run' ? 'dry_run' : 'production';
 
 	const start = String(formData.get('silent_auction_start') ?? '');
 	const end = String(formData.get('silent_auction_end') ?? '');
@@ -114,6 +119,7 @@ export function parseTournamentForm(formData: FormData): {
 	return {
 		data: {
 			name,
+			kind,
 			silent_auction_start: new Date(start).toISOString(),
 			silent_auction_end: new Date(end).toISOString(),
 			threshold_amount,
