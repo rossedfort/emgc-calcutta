@@ -1,7 +1,8 @@
 // No generated Supabase types in this project yet (see spec 6.8) — this is
-// just enough of the shape of `public.users`/`public.tournaments` for the
-// Edge Functions that touch them (bootstrap-owner, whoami, list-users,
-// update-user-role, import-csv-preview).
+// just enough of the shape of `public.users`/`public.tournaments`/
+// `public.players` for the Edge Functions that touch them (bootstrap-owner,
+// whoami, list-users, update-user-role, import-csv-preview,
+// import-csv-confirm).
 export interface Database {
   public: {
     Tables: {
@@ -56,6 +57,48 @@ export interface Database {
           name?: string;
           kind?: string;
           status?: string;
+        };
+        Relationships: [];
+      };
+      players: {
+        Row: {
+          id: string;
+          tournament_id: string;
+          slug: string;
+          name: string;
+          contact_email: string | null;
+          contact_phone: string | null;
+          preferences: string | null;
+          photo_url: string | null;
+          flight: string | null;
+          status: string;
+          user_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tournament_id: string;
+          slug?: string;
+          name: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          preferences?: string | null;
+          photo_url?: string | null;
+          flight?: string | null;
+          status?: string;
+          user_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          slug?: string;
+          name?: string;
+          contact_email?: string | null;
+          contact_phone?: string | null;
+          preferences?: string | null;
+          photo_url?: string | null;
+          flight?: string | null;
+          status?: string;
+          user_id?: string | null;
         };
         Relationships: [];
       };
