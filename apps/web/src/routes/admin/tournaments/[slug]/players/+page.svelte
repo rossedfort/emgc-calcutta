@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
-	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
 
@@ -22,37 +23,44 @@
 	);
 </script>
 
-<div class="flex flex-col gap-4">
-	<PageHeader title="Players" />
-	<p class="font-data text-xs tracking-widest text-fairway uppercase">{data.tournament.name}</p>
-
-	<div class="flex items-center gap-4 text-sm">
-		<label class="flex items-center gap-2">
-			<span class="text-muted-foreground">Status</span>
-			<select
-				bind:value={statusFilter}
-				class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-			>
-				<option value="all">All</option>
-				{#each PLAYER_STATUSES as status (status)}
-					<option value={status}>{playerStatusLabel(status)}</option>
-				{/each}
-			</select>
-		</label>
-		{#if flights.length > 0}
+<div class="flex flex-col gap-4 pt-4">
+	<div class="flex items-center justify-between">
+		<div class="flex items-center gap-4 text-sm">
 			<label class="flex items-center gap-2">
-				<span class="text-muted-foreground">Flight</span>
+				<span class="text-muted-foreground">Status</span>
 				<select
-					bind:value={flightFilter}
+					bind:value={statusFilter}
 					class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
 				>
 					<option value="all">All</option>
-					{#each flights as flight (flight)}
-						<option value={flight}>{flight}</option>
+					{#each PLAYER_STATUSES as status (status)}
+						<option value={status}>{playerStatusLabel(status)}</option>
 					{/each}
 				</select>
 			</label>
-		{/if}
+			{#if flights.length > 0}
+				<label class="flex items-center gap-2">
+					<span class="text-muted-foreground">Flight</span>
+					<select
+						bind:value={flightFilter}
+						class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+					>
+						<option value="all">All</option>
+						{#each flights as flight (flight)}
+							<option value={flight}>{flight}</option>
+						{/each}
+					</select>
+				</label>
+			{/if}
+		</div>
+
+		<Button
+			href={resolve('/admin/tournaments/[slug]/players/import', { slug: data.tournament.slug })}
+			variant="brass"
+			size="sm"
+		>
+			Import players
+		</Button>
 	</div>
 
 	{#if filteredPlayers.length === 0}
@@ -64,6 +72,8 @@
 					<Table.Head>Name</Table.Head>
 					<Table.Head>Flight</Table.Head>
 					<Table.Head>Status</Table.Head>
+					<Table.Head>Linked</Table.Head>
+					<Table.Head>Actions</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
@@ -75,6 +85,25 @@
 							<Badge variant={playerStatusBadgeVariant(player.status)}>
 								{playerStatusLabel(player.status)}
 							</Badge>
+						</Table.Cell>
+						<Table.Cell>
+							{#if player.user_id}
+								<Badge variant="fairway">Linked</Badge>
+							{:else}
+								<span class="text-muted-foreground">—</span>
+							{/if}
+						</Table.Cell>
+						<Table.Cell>
+							<Button
+								href={resolve('/admin/tournaments/[slug]/players/[playerSlug]/edit', {
+									slug: data.tournament.slug,
+									playerSlug: player.slug
+								})}
+								variant="brass"
+								size="sm"
+							>
+								Edit
+							</Button>
 						</Table.Cell>
 					</Table.Row>
 				{/each}

@@ -1,5 +1,18 @@
-import { error, fail } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import { fail } from '@sveltejs/kit';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+import type { Actions } from './$types';
+
+// supabase-js's invoke() wraps any non-2xx response in a FunctionsHttpError
+// whose own .message is just a generic "Edge Function returned a non-2xx
+// status code" — the function's actual error is in the response body, only
+// reachable via .context (the raw Response).
+async function extractFunctionError(error: unknown, fallback: string): Promise<string> {
+	if (error instanceof FunctionsHttpError) {
+		const body = await error.context.json().catch(() => null);
+		if (body?.error) return body.error;
+	}
+	return error instanceof Error ? error.message : fallback;
+}
 
 export interface PreviewRow {
 	rowNumber: number;
@@ -14,23 +27,8 @@ export interface PreviewRow {
 	matchedUserEmail: string | null;
 }
 
-export const load: PageServerLoad = async ({ params, locals: { supabase } }) => {
-	const { data, error: loadError } = await supabase
-		.from('tournaments')
-		.select('id, slug, name')
-		.eq('slug', params.slug)
-		.maybeSingle();
-
-	if (loadError) {
-		error(500, loadError.message);
-	}
-	if (!data) {
-		error(404, 'Tournament not found');
-	}
-
-	return { tournament: data };
-};
-
+// No own `load` — the tournament comes from the [slug] layout's load, merged
+// into this page's `data` automatically.
 export const actions: Actions = {
 	preview: async ({ request, params, locals: { supabase } }) => {
 		const formData = await request.formData();
@@ -59,7 +57,7 @@ export const actions: Actions = {
 		if (invokeError || !data) {
 			return fail(400, {
 				step: 'upload' as const,
-				error: invokeError?.message ?? 'Failed to parse CSV'
+				error: await extractFunctionError(invokeError, 'Failed to parse CSV')
 			});
 		}
 
@@ -97,7 +95,7 @@ export const actions: Actions = {
 		if (invokeError || !data) {
 			return fail(400, {
 				step: 'preview' as const,
-				error: invokeError?.message ?? 'Failed to import players'
+				error: await extractFunctionError(invokeError, 'Failed to import players')
 			});
 		}
 

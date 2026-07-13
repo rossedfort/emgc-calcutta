@@ -104,7 +104,16 @@ export default {
         .insert(insertRows)
         .select("id, slug, name");
       if (insertError) {
-        return Response.json({ error: insertError.message }, {
+        // Most likely cause: one of these rows' userId is already linked to
+        // a different player in this tournament (unique per (tournamentId,
+        // userId) — see the players migration) — e.g. re-importing a CSV
+        // where a row auto-matched to someone already linked from an
+        // earlier import. Translate rather than surfacing Postgres's raw
+        // constraint-name error.
+        const message = insertError.code === "23505"
+          ? "One of these rows is linked to a participant who's already linked to another player in this tournament. Uncheck that row's link (or exclude the row) and try again."
+          : insertError.message;
+        return Response.json({ error: message }, {
           status: 400,
         });
       }

@@ -12,16 +12,15 @@
 	let unlinkSubmitting = $state(false);
 </script>
 
-<div class="flex flex-col gap-4">
-	<PageHeader title={data.player.name} eyebrow="Admin">
+<div class="flex flex-col gap-4 pt-4">
+	<PageHeader title={data.player.name}>
 		{#snippet actions()}
-			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline"
-				>Back to tournaments</a
+			<a
+				href={resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug })}
+				class="text-sm text-brass hover:underline">Back to players</a
 			>
 		{/snippet}
 	</PageHeader>
-
-	<p class="font-data text-xs tracking-widest text-fairway uppercase">{data.tournament.name}</p>
 
 	{#if errorMessage}
 		<p class="text-sm text-destructive">{errorMessage}</p>

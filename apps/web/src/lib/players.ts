@@ -1,8 +1,8 @@
 import type { BadgeVariant } from '$lib/components/ui/badge';
 
 // No generated Supabase types in this project yet (see spec 6.8) — this is
-// just enough of the shape of public.players for the participant-facing
-// routes under /tournaments.
+// just enough of the shape of public.players for both the participant-facing
+// routes under /tournaments and the admin routes under /admin/tournaments.
 export interface Player {
 	id: string;
 	slug: string;

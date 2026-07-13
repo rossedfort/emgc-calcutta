@@ -18,18 +18,8 @@ export interface UserOption {
 	name: string | null;
 }
 
-export const load: PageServerLoad = async ({ params, locals: { supabase } }) => {
-	const { data: tournament, error: tournamentError } = await supabase
-		.from('tournaments')
-		.select('id, slug, name')
-		.eq('slug', params.slug)
-		.maybeSingle();
-	if (tournamentError) {
-		error(500, tournamentError.message);
-	}
-	if (!tournament) {
-		error(404, 'Tournament not found');
-	}
+export const load: PageServerLoad = async ({ params, parent, locals: { supabase } }) => {
+	const { tournament } = await parent();
 
 	const { data: player, error: playerError } = await supabase
 		.from('players')

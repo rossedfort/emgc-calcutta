@@ -57,11 +57,11 @@
 						</Table.Cell>
 						<Table.Cell>
 							<Button
-								href={resolve('/admin/tournaments/[slug]/edit', { slug: tournament.slug })}
+								href={resolve('/admin/tournaments/[slug]', { slug: tournament.slug })}
 								variant="brass"
 								size="sm"
 							>
-								Edit
+								Manage
 							</Button>
 						</Table.Cell>
 					</Table.Row>
