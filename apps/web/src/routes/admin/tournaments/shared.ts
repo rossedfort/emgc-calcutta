@@ -1,3 +1,5 @@
+import type { BadgeVariant } from '$lib/components/ui/badge';
+
 // No generated Supabase types in this project yet (see spec 6.8) — this is
 // just enough of the shape of public.tournaments for this feature.
 export interface Tournament {
@@ -29,6 +31,17 @@ export interface PayoutRow {
 	percent: string;
 }
 
+export function statusBadgeVariant(status: Tournament['status']): BadgeVariant {
+	switch (status) {
+		case 'active':
+			return 'fairway';
+		case 'complete':
+			return 'outline';
+		default:
+			return 'sand';
+	}
+}
+
 export interface ParsedTournament {
 	name: string;
 	silent_auction_start: string;
@@ -39,7 +52,7 @@ export interface ParsedTournament {
 	payout_structure: Record<string, number>;
 }
 
-// Shared by the new/create and [id]/edit/update form actions — same fields,
+// Shared by the new/create and [slug]/edit/update form actions — same fields,
 // same rules either way. Client-side validation (see TournamentForm.svelte)
 // is just UX; this is the authoritative check before the RLS-permitted
 // insert/update is attempted (spec 6.5: basic form validation doesn't need

@@ -4,21 +4,10 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '../PageHeader.svelte';
-	import type { Tournament } from './shared';
+	import { statusBadgeVariant, type Tournament } from './shared';
 
 	let { data } = $props();
 	let { tournaments } = $derived(data);
-
-	function statusBadgeVariant(status: Tournament['status']): BadgeVariant {
-		switch (status) {
-			case 'active':
-				return 'fairway';
-			case 'complete':
-				return 'outline';
-			default:
-				return 'sand';
-		}
-	}
 
 	function kindBadgeVariant(kind: Tournament['kind']): BadgeVariant {
 		return kind === 'dry_run' ? 'brass' : 'outline';
