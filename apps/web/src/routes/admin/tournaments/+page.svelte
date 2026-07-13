@@ -68,7 +68,7 @@
 						</Table.Cell>
 						<Table.Cell>
 							<Button
-								href={resolve('/admin/tournaments/[id]/edit', { id: tournament.id })}
+								href={resolve('/admin/tournaments/[slug]/edit', { slug: tournament.slug })}
 								variant="brass"
 								size="sm"
 							>

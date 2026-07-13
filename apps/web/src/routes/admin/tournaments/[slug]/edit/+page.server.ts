@@ -6,7 +6,7 @@ export const load: PageServerLoad = async ({ params, locals: { supabase } }) => 
 	const { data, error: loadError } = await supabase
 		.from('tournaments')
 		.select('*')
-		.eq('id', params.id)
+		.eq('slug', params.slug)
 		.maybeSingle();
 
 	if (loadError) {
@@ -30,7 +30,7 @@ export const actions: Actions = {
 		const { error: updateError } = await supabase
 			.from('tournaments')
 			.update(data)
-			.eq('id', params.id);
+			.eq('slug', params.slug);
 		if (updateError) {
 			return fail(400, {
 				errors: { form: updateError.message },
