@@ -2,6 +2,9 @@
 @import 'tw-animate-css';
 @import 'shadcn-svelte/tailwind.css';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/fraunces/soft.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -76,6 +79,18 @@
 
 @theme inline {
 	--font-sans: 'Inter Variable', sans-serif;
+	--font-display: 'Fraunces Variable', serif;
+	--font-data: 'IBM Plex Mono', monospace;
+
+	/* Scorecard palette — used only by the homepage's ledger treatment
+	   (see +page.svelte); deliberately not wired into --primary/--background
+	   so the rest of the app's shadcn theme is untouched. */
+	--color-fairway: #1b3a2b;
+	--color-scorecard: #f3efe3;
+	--color-brass: #b8925a;
+	--color-ink: #1a1815;
+	--color-flag: #a63a2e;
+	--color-sand: #dcd0b4;
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
