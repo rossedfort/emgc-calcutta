@@ -1,9 +1,8 @@
 import type { Role } from '$lib/roles';
 
-export interface UserRow {
-	id: string;
+export interface UserProfile {
 	name: string | null;
 	email: string;
+	avatar_url: string | null;
 	role: Role;
-	created_at: string;
 }

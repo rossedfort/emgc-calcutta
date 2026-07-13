@@ -3,9 +3,10 @@
 	import { invalidate } from '$app/navigation';
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import AppShell from '$lib/components/AppShell.svelte';
 
 	let { data, children } = $props();
-	let { session, supabase } = $derived(data);
+	let { session, supabase, profile } = $derived(data);
 
 	onMount(() => {
 		const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -22,4 +23,10 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children()}
+{#if session}
+	<AppShell {profile} {supabase}>
+		{@render children()}
+	</AppShell>
+{:else}
+	{@render children()}
+{/if}

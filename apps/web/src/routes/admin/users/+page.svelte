@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import { invalidateAll } from '$app/navigation';
-	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
-	import type { Role, UserRow } from './types';
+	import { roleBadgeVariant, type Role } from '$lib/roles';
+	import type { UserRow } from './types';
 
 	let { data } = $props();
 	let { supabase, users, role: viewerRole } = $derived(data);
@@ -12,19 +13,6 @@
 
 	let pendingId: string | null = $state(null);
 	let errorMessage = $state('');
-
-	function roleBadgeVariant(role: Role): BadgeVariant {
-		switch (role) {
-			case 'owner':
-				return 'default';
-			case 'admin':
-				return 'secondary';
-			case 'participant':
-				return 'outline';
-			default:
-				return 'outline';
-		}
-	}
 
 	// Mirrors the authorization rules enforced server-side in the
 	// update-user-role Edge Function — this only controls which buttons are
