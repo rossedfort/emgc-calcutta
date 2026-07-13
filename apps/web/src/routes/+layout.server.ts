@@ -1,14 +1,19 @@
+import type { UserProfile } from '$lib/profile';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals: { session, supabase }, cookies }) => {
-	// Best-effort: only used to decide which nav links the AppShell shows. The
-	// /admin route group re-checks this itself, so a failure here just hides
-	// links rather than being a real authorization concern.
-	let isAdmin = false;
+	// Best-effort: only used for the AppShell's nav links and profile
+	// dropdown. The /admin route group re-checks role itself, so a failure or
+	// stale value here just affects what's displayed, not authorization.
+	let profile: UserProfile | null = null;
 	if (session) {
-		const { data } = await supabase.functions.invoke<{ role: string }>('whoami');
-		isAdmin = data?.role === 'admin' || data?.role === 'owner';
+		const { data } = await supabase
+			.from('users')
+			.select('name, email, avatar_url, role')
+			.eq('id', session.user.id)
+			.single();
+		profile = (data as UserProfile) ?? null;
 	}
 
-	return { session, cookies: cookies.getAll(), isAdmin };
+	return { session, cookies: cookies.getAll(), profile };
 };

@@ -1,13 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
-import type { Role } from '$lib/roles';
+import type { UserProfile } from '$lib/profile';
 import type { PageServerLoad } from './$types';
-
-export interface Profile {
-	name: string | null;
-	email: string;
-	avatar_url: string | null;
-	role: Role;
-}
 
 export const load: PageServerLoad = async ({ locals: { session, supabase } }) => {
 	if (!session) {
@@ -24,5 +17,5 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 		error(500, queryError?.message ?? 'Failed to load profile');
 	}
 
-	return { profile: data as Profile };
+	return { profile: data as UserProfile };
 };

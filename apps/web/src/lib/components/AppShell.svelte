@@ -2,18 +2,27 @@
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import type { Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { Button } from '$lib/components/ui/button';
+	import * as Avatar from '$lib/components/ui/avatar';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { initials } from '$lib/initials';
+	import type { UserProfile } from '$lib/profile';
+	import { goto } from '$app/navigation';
 
 	interface Props {
-		isAdmin: boolean;
+		profile: UserProfile | null;
 		supabase: SupabaseClient;
 		children: Snippet;
 	}
 
-	let { isAdmin, supabase, children }: Props = $props();
+	let { profile, supabase, children }: Props = $props();
+
+	let isAdmin = $derived(profile?.role === 'admin' || profile?.role === 'owner');
 
 	async function signOut() {
-		await supabase.auth.signOut();
+		const { error } = await supabase.auth.signOut();
+		if (!error) {
+			goto(resolve('/login'));
+		}
 	}
 
 	const navLinkClass =
@@ -23,7 +32,26 @@
 <div class="flex min-h-screen flex-col">
 	<header class="flex items-center justify-between border-b px-6 py-3">
 		<span class="font-semibold text-foreground">EMGC Calcutta</span>
-		<Button onclick={signOut} variant="outline" size="sm">Sign out</Button>
+
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				<Avatar.Root size="sm">
+					<Avatar.Image src={profile?.avatar_url} alt={profile?.name ?? profile?.email} />
+					<Avatar.Fallback>
+						{profile ? initials(profile.name ?? profile.email) : '?'}
+					</Avatar.Fallback>
+				</Avatar.Root>
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end">
+				<DropdownMenu.Item>
+					{#snippet child({ props })}
+						<a href={resolve('/profile')} {...props}>View profile</a>
+					{/snippet}
+				</DropdownMenu.Item>
+				<DropdownMenu.Separator />
+				<DropdownMenu.Item onSelect={signOut}>Log out</DropdownMenu.Item>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 	</header>
 
 	<div class="flex flex-1">
