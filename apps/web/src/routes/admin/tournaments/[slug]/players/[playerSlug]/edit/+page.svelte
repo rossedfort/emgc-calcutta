@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
-	import PageHeader from '../../../../../PageHeader.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 
 	let { data, form } = $props();
 
@@ -13,7 +13,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title={data.player.name}>
+	<PageHeader title={data.player.name} eyebrow="Admin">
 		{#snippet actions()}
 			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline"
 				>Back to tournaments</a

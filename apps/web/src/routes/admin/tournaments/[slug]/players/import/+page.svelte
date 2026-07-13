@@ -4,7 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
-	import PageHeader from '../../../../PageHeader.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import type { PreviewRow } from './+page.server';
 
 	let { data, form } = $props();
@@ -80,7 +80,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="Import players">
+	<PageHeader title="Import players" eyebrow="Admin">
 		{#snippet actions()}
 			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline"
 				>Back to tournaments</a

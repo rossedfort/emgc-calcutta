@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import PageHeader from '../../../PageHeader.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import TournamentForm from '../../TournamentForm.svelte';
 	import {
 		statusBadgeVariant,
@@ -45,7 +45,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="Edit tournament">
+	<PageHeader title="Edit tournament" eyebrow="Admin">
 		{#snippet actions()}
 			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline">Cancel</a>
 		{/snippet}

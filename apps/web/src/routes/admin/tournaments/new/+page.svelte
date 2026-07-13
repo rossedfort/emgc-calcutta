@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
-	import PageHeader from '../../PageHeader.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import TournamentForm from '../TournamentForm.svelte';
 	import type { TournamentFormValues } from '../shared';
 
@@ -19,7 +19,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="New tournament">
+	<PageHeader title="New tournament" eyebrow="Admin">
 		{#snippet actions()}
 			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline">Cancel</a>
 		{/snippet}
