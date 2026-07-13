@@ -1,11 +1,15 @@
+import type { BadgeVariant } from '$lib/components/ui/badge';
+
 // No generated Supabase types in this project yet (see spec 6.8) — this is
 // just enough of the shape of public.tournaments for this feature.
 export interface Tournament {
 	id: string;
+	slug: string;
 	name: string;
 	silent_auction_start: string;
 	silent_auction_end: string;
 	status: 'setup' | 'active' | 'complete';
+	kind: 'production' | 'dry_run';
 	threshold_amount: number;
 	min_increment: number;
 	anti_snipe_seconds: number;
@@ -15,6 +19,7 @@ export interface Tournament {
 
 export interface TournamentFormValues {
 	name: string;
+	kind: 'production' | 'dry_run';
 	silent_auction_start: string;
 	silent_auction_end: string;
 	threshold_amount: string;
@@ -27,8 +32,20 @@ export interface PayoutRow {
 	percent: string;
 }
 
+export function statusBadgeVariant(status: Tournament['status']): BadgeVariant {
+	switch (status) {
+		case 'active':
+			return 'fairway';
+		case 'complete':
+			return 'outline';
+		default:
+			return 'sand';
+	}
+}
+
 export interface ParsedTournament {
 	name: string;
+	kind: 'production' | 'dry_run';
 	silent_auction_start: string;
 	silent_auction_end: string;
 	threshold_amount: number;
@@ -37,7 +54,7 @@ export interface ParsedTournament {
 	payout_structure: Record<string, number>;
 }
 
-// Shared by the new/create and [id]/edit/update form actions — same fields,
+// Shared by the new/create and [slug]/edit/update form actions — same fields,
 // same rules either way. Client-side validation (see TournamentForm.svelte)
 // is just UX; this is the authoritative check before the RLS-permitted
 // insert/update is attempted (spec 6.5: basic form validation doesn't need
@@ -51,6 +68,9 @@ export function parseTournamentForm(formData: FormData): {
 
 	const name = String(formData.get('name') ?? '').trim();
 	if (!name) errors.name = 'Name is required';
+
+	const kindRaw = String(formData.get('kind') ?? 'production');
+	const kind: 'production' | 'dry_run' = kindRaw === 'dry_run' ? 'dry_run' : 'production';
 
 	const start = String(formData.get('silent_auction_start') ?? '');
 	const end = String(formData.get('silent_auction_end') ?? '');
@@ -99,6 +119,7 @@ export function parseTournamentForm(formData: FormData): {
 	return {
 		data: {
 			name,
+			kind,
 			silent_auction_start: new Date(start).toISOString(),
 			silent_auction_end: new Date(end).toISOString(),
 			threshold_amount,

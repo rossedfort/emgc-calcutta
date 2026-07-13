@@ -2,15 +2,13 @@ import type { PageServerLoad } from './$types';
 import type { Tournament } from './shared';
 
 export const load: PageServerLoad = async ({ locals: { supabase } }) => {
-	// Spec 3: "a single internal league runs one Tournament at a time" — this
-	// UI never lets a second one be created (see new/+page.server.ts), but
-	// .limit(1) rather than .maybeSingle() so this page doesn't hard-error if
-	// that invariant is ever violated some other way (e.g. direct DB access).
+	// Phase 1.6: multiple tournaments — past, active, dry runs — are fully
+	// supported now (see spec sections 2 and 5), so this lists every row
+	// instead of assuming at most one.
 	const { data } = await supabase
 		.from('tournaments')
 		.select('*')
-		.order('created_at', { ascending: false })
-		.limit(1);
+		.order('created_at', { ascending: false });
 
-	return { tournament: (data?.[0] as Tournament | undefined) ?? null };
+	return { tournaments: (data as Tournament[] | null) ?? [] };
 };

@@ -9,6 +9,7 @@
 
 	const emptyValues: TournamentFormValues = {
 		name: '',
+		kind: 'production',
 		silent_auction_start: '',
 		silent_auction_end: '',
 		threshold_amount: '',

@@ -1,17 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import type { Actions } from './$types';
 import { parseTournamentForm } from '../shared';
-
-export const load: PageServerLoad = async ({ locals: { supabase } }) => {
-	// Spec 3: "a single internal league runs one Tournament at a time" — this
-	// UI doesn't support creating a second one, so bounce to the existing
-	// tournament's page instead of showing a create form that would just fail
-	// the RLS-permitted insert anyway once a unique-tournament rule exists.
-	const { data } = await supabase.from('tournaments').select('id').limit(1);
-	if (data && data.length > 0) {
-		redirect(303, '/admin/tournaments');
-	}
-};
 
 export const actions: Actions = {
 	default: async ({ request, locals: { supabase } }) => {
