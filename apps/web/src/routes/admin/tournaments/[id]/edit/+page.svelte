@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import PageHeader from '../../../PageHeader.svelte';
 	import TournamentForm from '../../TournamentForm.svelte';
 	import type { PayoutRow, TournamentFormValues } from '../../shared';
 
@@ -34,12 +35,11 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<div class="flex items-center justify-between">
-		<h2 class="text-lg font-medium text-foreground">Edit tournament</h2>
-		<a href={resolve('/admin/tournaments')} class="text-sm text-muted-foreground hover:underline"
-			>Cancel</a
-		>
-	</div>
+	<PageHeader title="Edit tournament">
+		{#snippet actions()}
+			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline">Cancel</a>
+		{/snippet}
+	</PageHeader>
 
 	<form method="POST" use:enhance>
 		<TournamentForm

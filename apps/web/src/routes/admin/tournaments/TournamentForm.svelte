@@ -158,5 +158,5 @@
 
 	<input type="hidden" name="payout_structure" value={payoutJson} />
 
-	<Button type="submit" class="w-fit">{submitLabel}</Button>
+	<Button type="submit" variant="brass" class="w-fit">{submitLabel}</Button>
 </div>
