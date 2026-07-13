@@ -2,10 +2,12 @@
 // just enough of the shape of public.tournaments for this feature.
 export interface Tournament {
 	id: string;
+	slug: string;
 	name: string;
 	silent_auction_start: string;
 	silent_auction_end: string;
 	status: 'setup' | 'active' | 'complete';
+	kind: 'production' | 'dry_run';
 	threshold_amount: number;
 	min_increment: number;
 	anti_snipe_seconds: number;
