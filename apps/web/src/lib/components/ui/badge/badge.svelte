@@ -11,7 +11,10 @@
 					'bg-destructive/10 [a]:hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 text-destructive dark:bg-destructive/20',
 				outline: 'border-border text-foreground [a]:hover:bg-muted [a]:hover:text-muted-foreground',
 				ghost: 'hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50',
-				link: 'text-primary underline-offset-4 hover:underline'
+				link: 'text-primary underline-offset-4 hover:underline',
+				brass: 'bg-brass text-scorecard [a]:hover:bg-brass/80',
+				fairway: 'bg-fairway text-scorecard [a]:hover:bg-fairway/80',
+				sand: 'bg-sand text-ink [a]:hover:bg-sand/80'
 			}
 		},
 		defaultVariants: {

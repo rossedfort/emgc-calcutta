@@ -95,13 +95,7 @@
 
 		{#if isAdmin}
 			<div class="mt-6">
-				<Button
-					href={resolve('/admin/tournaments')}
-					variant="outline"
-					class="border-brass text-brass hover:bg-brass/10 hover:text-brass"
-				>
-					Manage tournament
-				</Button>
+				<Button href={resolve('/admin/tournaments')} variant="brass">Manage tournament</Button>
 			</div>
 		{/if}
 	{:else}
@@ -117,13 +111,7 @@
 
 		{#if isAdmin}
 			<div class="mt-6">
-				<Button
-					href={resolve('/admin/tournaments/new')}
-					variant="outline"
-					class="border-brass text-brass hover:bg-brass/10 hover:text-brass"
-				>
-					Create tournament
-				</Button>
+				<Button href={resolve('/admin/tournaments/new')} variant="brass">Create tournament</Button>
 			</div>
 		{/if}
 	{/if}

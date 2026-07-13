@@ -5,11 +5,11 @@ export type Role = 'unassigned' | 'participant' | 'admin' | 'owner';
 export function roleBadgeVariant(role: Role): BadgeVariant {
 	switch (role) {
 		case 'owner':
-			return 'default';
+			return 'brass';
 		case 'admin':
-			return 'secondary';
+			return 'fairway';
 		case 'participant':
-			return 'outline';
+			return 'sand';
 		default:
 			return 'outline';
 	}
