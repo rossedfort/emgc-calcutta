@@ -1,4 +1,4 @@
-export type Role = 'unassigned' | 'participant' | 'admin' | 'owner';
+import type { Role } from '$lib/roles';
 
 export interface UserRow {
 	id: string;
