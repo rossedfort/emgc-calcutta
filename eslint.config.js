@@ -12,7 +12,10 @@ export default ts.config(
 			'**/build/**',
 			'apps/web/.svelte-kit/**',
 			'apps/web/.vercel/**',
-			'supabase/.temp/**'
+			'supabase/.temp/**',
+			// Deno code — linted separately via `deno lint`/`deno check`, not
+			// this frontend config (see .claude/skills/emgc-calcutta-task-workflow).
+			'supabase/functions/**'
 		]
 	},
 	js.configs.recommended,

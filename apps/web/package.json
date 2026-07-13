@@ -5,6 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"dev:local": "vite dev",
+		"dev:prod": "vite dev --mode prod",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -31,6 +33,8 @@
 		"vite": "^8.0.16"
 	},
 	"dependencies": {
-		"@supabase/supabase-js": "^2.110.2"
+		"@supabase/ssr": "^0.12.0",
+		"@supabase/supabase-js": "^2.110.2",
+		"bits-ui": "^2.18.1"
 	}
 }
