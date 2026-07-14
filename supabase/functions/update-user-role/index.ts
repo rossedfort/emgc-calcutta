@@ -13,6 +13,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
+import { logAuditEvent, requestMetadata } from "../_shared/audit.ts";
 import type { Database } from "../_shared/database.ts";
 import { isAdminOrOwner, isAssignableRole } from "../_shared/roles.ts";
 
@@ -27,11 +28,18 @@ export default {
       const userId = body?.userId;
       const role = body?.role;
 
-      if (typeof userId !== "string" || typeof role !== "string" || !isAssignableRole(role)) {
-        return Response.json({ error: "Invalid userId or role" }, { status: 400 });
+      if (
+        typeof userId !== "string" || typeof role !== "string" ||
+        !isAssignableRole(role)
+      ) {
+        return Response.json({ error: "Invalid userId or role" }, {
+          status: 400,
+        });
       }
       if (userId === ctx.userClaims!.id) {
-        return Response.json({ error: "You cannot change your own role" }, { status: 400 });
+        return Response.json({ error: "You cannot change your own role" }, {
+          status: 400,
+        });
       }
 
       const { data: caller, error: callerError } = await ctx.supabaseAdmin
@@ -55,13 +63,17 @@ export default {
         return Response.json({ error: targetError.message }, { status: 404 });
       }
       if (target.role === "owner") {
-        return Response.json({ error: "Cannot change the Owner's role" }, { status: 403 });
+        return Response.json({ error: "Cannot change the Owner's role" }, {
+          status: 403,
+        });
       }
 
       const callerIsPlainAdmin = caller.role === "admin";
       const touchesAdmin = role === "admin" || target.role === "admin";
       if (callerIsPlainAdmin && touchesAdmin) {
-        return Response.json({ error: "Only the Owner can manage Admins" }, { status: 403 });
+        return Response.json({ error: "Only the Owner can manage Admins" }, {
+          status: 403,
+        });
       }
 
       const { data, error } = await ctx.supabaseAdmin
@@ -74,6 +86,19 @@ export default {
       if (error) {
         return Response.json({ error: error.message }, { status: 500 });
       }
+
+      const { ip, user_agent } = requestMetadata(req);
+      await logAuditEvent(ctx.supabaseAdmin, {
+        actor_id: ctx.userClaims!.id,
+        actor_identity: ctx.userClaims?.email ?? null,
+        action: "role_change",
+        entity_type: "User",
+        entity_id: userId,
+        before: { role: target.role },
+        after: { role: data.role },
+        ip,
+        user_agent,
+      });
 
       return Response.json({ user: data });
     },

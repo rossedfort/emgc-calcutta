@@ -1,7 +1,10 @@
 // Admin voids a bid with a required reason (spec 7: voids are soft,
-// logged, and reversible by an Owner — never a hard delete). AuditEvent
-// logging is deferred to Phase 5, same as every other state-changing
-// function built before it — the table doesn't exist yet.
+// logged, and reversible by an Owner — never a hard delete). Logs an
+// AuditEvent (Phase 5's review pass) — the void-after-close recompute
+// outcome, if any, rides along inside the same event's `after` payload
+// rather than a second event, since the void is the one action a human
+// took here; the recompute is a side effect of it, not a separate
+// decision.
 //
 // Scope of the void-after-close recompute, confirmed with the user
 // rather than assumed (the backlog explicitly flagged this as needing an
@@ -22,6 +25,7 @@ import { withSupabase } from "@supabase/server";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import { isAdminOrOwner } from "../_shared/roles.ts";
+import { logAuditEvent, requestMetadata } from "../_shared/audit.ts";
 import type { Database } from "../_shared/database.ts";
 import type {
   VoidBidRequest,
@@ -56,7 +60,7 @@ export default {
 
       const { data: bid, error: bidError } = await ctx.supabaseAdmin
         .from("bids")
-        .select("id, player_id, voided_at")
+        .select("id, player_id, voided_at, amount, players(tournament_id)")
         .eq("id", body.bidId)
         .maybeSingle();
       if (bidError) {
@@ -98,6 +102,7 @@ export default {
       }
 
       let recomputed = false;
+      let newWinningBidId: string | null = null;
       if (affectedLot) {
         const { data: newHighBid, error: newHighBidError } = await ctx
           .supabaseAdmin
@@ -135,7 +140,29 @@ export default {
         }
 
         recomputed = true;
+        newWinningBidId = newHighBid?.id ?? null;
       }
+
+      const { ip, user_agent } = requestMetadata(req);
+      await logAuditEvent(ctx.supabaseAdmin, {
+        tournament_id: bid.players?.tournament_id ?? null,
+        player_id: bid.player_id,
+        actor_id: ctx.userClaims!.id,
+        actor_identity: ctx.userClaims?.email ?? null,
+        action: "bid_voided",
+        entity_type: "Bid",
+        entity_id: bid.id,
+        reason: body.reason.trim(),
+        before: { voided_at: null, amount: bid.amount },
+        after: {
+          voided_at: voidedBid.voided_at,
+          void_reason: voidedBid.void_reason,
+          recomputed,
+          new_winning_bid_id: newWinningBidId,
+        },
+        ip,
+        user_agent,
+      });
 
       // voided_at/void_reason are typed nullable on the bids table in
       // general, but this select immediately follows the update that set

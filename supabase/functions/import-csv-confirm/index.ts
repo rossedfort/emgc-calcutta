@@ -6,13 +6,16 @@
 // constraint, the whole batch rolls back, matching "transactionally" in the
 // backlog without needing an explicit BEGIN/COMMIT.
 //
-// Does NOT log an AuditEvent yet — that table doesn't exist until Phase 5,
-// which explicitly includes a review pass to wire audit logging into every
-// state-changing Edge Function built before it, this one included.
+// Logs one AuditEvent for the whole batch (Phase 5's review pass), not
+// one per imported player — this is a single admin action even though it
+// writes many rows, and a summary event (with every created player's id
+// in `after`) is more useful for dispute resolution than N near-identical
+// log lines.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
+import { logAuditEvent, requestMetadata } from "../_shared/audit.ts";
 import type { Database } from "../_shared/database.ts";
 import { isAdminOrOwner } from "../_shared/roles.ts";
 import type {
@@ -112,6 +115,18 @@ export default {
           status: 400,
         });
       }
+
+      const { ip, user_agent } = requestMetadata(req);
+      await logAuditEvent(ctx.supabaseAdmin, {
+        tournament_id: body.tournamentId,
+        actor_id: ctx.userClaims!.id,
+        actor_identity: ctx.userClaims?.email ?? null,
+        action: "csv_import",
+        entity_type: "CSVImport",
+        after: { count: data.length, players: data },
+        ip,
+        user_agent,
+      });
 
       return Response.json(
         {
