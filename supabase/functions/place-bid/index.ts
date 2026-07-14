@@ -15,10 +15,18 @@
 // whether the caller can bid in THIS TOURNAMENT at all, not about which
 // specific player they're bidding on.
 //
-// Scope of this task: validation + a single Bid insert. Idempotency guard,
-// the atomic reserved-flip on threshold, and AuditEvent logging are
-// separate, later backlog tasks (AuditEvent's table doesn't exist until
-// Phase 5).
+// After a successful bid, conditionally flips the player to "reserved" if
+// the amount crosses the tournament's threshold. This is two sequential
+// writes (insert the Bid, then maybe update the Player), not a single
+// atomic DB transaction — matching spec 6.5's own description of place-bid
+// as a plain sequence within one Edge Function call, the same shape the
+// original Fastify design would have had. A crash between the two writes
+// could in theory leave a bid recorded without the reserved flip; revisit
+// with a transactional RPC if that ever proves to be a real problem.
+//
+// Idempotency guard and AuditEvent logging (for both the bid and the
+// reserve event) are separate, later backlog tasks — AuditEvent's table
+// doesn't exist until Phase 5.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
@@ -81,7 +89,9 @@ export default {
       const { data: tournament, error: tournamentError } = await ctx
         .supabaseAdmin
         .from("tournaments")
-        .select("silent_auction_start, silent_auction_end, min_increment")
+        .select(
+          "silent_auction_start, silent_auction_end, min_increment, threshold_amount",
+        )
         .eq("id", player.tournament_id)
         .maybeSingle();
       if (tournamentError) {
@@ -163,7 +173,25 @@ export default {
         });
       }
 
-      return Response.json({ bid });
+      // Crossing the threshold pulls the player from the silent pool and
+      // freezes further silent bidding on them (spec 4.3). `player.status`
+      // was already confirmed "open" above, so this is necessarily the
+      // first bid to cross it — no risk of double-reserving.
+      let reserved = false;
+      if (body.amount >= tournament.threshold_amount) {
+        const { error: reserveError } = await ctx.supabaseAdmin
+          .from("players")
+          .update({ status: "reserved" })
+          .eq("id", body.playerId);
+        if (reserveError) {
+          return Response.json({ error: reserveError.message }, {
+            status: 500,
+          });
+        }
+        reserved = true;
+      }
+
+      return Response.json({ bid, reserved });
     },
   ),
 };
