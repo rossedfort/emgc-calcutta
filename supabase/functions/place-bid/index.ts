@@ -24,9 +24,8 @@
 // could in theory leave a bid recorded without the reserved flip; revisit
 // with a transactional RPC if that ever proves to be a real problem.
 //
-// Idempotency guard and AuditEvent logging (for both the bid and the
-// reserve event) are separate, later backlog tasks — AuditEvent's table
-// doesn't exist until Phase 5.
+// AuditEvent logging (for both the bid and the reserve event) is a
+// separate, later backlog task — the table doesn't exist until Phase 5.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
@@ -132,6 +131,37 @@ export default {
           { error: "You're not entered in this tournament" },
           { status: 403 },
         );
+      }
+
+      // Idempotency guard: a double-click or a network retry re-submitting
+      // the exact same bid (same bidder, player, amount) within a few
+      // seconds shouldn't create a second Bid row. Runs *before* the
+      // current-high/increment check below — otherwise a same-amount
+      // resubmission would always get misread as "too low" (the first
+      // bid just became the new current high) instead of the accurate
+      // "you already did this" message. Doesn't guard rapid *different*-
+      // amount re-bids (e.g. quickly outbidding yourself after seeing a
+      // competing bid land) — that's legitimate.
+      const idempotencyCutoff = new Date(Date.now() - 5000).toISOString();
+      const { data: recentDuplicate, error: duplicateError } = await ctx
+        .supabaseAdmin
+        .from("bids")
+        .select("id")
+        .eq("player_id", body.playerId)
+        .eq("bidder_id", ctx.userClaims!.id)
+        .eq("amount", body.amount)
+        .gte("placed_at", idempotencyCutoff)
+        .limit(1)
+        .maybeSingle();
+      if (duplicateError) {
+        return Response.json({ error: duplicateError.message }, {
+          status: 500,
+        });
+      }
+      if (recentDuplicate) {
+        return Response.json({
+          error: "You just placed this bid — wait a moment before trying again",
+        }, { status: 409 });
       }
 
       const { data: highBid, error: highBidError } = await ctx.supabaseAdmin
