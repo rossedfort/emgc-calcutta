@@ -57,6 +57,7 @@
 					contact_email: row.contact_email,
 					contact_phone: row.contact_phone,
 					flight: row.flight,
+					handicap_index: row.handicap_index,
 					preferences: row.preferences,
 					photo_url: row.photo_url,
 					userId: keepLink[row.rowNumber] ? row.matchedUserId : null
@@ -122,6 +123,7 @@
 					<Table.Head>Name</Table.Head>
 					<Table.Head>Contact</Table.Head>
 					<Table.Head>Flight</Table.Head>
+					<Table.Head>Handicap</Table.Head>
 					<Table.Head>Match</Table.Head>
 					<Table.Head>Notes</Table.Head>
 				</Table.Row>
@@ -147,6 +149,7 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>{row.flight ?? '—'}</Table.Cell>
+						<Table.Cell class="font-data">{row.handicap_index ?? '—'}</Table.Cell>
 						<Table.Cell>
 							{#if row.matchedUserId}
 								<label class="flex items-center gap-2 text-sm">
