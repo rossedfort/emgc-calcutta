@@ -43,5 +43,28 @@ export const actions: Actions = {
 		if (updateError) {
 			return fail(400, { statusError: updateError.message });
 		}
+	},
+
+	// Separate from updateSettings/setStatus for the same reason those are
+	// separate from each other — a one-way action shouldn't ride along with
+	// unrelated form submissions. start_live_auction (the RPC) is the
+	// authoritative gate (silent auction must have already ended, and this
+	// can only run once) — this action just surfaces its error message.
+	startLiveAuction: async ({ params, locals: { supabase } }) => {
+		const { data: tournament, error: tournamentError } = await supabase
+			.from('tournaments')
+			.select('id')
+			.eq('slug', params.slug)
+			.maybeSingle();
+		if (tournamentError || !tournament) {
+			return fail(404, { liveAuctionError: tournamentError?.message ?? 'Tournament not found' });
+		}
+
+		const { error: rpcError } = await supabase.rpc('start_live_auction', {
+			tournament_id: tournament.id
+		});
+		if (rpcError) {
+			return fail(400, { liveAuctionError: rpcError.message });
+		}
 	}
 };

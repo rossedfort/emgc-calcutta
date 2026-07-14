@@ -99,6 +99,10 @@
 				variant="fairway">Silent auction</Button
 			>
 			<Button
+				href={resolve('/tournaments/[slug]/auction/live', { slug: tournament.slug })}
+				variant="brass">Live auction</Button
+			>
+			<Button
 				href={resolve('/tournaments/[slug]/players', { slug: tournament.slug })}
 				variant="brass">View the field</Button
 			>

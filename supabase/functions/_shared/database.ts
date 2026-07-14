@@ -89,6 +89,61 @@ export type Database = {
           },
         ];
       };
+      live_lots: {
+        Row: {
+          closed_at: string | null;
+          closes_at: string | null;
+          id: string;
+          opened_at: string | null;
+          player_id: string;
+          queue_position: number;
+          tournament_id: string;
+          winning_bid_id: string | null;
+        };
+        Insert: {
+          closed_at?: string | null;
+          closes_at?: string | null;
+          id?: string;
+          opened_at?: string | null;
+          player_id: string;
+          queue_position: number;
+          tournament_id: string;
+          winning_bid_id?: string | null;
+        };
+        Update: {
+          closed_at?: string | null;
+          closes_at?: string | null;
+          id?: string;
+          opened_at?: string | null;
+          player_id?: string;
+          queue_position?: number;
+          tournament_id?: string;
+          winning_bid_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "live_lots_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_lots_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_lots_winning_bid_id_fkey";
+            columns: ["winning_bid_id"];
+            isOneToOne: false;
+            referencedRelation: "bids";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       players: {
         Row: {
           contact_email: string | null;
@@ -158,6 +213,7 @@ export type Database = {
           created_at: string;
           id: string;
           kind: string;
+          live_auction_started_at: string | null;
           min_increment: number;
           name: string;
           payout_structure: Json;
@@ -172,6 +228,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           kind?: string;
+          live_auction_started_at?: string | null;
           min_increment: number;
           name: string;
           payout_structure?: Json;
@@ -186,6 +243,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           kind?: string;
+          live_auction_started_at?: string | null;
           min_increment?: number;
           name?: string;
           payout_structure?: Json;
@@ -235,12 +293,27 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      close_live_lot: { Args: { lot_id: string }; Returns: undefined };
       close_silent_auctions: { Args: never; Returns: undefined };
       current_user_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      enqueue_player_for_live_auction: {
+        Args: { p_player_id: string; p_tournament_id: string };
+        Returns: undefined;
+      };
+      open_live_lot: { Args: { lot_id: string }; Returns: undefined };
+      resequence_queue: {
+        Args: { p_ordered_lot_ids: string[]; p_tournament_id: string };
+        Returns: undefined;
+      };
       slugify: { Args: { input: string }; Returns: string };
+      start_live_auction: { Args: { tournament_id: string }; Returns: undefined };
+      swap_queue_position: {
+        Args: { lot_a: string; lot_b: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       auth_provider: "google" | "azure" | "apple";
