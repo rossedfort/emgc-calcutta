@@ -95,6 +95,7 @@ export type Database = {
           contact_phone: string | null;
           created_at: string;
           flight: string | null;
+          handicap_index: number | null;
           id: string;
           name: string;
           photo_url: string | null;
@@ -109,6 +110,7 @@ export type Database = {
           contact_phone?: string | null;
           created_at?: string;
           flight?: string | null;
+          handicap_index?: number | null;
           id?: string;
           name: string;
           photo_url?: string | null;
@@ -123,6 +125,7 @@ export type Database = {
           contact_phone?: string | null;
           created_at?: string;
           flight?: string | null;
+          handicap_index?: number | null;
           id?: string;
           name?: string;
           photo_url?: string | null;
