@@ -290,11 +290,13 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      close_live_lot: { Args: { lot_id: string }; Returns: undefined };
       close_silent_auctions: { Args: never; Returns: undefined };
       current_user_role: {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      open_live_lot: { Args: { lot_id: string }; Returns: undefined };
       slugify: { Args: { input: string }; Returns: string };
       swap_queue_position: {
         Args: { lot_a: string; lot_b: string };

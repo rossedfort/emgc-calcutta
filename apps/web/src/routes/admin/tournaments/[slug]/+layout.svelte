@@ -44,6 +44,13 @@
 				false
 			)}>Live auction queue</a
 		>
+		<a
+			href={resolve('/admin/tournaments/[slug]/auction/live', { slug: data.tournament.slug })}
+			class={tabClass(
+				resolve('/admin/tournaments/[slug]/auction/live', { slug: data.tournament.slug }),
+				false
+			)}>Live auction</a
+		>
 	</nav>
 
 	{@render children()}
