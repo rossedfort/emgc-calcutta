@@ -64,7 +64,7 @@
 		<div class="mt-4 border-t border-brass/40"></div>
 
 		<div class="mt-4 flex items-center gap-2 text-sm">
-			<span class={['inline-block size-2 rounded-full', state.live ? 'bg-flag' : 'bg-brass/60']}
+			<span class={['inline-block size-2 rounded-full', state.live ? 'bg-fairway' : 'bg-brass/60']}
 			></span>
 			<span>{state.label}</span>
 		</div>
@@ -94,6 +94,10 @@
 		</div>
 
 		<div class="mt-6 flex items-center gap-2">
+			<Button
+				href={resolve('/tournaments/[slug]/auction/silent', { slug: tournament.slug })}
+				variant="fairway">Silent auction</Button
+			>
 			<Button
 				href={resolve('/tournaments/[slug]/players', { slug: tournament.slug })}
 				variant="brass">View the field</Button

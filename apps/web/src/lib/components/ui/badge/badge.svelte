@@ -14,7 +14,8 @@
 				link: 'text-primary underline-offset-4 hover:underline',
 				brass: 'bg-brass text-scorecard [a]:hover:bg-brass/80',
 				fairway: 'bg-fairway text-scorecard [a]:hover:bg-fairway/80',
-				sand: 'bg-sand text-ink [a]:hover:bg-sand/80'
+				sand: 'bg-sand text-ink [a]:hover:bg-sand/80',
+				flag: 'bg-flag text-scorecard [a]:hover:bg-flag/80'
 			}
 		},
 		defaultVariants: {
