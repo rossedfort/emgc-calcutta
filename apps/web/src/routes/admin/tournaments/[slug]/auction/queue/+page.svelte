@@ -72,8 +72,8 @@
 		</div>
 		{#if data.queue.length === 0}
 			<p class="text-sm text-muted-foreground">
-				No players queued yet — players are added automatically as they cross the reserve
-				threshold during the silent auction.
+				No players queued yet — players are added automatically as they cross the reserve threshold
+				during the silent auction.
 			</p>
 		{:else}
 			<Table.Root>
