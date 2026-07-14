@@ -41,6 +41,66 @@ export type Database = {
   };
   public: {
     Tables: {
+      audit_events: {
+        Row: {
+          action: string;
+          actor_id: string | null;
+          after: Json | null;
+          before: Json | null;
+          created_at: string;
+          entity_id: string | null;
+          entity_type: string;
+          id: string;
+          ip: string | null;
+          reason: string | null;
+          tournament_id: string | null;
+          user_agent: string | null;
+        };
+        Insert: {
+          action: string;
+          actor_id?: string | null;
+          after?: Json | null;
+          before?: Json | null;
+          created_at?: string;
+          entity_id?: string | null;
+          entity_type: string;
+          id?: string;
+          ip?: string | null;
+          reason?: string | null;
+          tournament_id?: string | null;
+          user_agent?: string | null;
+        };
+        Update: {
+          action?: string;
+          actor_id?: string | null;
+          after?: Json | null;
+          before?: Json | null;
+          created_at?: string;
+          entity_id?: string | null;
+          entity_type?: string;
+          id?: string;
+          ip?: string | null;
+          reason?: string | null;
+          tournament_id?: string | null;
+          user_agent?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_actor_id_fkey";
+            columns: ["actor_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "audit_events_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       bids: {
         Row: {
           amount: number;
