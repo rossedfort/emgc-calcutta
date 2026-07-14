@@ -43,9 +43,9 @@
 // leave a bid recorded without the reserved flip; revisit with a
 // transactional RPC if that ever proves to be a real problem.
 //
-// Doesn't yet set/reset live_lots.closes_at (the anti-snipe countdown) on
-// a new live bid — that's the next backlog task, deliberately not bundled
-// into this one.
+// Every live bid also resets live_lots.closes_at, the anti-snipe
+// countdown (spec 4.4/182) — see the comment at that block below for the
+// exact semantics.
 //
 // AuditEvent logging (for both the bid and the reserve event) is a
 // separate, later backlog task — the table doesn't exist until Phase 5.
@@ -122,7 +122,7 @@ export default {
         .supabaseAdmin
         .from("tournaments")
         .select(
-          "silent_auction_start, silent_auction_end, min_increment, threshold_amount",
+          "silent_auction_start, silent_auction_end, min_increment, threshold_amount, anti_snipe_seconds",
         )
         .eq("id", player.tournament_id)
         .maybeSingle();
@@ -137,6 +137,7 @@ export default {
         });
       }
 
+      let liveLotId: string | undefined;
       if (phase === "silent") {
         const now = new Date();
         if (
@@ -167,6 +168,7 @@ export default {
             { status: 400 },
           );
         }
+        liveLotId = liveLot.id;
       }
 
       // Bid eligibility is 1:1 with this tournament's Player roster (spec
@@ -277,6 +279,32 @@ export default {
           });
         }
         reserved = true;
+      }
+
+      // Anti-snipe (spec 4.4/182): every live bid resets the lot's
+      // countdown to the full window, not just bids landing near expiry —
+      // "a 15-second bid window resets to 15 seconds on any new bid" is
+      // the spec's own phrasing. anti_snipe_seconds <= 0 means the
+      // tournament has the feature disabled (spec: "can be disabled if a
+      // human auctioneer is calling it live"), so closes_at is left alone
+      // in that case rather than being set to a meaningless "now".
+      // live_lots is already in the Realtime publication (see the
+      // create_live_lots migration), so this update reaches connected
+      // clients the same way any other lot change does — no separate
+      // broadcast needed.
+      if (phase === "live" && tournament.anti_snipe_seconds > 0) {
+        const closesAt = new Date(
+          Date.now() + tournament.anti_snipe_seconds * 1000,
+        ).toISOString();
+        const { error: closesAtError } = await ctx.supabaseAdmin
+          .from("live_lots")
+          .update({ closes_at: closesAt })
+          .eq("id", liveLotId!);
+        if (closesAtError) {
+          return Response.json({ error: closesAtError.message }, {
+            status: 500,
+          });
+        }
       }
 
       return Response.json({ bid, reserved } satisfies PlaceBidResponse);
