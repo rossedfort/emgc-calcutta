@@ -1,6 +1,23 @@
-// Validates and records a silent-auction bid. Live-phase bidding (spec
-// 4.4) is a later Phase 4 task that reuses this same function scoped to
-// phase: live — this only handles phase: silent for now.
+// Validates and records a bid, silent or live (spec 4.3/4.4). Which phase
+// applies is derived from the player's own current status, not a
+// client-supplied field — same "read current state, don't trust the
+// caller" philosophy as every other check in this function (roster
+// membership, current high bid, idempotency):
+//   status "open"     -> silent phase, gated by the tournament's
+//                        silent_auction_start/end window
+//   status "reserved" -> live phase, gated by that player having a
+//                        currently-open live_lots row (opened_at set,
+//                        closed_at null) — see the admin queue UI
+//                        migration for how a lot gets opened
+//   anything else      -> rejected outright, neither phase applies
+//
+// The current-high-bid lookup below is intentionally NOT filtered by
+// phase — confirmed with the user rather than assumed: the silent bid
+// that crossed the threshold and got a player reserved carries over as
+// the live auction's opening floor, so the first live bid must still
+// beat it by the minimum increment, same as any other new-high-bid
+// check. This falls out for free by *not* scoping that query to the
+// current phase, rather than needing special-case logic.
 //
 // Per spec 6.5, this is the canonical place-bid pattern: read current
 // state, validate, write — a single Edge Function call, not a DB-level
@@ -15,14 +32,20 @@
 // whether the caller can bid in THIS TOURNAMENT at all, not about which
 // specific player they're bidding on.
 //
-// After a successful bid, conditionally flips the player to "reserved" if
-// the amount crosses the tournament's threshold. This is two sequential
-// writes (insert the Bid, then maybe update the Player), not a single
-// atomic DB transaction — matching spec 6.5's own description of place-bid
-// as a plain sequence within one Edge Function call, the same shape the
-// original Fastify design would have had. A crash between the two writes
-// could in theory leave a bid recorded without the reserved flip; revisit
-// with a transactional RPC if that ever proves to be a real problem.
+// After a successful silent bid, conditionally flips the player to
+// "reserved" if the amount crosses the tournament's threshold — a
+// silent-only concept, so live bids never trigger it (reserved is already
+// where they started). This is two sequential writes (insert the Bid,
+// then maybe update the Player), not a single atomic DB transaction —
+// matching spec 6.5's own description of place-bid as a plain sequence
+// within one Edge Function call, the same shape the original Fastify
+// design would have had. A crash between the two writes could in theory
+// leave a bid recorded without the reserved flip; revisit with a
+// transactional RPC if that ever proves to be a real problem.
+//
+// Doesn't yet set/reset live_lots.closes_at (the anti-snipe countdown) on
+// a new live bid — that's the next backlog task, deliberately not bundled
+// into this one.
 //
 // AuditEvent logging (for both the bid and the reserve event) is a
 // separate, later backlog task — the table doesn't exist until Phase 5.
@@ -82,9 +105,15 @@ export default {
       if (!player) {
         return Response.json({ error: "Player not found" }, { status: 404 });
       }
-      if (player.status !== "open") {
+
+      let phase: "silent" | "live";
+      if (player.status === "open") {
+        phase = "silent";
+      } else if (player.status === "reserved") {
+        phase = "live";
+      } else {
         return Response.json(
-          { error: "This player isn't open for silent bidding" },
+          { error: "This player isn't open for bidding" },
           { status: 400 },
         );
       }
@@ -108,14 +137,36 @@ export default {
         });
       }
 
-      const now = new Date();
-      if (
-        now < new Date(tournament.silent_auction_start) ||
-        now > new Date(tournament.silent_auction_end)
-      ) {
-        return Response.json({ error: "The silent auction isn't open" }, {
-          status: 400,
-        });
+      if (phase === "silent") {
+        const now = new Date();
+        if (
+          now < new Date(tournament.silent_auction_start) ||
+          now > new Date(tournament.silent_auction_end)
+        ) {
+          return Response.json({ error: "The silent auction isn't open" }, {
+            status: 400,
+          });
+        }
+      } else {
+        const { data: liveLot, error: liveLotError } = await ctx.supabaseAdmin
+          .from("live_lots")
+          .select("id")
+          .eq("tournament_id", player.tournament_id)
+          .eq("player_id", body.playerId)
+          .not("opened_at", "is", null)
+          .is("closed_at", null)
+          .maybeSingle();
+        if (liveLotError) {
+          return Response.json({ error: liveLotError.message }, {
+            status: 500,
+          });
+        }
+        if (!liveLot) {
+          return Response.json(
+            { error: "This player's live lot isn't open for bidding" },
+            { status: 400 },
+          );
+        }
       }
 
       // Bid eligibility is 1:1 with this tournament's Player roster (spec
@@ -197,7 +248,7 @@ export default {
           player_id: body.playerId,
           bidder_id: ctx.userClaims!.id,
           amount: body.amount,
-          phase: "silent",
+          phase,
         })
         .select("id, amount, phase, placed_at")
         .single();
@@ -208,11 +259,14 @@ export default {
       }
 
       // Crossing the threshold pulls the player from the silent pool and
-      // freezes further silent bidding on them (spec 4.3). `player.status`
-      // was already confirmed "open" above, so this is necessarily the
-      // first bid to cross it — no risk of double-reserving.
+      // freezes further silent bidding on them (spec 4.3) — a silent-only
+      // concept, so this never runs for live bids: a live-phase player is
+      // already "reserved", the very status this flip moves *into*.
+      // `player.status` was already confirmed "open" above for the silent
+      // branch, so this is necessarily the first bid to cross it — no risk
+      // of double-reserving.
       let reserved = false;
-      if (body.amount >= tournament.threshold_amount) {
+      if (phase === "silent" && body.amount >= tournament.threshold_amount) {
         const { error: reserveError } = await ctx.supabaseAdmin
           .from("players")
           .update({ status: "reserved" })
