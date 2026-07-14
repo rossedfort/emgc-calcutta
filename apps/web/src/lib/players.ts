@@ -21,7 +21,7 @@ export const PLAYER_STATUSES = ['open', 'reserved', 'sold_silent', 'sold_live', 
 export function playerStatusBadgeVariant(status: Player['status']): BadgeVariant {
 	switch (status) {
 		case 'reserved':
-			return 'brass';
+			return 'flag';
 		case 'sold_silent':
 		case 'sold_live':
 			return 'fairway';

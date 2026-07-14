@@ -17,7 +17,8 @@
 				destructive:
 					'bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30',
 				link: 'text-primary underline-offset-4 hover:underline',
-				brass: 'border-brass text-brass bg-transparent hover:bg-brass/10 aria-expanded:bg-brass/10'
+				brass: 'border-brass text-brass bg-transparent hover:bg-brass/10 aria-expanded:bg-brass/10',
+				fairway: 'bg-fairway text-scorecard [a]:hover:bg-fairway/85 aria-expanded:bg-fairway/85'
 			},
 			size: {
 				default:
