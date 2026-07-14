@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import * as Table from '$lib/components/ui/table';
@@ -69,7 +70,15 @@
 			<Table.Body>
 				{#each filteredPlayers as player (player.id)}
 					<Table.Row>
-						<Table.Cell class="font-medium text-ink">{player.name}</Table.Cell>
+						<Table.Cell class="font-medium text-ink">
+							<a
+								href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+									slug: data.tournament.slug,
+									playerSlug: player.slug
+								})}
+								class="hover:underline">{player.name}</a
+							>
+						</Table.Cell>
 						<Table.Cell>{player.flight ?? '—'}</Table.Cell>
 						<Table.Cell>
 							<Badge variant={playerStatusBadgeVariant(player.status)}>
