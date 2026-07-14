@@ -12,6 +12,7 @@
 		contact_email: '',
 		contact_phone: '',
 		flight: '',
+		handicap_index: '',
 		preferences: ''
 	};
 </script>

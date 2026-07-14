@@ -1,4 +1,4 @@
-import type { RealtimeBid } from '$lib/stores/realtime';
+import type { RealtimeBid } from '@emgc-calcutta/shared-types';
 
 // Colocated with the Bid domain, following the same pattern as
 // playerStatusBadgeVariant in $lib/players.ts. The current high bid for a

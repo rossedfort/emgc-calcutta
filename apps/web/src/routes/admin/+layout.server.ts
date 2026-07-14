@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import type { WhoamiResponse } from '@emgc-calcutta/shared-types';
 import type { LayoutServerLoad } from './$types';
 
 // Shared guard for every Admin/Owner-only page (see the "more admin-only
@@ -12,10 +13,10 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase } }) 
 		redirect(303, '/login');
 	}
 
-	const { data, error } = await supabase.functions.invoke<{ role: string }>('whoami');
+	const { data, error } = await supabase.functions.invoke<WhoamiResponse>('whoami');
 	if (error || !data || (data.role !== 'admin' && data.role !== 'owner')) {
 		redirect(303, '/');
 	}
 
-	return { role: data.role as 'admin' | 'owner' };
+	return { role: data.role };
 };

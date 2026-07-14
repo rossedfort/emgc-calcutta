@@ -1,22 +1,12 @@
+import { Constants, type Tables } from '@emgc-calcutta/shared-types';
 import type { BadgeVariant } from '$lib/components/ui/badge';
 
-// No generated Supabase types in this project yet (see spec 6.8) — this is
-// just enough of the shape of public.players for both the participant-facing
-// routes under /tournaments and the admin routes under /admin/tournaments.
-export interface Player {
-	id: string;
-	slug: string;
-	name: string;
-	contact_email: string | null;
-	contact_phone: string | null;
-	preferences: string | null;
-	photo_url: string | null;
-	flight: string | null;
-	status: 'open' | 'reserved' | 'sold_silent' | 'sold_live' | 'no_bid';
-	user_id: string | null;
-}
+// The full generated Row shape, not a hand-picked subset — used for both
+// the participant-facing routes under /tournaments and the admin routes
+// under /admin/tournaments.
+export type Player = Tables<'players'>;
 
-export const PLAYER_STATUSES = ['open', 'reserved', 'sold_silent', 'sold_live', 'no_bid'] as const;
+export const PLAYER_STATUSES = Constants.public.Enums.player_status;
 
 export function playerStatusBadgeVariant(status: Player['status']): BadgeVariant {
 	switch (status) {

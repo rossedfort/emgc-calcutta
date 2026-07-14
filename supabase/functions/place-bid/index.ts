@@ -31,6 +31,10 @@ import { withSupabase } from "@supabase/server";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import type { Database } from "../_shared/database.ts";
+import type {
+  PlaceBidRequest,
+  PlaceBidResponse,
+} from "../_shared/contracts/place-bid.ts";
 
 export default {
   fetch: withSupabase<Database>(
@@ -53,7 +57,7 @@ export default {
       }
 
       const body = await req.json().catch(() => null) as
-        | { playerId?: string; amount?: number }
+        | Partial<PlaceBidRequest>
         | null;
       if (!body?.playerId || typeof body.amount !== "number") {
         return Response.json(
@@ -221,7 +225,7 @@ export default {
         reserved = true;
       }
 
-      return Response.json({ bid, reserved });
+      return Response.json({ bid, reserved } satisfies PlaceBidResponse);
     },
   ),
 };

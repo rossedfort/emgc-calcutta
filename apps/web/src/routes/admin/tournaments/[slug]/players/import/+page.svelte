@@ -1,22 +1,16 @@
 <script lang="ts">
+	import type { ImportCsvPreviewResponse } from '@emgc-calcutta/shared-types';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import type { PreviewRow } from './+page.server';
 
 	let { data, form } = $props();
 
-	interface PreviewPayload {
-		rows: PreviewRow[];
-		validCount: number;
-		errorCount: number;
-	}
-
 	let step = $state<'upload' | 'preview' | 'done'>('upload');
-	let previewData = $state<PreviewPayload | null>(null);
+	let previewData = $state<ImportCsvPreviewResponse | null>(null);
 	let importedCount = $state(0);
 
 	// Per-row checkbox state, seeded whenever a new preview payload arrives —
@@ -32,7 +26,7 @@
 				// this effect also writes) — reading the state var back inside the
 				// same effect that assigns it re-triggers the effect on its own
 				// write, causing an infinite loop (effect_update_depth_exceeded).
-				const nextPreview = form.preview as PreviewPayload;
+				const nextPreview = form.preview as ImportCsvPreviewResponse;
 				const nextIncluded: Record<number, boolean> = {};
 				const nextKeepLink: Record<number, boolean> = {};
 				for (const row of nextPreview.rows) {
@@ -63,6 +57,7 @@
 					contact_email: row.contact_email,
 					contact_phone: row.contact_phone,
 					flight: row.flight,
+					handicap_index: row.handicap_index,
 					preferences: row.preferences,
 					photo_url: row.photo_url,
 					userId: keepLink[row.rowNumber] ? row.matchedUserId : null
@@ -128,6 +123,7 @@
 					<Table.Head>Name</Table.Head>
 					<Table.Head>Contact</Table.Head>
 					<Table.Head>Flight</Table.Head>
+					<Table.Head>Handicap</Table.Head>
 					<Table.Head>Match</Table.Head>
 					<Table.Head>Notes</Table.Head>
 				</Table.Row>
@@ -153,6 +149,7 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>{row.flight ?? '—'}</Table.Cell>
+						<Table.Cell class="font-data">{row.handicap_index ?? '—'}</Table.Cell>
 						<Table.Cell>
 							{#if row.matchedUserId}
 								<label class="flex items-center gap-2 text-sm">
