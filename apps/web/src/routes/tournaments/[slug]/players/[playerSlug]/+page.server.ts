@@ -2,6 +2,21 @@ import { error, redirect } from '@sveltejs/kit';
 import type { Player } from '$lib/players';
 import type { PageServerLoad } from './$types';
 
+export type PlayerProfile = Pick<
+	Player,
+	| 'id'
+	| 'slug'
+	| 'name'
+	| 'contact_email'
+	| 'contact_phone'
+	| 'preferences'
+	| 'photo_url'
+	| 'flight'
+	| 'handicap_index'
+	| 'status'
+	| 'user_id'
+>;
+
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
 	if (!session) {
 		redirect(303, '/login');
@@ -25,7 +40,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	const { data: player, error: playerError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, name, contact_email, contact_phone, preferences, photo_url, flight, status, user_id'
+			'id, slug, name, contact_email, contact_phone, preferences, photo_url, flight, handicap_index, status, user_id'
 		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
@@ -54,7 +69,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	return {
 		tournament,
-		player: player as Player,
+		player: player as PlayerProfile,
 		linkedUserName,
 		isYou: player.user_id === session.user.id
 	};
