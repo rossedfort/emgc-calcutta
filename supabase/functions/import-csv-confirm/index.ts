@@ -88,6 +88,7 @@ export default {
         contact_email: row.contact_email || null,
         contact_phone: row.contact_phone || null,
         flight: row.flight || null,
+        handicap_index: row.handicap_index ?? null,
         preferences: row.preferences || null,
         photo_url: row.photo_url || null,
         user_id: row.userId || null,

@@ -13,6 +13,7 @@ export interface ImportCsvPreviewRow {
   contact_email: string | null;
   contact_phone: string | null;
   flight: string | null;
+  handicap_index: number | null;
   preferences: string | null;
   photo_url: string | null;
   errors: string[];

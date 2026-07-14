@@ -15,12 +15,13 @@ import type {
   ImportCsvPreviewRow,
 } from "../_shared/contracts/import-csv-preview.ts";
 
-// CSV headers accepted for each Player field (spec 4.2 lists "tee time /
-// group", "handicap", and "starting bid" too, but none of those map to a
-// Player column — see spec 5's actual data model — so they're not
-// recognized here; a "notes/preferences" column can carry that info as free
-// text if an Admin wants it captured, and starting bid has nowhere to go
-// until Phase 3's Bid table exists).
+// CSV headers accepted for each Player field (spec 4.2 also lists "tee
+// time / group" and "starting bid", but neither maps to a Player column —
+// see spec 5's actual data model — so they're not recognized here; a
+// "notes/preferences" column can carry that info as free text if an Admin
+// wants it captured, and starting bid has nowhere to go until Phase 3's
+// Bid table exists. "handicap" maps to handicap_index — Phase 3.5 added
+// that column specifically to close this gap).
 const HEADER_ALIASES: Record<string, string> = {
   "name": "name",
   "contact_email": "contact_email",
@@ -28,6 +29,10 @@ const HEADER_ALIASES: Record<string, string> = {
   "contact_phone": "contact_phone",
   "phone": "contact_phone",
   "flight": "flight",
+  "handicap": "handicap_index",
+  "handicap_index": "handicap_index",
+  "handicap index": "handicap_index",
+  "hcp": "handicap_index",
   "preferences": "preferences",
   "notes": "preferences",
   "notes/preferences": "preferences",
@@ -108,6 +113,24 @@ export default {
         return value ? value : null;
       };
 
+      // Unlike the other fields, an unparseable handicap is a row error
+      // rather than silently dropped — an Admin reviewing the preview
+      // should see that something in the CSV didn't look like a number,
+      // not just find handicap_index quietly blank after import.
+      const getHandicap = (
+        row: Record<string, string>,
+        errors: string[],
+      ): number | null => {
+        const raw = getField(row, "handicap_index");
+        if (raw === null) return null;
+        const value = Number(raw);
+        if (!Number.isFinite(value)) {
+          errors.push("Handicap must be a number");
+          return null;
+        }
+        return value;
+      };
+
       const emails = parsed.data
         .map((row: Record<string, string>) =>
           getField(row, "contact_email")?.toLowerCase()
@@ -135,6 +158,7 @@ export default {
         const name = getField(row, "name");
         const errors: string[] = [];
         if (!name) errors.push("Name is required");
+        const handicap_index = getHandicap(row, errors);
 
         const contact_email = getField(row, "contact_email");
         const matchedUser = contact_email
@@ -147,6 +171,7 @@ export default {
           contact_email,
           contact_phone: getField(row, "contact_phone"),
           flight: getField(row, "flight"),
+          handicap_index,
           preferences: getField(row, "preferences"),
           photo_url: getField(row, "photo_url"),
           errors,
