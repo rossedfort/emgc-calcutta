@@ -1,8 +1,6 @@
-// Every Edge Function in this project returns this same shape on failure
-// (400/403/404/409/500 — see each function's own comments for which
-// statuses it uses and why). Useful for typing a manually-parsed error
-// body, e.g. `await (error as FunctionsHttpError).context.json()` after a
-// non-2xx `supabase.functions.invoke(...)` response.
-export interface ErrorResponse {
-	error: string;
-}
+// Canonical copy lives under supabase/functions/_shared/contracts — see
+// that directory's files and packages/shared-types/src/database.ts's
+// header comment for why (the Supabase edge runtime can't reach outside
+// supabase/, so Edge Functions need their own copy; apps/web has no such
+// sandboxing and re-exports from there instead of the other way around).
+export * from '../../../../supabase/functions/_shared/contracts/common';

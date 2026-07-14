@@ -9,19 +9,11 @@ import Papa from "papaparse";
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import type { Database } from "../_shared/database.ts";
 import { isAdminOrOwner } from "../_shared/roles.ts";
-
-interface PreviewRow {
-  rowNumber: number;
-  name: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  flight: string | null;
-  preferences: string | null;
-  photo_url: string | null;
-  errors: string[];
-  matchedUserId: string | null;
-  matchedUserEmail: string | null;
-}
+import type {
+  ImportCsvPreviewRequest,
+  ImportCsvPreviewResponse,
+  ImportCsvPreviewRow,
+} from "../_shared/contracts/import-csv-preview.ts";
 
 // CSV headers accepted for each Player field (spec 4.2 lists "tee time /
 // group", "handicap", and "starting bid" too, but none of those map to a
@@ -65,7 +57,7 @@ export default {
       }
 
       const body = await req.json().catch(() => null) as
-        | { tournamentId?: string; csv?: string }
+        | Partial<ImportCsvPreviewRequest>
         | null;
       if (!body?.tournamentId || typeof body.csv !== "string") {
         return Response.json(
@@ -136,7 +128,7 @@ export default {
         (matchingUsers ?? []).map((u) => [u.email.toLowerCase(), u]),
       );
 
-      const rows: PreviewRow[] = parsed.data.map((
+      const rows: ImportCsvPreviewRow[] = parsed.data.map((
         row: Record<string, string>,
         index: number,
       ) => {
@@ -163,11 +155,13 @@ export default {
         };
       });
 
-      return Response.json({
-        rows,
-        validCount: rows.filter((r) => r.errors.length === 0).length,
-        errorCount: rows.filter((r) => r.errors.length > 0).length,
-      });
+      return Response.json(
+        {
+          rows,
+          validCount: rows.filter((r) => r.errors.length === 0).length,
+          errorCount: rows.filter((r) => r.errors.length > 0).length,
+        } satisfies ImportCsvPreviewResponse,
+      );
     },
   ),
 };

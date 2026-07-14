@@ -15,16 +15,10 @@ import { withSupabase } from "@supabase/server";
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import type { Database } from "../_shared/database.ts";
 import { isAdminOrOwner } from "../_shared/roles.ts";
-
-interface ConfirmedRow {
-  name?: string;
-  contact_email?: string | null;
-  contact_phone?: string | null;
-  flight?: string | null;
-  preferences?: string | null;
-  photo_url?: string | null;
-  userId?: string | null;
-}
+import type {
+  ImportCsvConfirmRequest,
+  ImportCsvConfirmResponse,
+} from "../_shared/contracts/import-csv-confirm.ts";
 
 export default {
   fetch: withSupabase<Database>(
@@ -43,7 +37,7 @@ export default {
       }
 
       const body = await req.json().catch(() => null) as
-        | { tournamentId?: string; rows?: ConfirmedRow[] }
+        | Partial<ImportCsvConfirmRequest>
         | null;
       if (!body?.tournamentId || !Array.isArray(body.rows)) {
         return Response.json(
@@ -118,7 +112,12 @@ export default {
         });
       }
 
-      return Response.json({ count: data.length, players: data });
+      return Response.json(
+        {
+          count: data.length,
+          players: data,
+        } satisfies ImportCsvConfirmResponse,
+      );
     },
   ),
 };

@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
+	import type {
+		ErrorResponse,
+		PlaceBidRequest,
+		PlaceBidResponse,
+		RealtimeBid,
+		RealtimePlayer
+	} from '@emgc-calcutta/shared-types';
 	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -8,11 +15,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
 	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
-	import {
-		createTournamentRealtime,
-		type RealtimeBid,
-		type RealtimePlayer
-	} from '$lib/stores/realtime';
+	import { createTournamentRealtime } from '$lib/stores/realtime';
 
 	let { data } = $props();
 
@@ -110,9 +113,10 @@
 		bidPending[playerId] = true;
 		bidErrors[playerId] = '';
 
-		const { error: invokeError } = await data.supabase.functions.invoke('place-bid', {
-			body: { playerId, amount }
-		});
+		const { error: invokeError } = await data.supabase.functions.invoke<PlaceBidResponse>(
+			'place-bid',
+			{ body: { playerId, amount } satisfies PlaceBidRequest }
+		);
 
 		bidPending[playerId] = false;
 
@@ -123,7 +127,7 @@
 			// otherwise.
 			let message = invokeError.message;
 			if (invokeError instanceof FunctionsHttpError) {
-				const body = await invokeError.context.json().catch(() => null);
+				const body = (await invokeError.context.json().catch(() => null)) as ErrorResponse | null;
 				message = body?.error ?? message;
 			}
 			bidErrors[playerId] = message;

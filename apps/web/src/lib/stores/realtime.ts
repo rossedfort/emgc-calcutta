@@ -1,20 +1,6 @@
 import { get, writable, type Readable } from 'svelte/store';
 import type { SupabaseClient } from '@supabase/supabase-js';
-
-export interface RealtimeBid {
-	id: string;
-	player_id: string;
-	bidder_id: string;
-	amount: number;
-	phase: string;
-	placed_at: string;
-	voided_at: string | null;
-}
-
-export interface RealtimePlayer {
-	id: string;
-	status: string;
-}
+import type { Database, RealtimeBid, RealtimePlayer } from '@emgc-calcutta/shared-types';
 
 export interface TournamentRealtime {
 	bids: Readable<RealtimeBid[]>;
@@ -32,7 +18,7 @@ export interface TournamentRealtime {
 // than a separately-written reconnect handler that could drift out of sync
 // with it.
 export function createTournamentRealtime(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient<Database>,
 	tournamentId: string
 ): TournamentRealtime {
 	const bids = writable<RealtimeBid[]>([]);

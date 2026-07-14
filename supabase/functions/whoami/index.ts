@@ -8,6 +8,7 @@ import { withSupabase } from "@supabase/server";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import type { Database } from "../_shared/database.ts";
+import type { WhoamiResponse } from "../_shared/contracts/whoami.ts";
 
 export default {
   fetch: withSupabase<Database>(
@@ -26,7 +27,9 @@ export default {
         return Response.json({ error: error.message }, { status: 500 });
       }
 
-      return Response.json({ id: ctx.userClaims!.id, role: data.role });
+      return Response.json(
+        { id: ctx.userClaims!.id, role: data.role } satisfies WhoamiResponse,
+      );
     },
   ),
 };

@@ -1,5 +1,12 @@
 import { fail } from '@sveltejs/kit';
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import type {
+	ErrorResponse,
+	ImportCsvConfirmRequest,
+	ImportCsvConfirmResponse,
+	ImportCsvPreviewRequest,
+	ImportCsvPreviewResponse
+} from '@emgc-calcutta/shared-types';
 import type { Actions } from './$types';
 
 // supabase-js's invoke() wraps any non-2xx response in a FunctionsHttpError
@@ -8,23 +15,10 @@ import type { Actions } from './$types';
 // reachable via .context (the raw Response).
 async function extractFunctionError(error: unknown, fallback: string): Promise<string> {
 	if (error instanceof FunctionsHttpError) {
-		const body = await error.context.json().catch(() => null);
+		const body = (await error.context.json().catch(() => null)) as ErrorResponse | null;
 		if (body?.error) return body.error;
 	}
 	return error instanceof Error ? error.message : fallback;
-}
-
-export interface PreviewRow {
-	rowNumber: number;
-	name: string | null;
-	contact_email: string | null;
-	contact_phone: string | null;
-	flight: string | null;
-	preferences: string | null;
-	photo_url: string | null;
-	errors: string[];
-	matchedUserId: string | null;
-	matchedUserEmail: string | null;
 }
 
 // No own `load` — the tournament comes from the [slug] layout's load, merged
@@ -48,11 +42,10 @@ export const actions: Actions = {
 
 		const csv = await file.text();
 
-		const { data, error: invokeError } = await supabase.functions.invoke<{
-			rows: PreviewRow[];
-			validCount: number;
-			errorCount: number;
-		}>('import-csv-preview', { body: { tournamentId: tournament.id, csv } });
+		const { data, error: invokeError } = await supabase.functions.invoke<ImportCsvPreviewResponse>(
+			'import-csv-preview',
+			{ body: { tournamentId: tournament.id, csv } satisfies ImportCsvPreviewRequest }
+		);
 
 		if (invokeError || !data) {
 			return fail(400, {
@@ -77,6 +70,9 @@ export const actions: Actions = {
 		if (!Array.isArray(rows) || rows.length === 0) {
 			return fail(400, { step: 'preview' as const, error: 'Select at least one row to import' });
 		}
+		// Client-submitted, not otherwise validated here — import-csv-confirm
+		// itself is the authoritative re-check (see its own comments).
+		const confirmedRows = rows as ImportCsvConfirmRequest['rows'];
 
 		const { data: tournament } = await supabase
 			.from('tournaments')
@@ -87,10 +83,12 @@ export const actions: Actions = {
 			return fail(404, { step: 'preview' as const, error: 'Tournament not found' });
 		}
 
-		const { data, error: invokeError } = await supabase.functions.invoke<{
-			count: number;
-			players: { id: string; slug: string; name: string }[];
-		}>('import-csv-confirm', { body: { tournamentId: tournament.id, rows } });
+		const { data, error: invokeError } = await supabase.functions.invoke<ImportCsvConfirmResponse>(
+			'import-csv-confirm',
+			{
+				body: { tournamentId: tournament.id, rows: confirmedRows } satisfies ImportCsvConfirmRequest
+			}
+		);
 
 		if (invokeError || !data) {
 			return fail(400, {
