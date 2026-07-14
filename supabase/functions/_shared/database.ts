@@ -1,8 +1,8 @@
 // No generated Supabase types in this project yet (see spec 6.8) — this is
 // just enough of the shape of `public.users`/`public.tournaments`/
-// `public.players` for the Edge Functions that touch them (bootstrap-owner,
-// whoami, list-users, update-user-role, import-csv-preview,
-// import-csv-confirm).
+// `public.players`/`public.bids` for the Edge Functions that touch them
+// (bootstrap-owner, whoami, list-users, update-user-role,
+// import-csv-preview, import-csv-confirm, place-bid).
 export interface Database {
   public: {
     Tables: {
@@ -44,6 +44,10 @@ export interface Database {
           name: string;
           kind: string;
           status: string;
+          silent_auction_start: string;
+          silent_auction_end: string;
+          threshold_amount: number;
+          min_increment: number;
         };
         Insert: {
           id?: string;
@@ -51,12 +55,20 @@ export interface Database {
           name: string;
           kind?: string;
           status?: string;
+          silent_auction_start: string;
+          silent_auction_end: string;
+          threshold_amount: number;
+          min_increment: number;
         };
         Update: {
           slug?: string;
           name?: string;
           kind?: string;
           status?: string;
+          silent_auction_start?: string;
+          silent_auction_end?: string;
+          threshold_amount?: number;
+          min_increment?: number;
         };
         Relationships: [];
       };
@@ -99,6 +111,35 @@ export interface Database {
           flight?: string | null;
           status?: string;
           user_id?: string | null;
+        };
+        Relationships: [];
+      };
+      bids: {
+        Row: {
+          id: string;
+          player_id: string;
+          bidder_id: string;
+          amount: number;
+          phase: string;
+          placed_at: string;
+          voided_at: string | null;
+          void_reason: string | null;
+        };
+        Insert: {
+          id?: string;
+          player_id: string;
+          bidder_id: string;
+          amount: number;
+          phase: string;
+          placed_at?: string;
+          voided_at?: string | null;
+          void_reason?: string | null;
+        };
+        Update: {
+          amount?: number;
+          phase?: string;
+          voided_at?: string | null;
+          void_reason?: string | null;
         };
         Relationships: [];
       };
