@@ -2,10 +2,7 @@
 	"extends": "../../tsconfig.base.json",
 	"compilerOptions": {
 		"target": "ES2022",
-		"module": "ES2022",
-		"declaration": true,
-		"outDir": "dist",
-		"rootDir": "src"
+		"module": "ES2022"
 	},
-	"include": ["src"]
+	"include": ["src", "../../supabase/functions/_shared/database.ts"]
 }

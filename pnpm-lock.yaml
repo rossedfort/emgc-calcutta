@@ -41,6 +41,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@emgc-calcutta/shared-types':
+        specifier: workspace:*
+        version: link:../../packages/shared-types
       '@fontsource-variable/fraunces':
         specifier: ^5.2.9
         version: 5.2.9
