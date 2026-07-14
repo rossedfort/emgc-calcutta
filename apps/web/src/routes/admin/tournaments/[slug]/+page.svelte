@@ -1,16 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import PageHeader from '../../../PageHeader.svelte';
-	import TournamentForm from '../../TournamentForm.svelte';
+	import TournamentForm from '../TournamentForm.svelte';
 	import {
 		statusBadgeVariant,
 		type PayoutRow,
 		type Tournament,
 		type TournamentFormValues
-	} from '../../shared';
+	} from '../shared';
 
 	let { data, form } = $props();
 
@@ -44,13 +42,7 @@
 	);
 </script>
 
-<div class="flex flex-col gap-4">
-	<PageHeader title="Edit tournament">
-		{#snippet actions()}
-			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline">Cancel</a>
-		{/snippet}
-	</PageHeader>
-
+<div class="flex flex-col gap-4 pt-4">
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center gap-2">
 			<span class="text-sm text-muted-foreground">Status</span>

@@ -1,23 +1,6 @@
-import { error, fail, redirect } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
-import { parseTournamentForm, type Tournament } from '../../shared';
-
-export const load: PageServerLoad = async ({ params, locals: { supabase } }) => {
-	const { data, error: loadError } = await supabase
-		.from('tournaments')
-		.select('*')
-		.eq('slug', params.slug)
-		.maybeSingle();
-
-	if (loadError) {
-		error(500, loadError.message);
-	}
-	if (!data) {
-		error(404, 'Tournament not found');
-	}
-
-	return { tournament: data as Tournament };
-};
+import { fail } from '@sveltejs/kit';
+import type { Actions } from './$types';
+import { parseTournamentForm } from '../shared';
 
 export const actions: Actions = {
 	// Named (not `default`) because it coexists with the `setStatus` action
@@ -39,8 +22,6 @@ export const actions: Actions = {
 				values: Object.fromEntries(formData)
 			});
 		}
-
-		redirect(303, '/admin/tournaments');
 	},
 
 	// Separate from the main settings form so switching status doesn't

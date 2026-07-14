@@ -93,11 +93,15 @@
 			</div>
 		</div>
 
-		{#if isAdmin}
-			<div class="mt-6">
+		<div class="mt-6 flex items-center gap-2">
+			<Button
+				href={resolve('/tournaments/[slug]/players', { slug: tournament.slug })}
+				variant="brass">View the field</Button
+			>
+			{#if isAdmin}
 				<Button href={resolve('/admin/tournaments')} variant="brass">Manage tournament</Button>
-			</div>
-		{/if}
+			{/if}
+		</div>
 	{:else}
 		<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Calcutta</p>
 		<h1 class="mt-2 font-display text-3xl font-semibold text-ink">

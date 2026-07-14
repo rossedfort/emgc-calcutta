@@ -1,0 +1,234 @@
+<script lang="ts">
+	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
+	import * as Table from '$lib/components/ui/table';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import type { PreviewRow } from './+page.server';
+
+	let { data, form } = $props();
+
+	interface PreviewPayload {
+		rows: PreviewRow[];
+		validCount: number;
+		errorCount: number;
+	}
+
+	let step = $state<'upload' | 'preview' | 'done'>('upload');
+	let previewData = $state<PreviewPayload | null>(null);
+	let importedCount = $state(0);
+
+	// Per-row checkbox state, seeded whenever a new preview payload arrives —
+	// error rows start unchecked (can't be imported until the CSV is fixed),
+	// matched rows start with their auto-match kept.
+	let included = $state<Record<number, boolean>>({});
+	let keepLink = $state<Record<number, boolean>>({});
+
+	$effect(() => {
+		if (form && 'step' in form) {
+			if (form.step === 'preview' && 'preview' in form) {
+				// Read from `form.preview` (a local, not the `previewData` state
+				// this effect also writes) — reading the state var back inside the
+				// same effect that assigns it re-triggers the effect on its own
+				// write, causing an infinite loop (effect_update_depth_exceeded).
+				const nextPreview = form.preview as PreviewPayload;
+				const nextIncluded: Record<number, boolean> = {};
+				const nextKeepLink: Record<number, boolean> = {};
+				for (const row of nextPreview.rows) {
+					nextIncluded[row.rowNumber] = row.errors.length === 0;
+					nextKeepLink[row.rowNumber] = true;
+				}
+				previewData = nextPreview;
+				included = nextIncluded;
+				keepLink = nextKeepLink;
+				step = 'preview';
+			} else if (form.step === 'done' && 'imported' in form) {
+				importedCount = (form.imported as { count: number }).count;
+				step = 'done';
+			}
+		}
+	});
+
+	let errorMessage = $derived(form && 'error' in form ? (form.error as string) : null);
+
+	let includedCount = $derived(Object.values(included).filter(Boolean).length);
+
+	let confirmRows = $derived(
+		JSON.stringify(
+			(previewData?.rows ?? [])
+				.filter((row) => included[row.rowNumber])
+				.map((row) => ({
+					name: row.name,
+					contact_email: row.contact_email,
+					contact_phone: row.contact_phone,
+					flight: row.flight,
+					preferences: row.preferences,
+					photo_url: row.photo_url,
+					userId: keepLink[row.rowNumber] ? row.matchedUserId : null
+				}))
+		)
+	);
+
+	function cancelPreview() {
+		step = 'upload';
+		previewData = null;
+	}
+
+	let previewSubmitting = $state(false);
+	let confirmSubmitting = $state(false);
+</script>
+
+<div class="flex flex-col gap-4 pt-4">
+	<PageHeader title="Import players">
+		{#snippet actions()}
+			<a
+				href={resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug })}
+				class="text-sm text-brass hover:underline">Back to players</a
+			>
+		{/snippet}
+	</PageHeader>
+
+	{#if errorMessage}
+		<p class="text-sm text-destructive">{errorMessage}</p>
+	{/if}
+
+	{#if step === 'done'}
+		<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+			<p class="font-display text-xl font-semibold text-ink">
+				{importedCount}
+				{importedCount === 1 ? 'player' : 'players'} added to the roster
+			</p>
+			<div class="mt-4">
+				<Button
+					href={resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug })}
+					variant="brass">Back to players</Button
+				>
+			</div>
+		</div>
+	{:else if step === 'preview' && previewData}
+		<div class="flex items-center gap-4 text-sm">
+			<span class="font-data flex items-center gap-2">
+				<span class="size-1.5 rounded-full bg-fairway"></span>
+				{previewData.validCount} ready to import
+			</span>
+			{#if previewData.errorCount > 0}
+				<span class="font-data flex items-center gap-2 text-flag">
+					<span class="size-1.5 rounded-full bg-flag"></span>
+					{previewData.errorCount}
+					{previewData.errorCount === 1 ? 'row needs' : 'rows need'} attention
+				</span>
+			{/if}
+		</div>
+
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					<Table.Head>Include</Table.Head>
+					<Table.Head>Name</Table.Head>
+					<Table.Head>Contact</Table.Head>
+					<Table.Head>Flight</Table.Head>
+					<Table.Head>Match</Table.Head>
+					<Table.Head>Notes</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each previewData.rows as row (row.rowNumber)}
+					<Table.Row class={row.errors.length > 0 ? 'bg-flag/5' : ''}>
+						<Table.Cell>
+							<input
+								type="checkbox"
+								class="accent-brass"
+								aria-label="Include {row.name ?? `row ${row.rowNumber}`}"
+								disabled={row.errors.length > 0}
+								checked={included[row.rowNumber] ?? false}
+								onchange={(e) => (included[row.rowNumber] = e.currentTarget.checked)}
+							/>
+						</Table.Cell>
+						<Table.Cell class="font-medium text-ink">{row.name ?? '—'}</Table.Cell>
+						<Table.Cell class="text-sm">
+							{row.contact_email ?? '—'}
+							{#if row.contact_phone}
+								<br /><span class="text-muted-foreground">{row.contact_phone}</span>
+							{/if}
+						</Table.Cell>
+						<Table.Cell>{row.flight ?? '—'}</Table.Cell>
+						<Table.Cell>
+							{#if row.matchedUserId}
+								<label class="flex items-center gap-2 text-sm">
+									<input
+										type="checkbox"
+										class="accent-brass"
+										checked={keepLink[row.rowNumber] ?? true}
+										onchange={(e) => (keepLink[row.rowNumber] = e.currentTarget.checked)}
+									/>
+									<Badge variant="fairway">Linked · {row.matchedUserEmail}</Badge>
+								</label>
+							{:else}
+								<Badge variant="sand">No match</Badge>
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-sm text-flag">
+							{row.errors.join(', ')}
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
+
+		<div class="flex items-center gap-2">
+			<form
+				method="POST"
+				action="?/confirm"
+				use:enhance={() => {
+					confirmSubmitting = true;
+					return async ({ update }) => {
+						await update();
+						confirmSubmitting = false;
+					};
+				}}
+			>
+				<input type="hidden" name="rows" value={confirmRows} />
+				<Button type="submit" variant="brass" disabled={includedCount === 0 || confirmSubmitting}>
+					{confirmSubmitting ? 'Importing…' : `Confirm import (${includedCount})`}
+				</Button>
+			</form>
+			<Button type="button" variant="outline" disabled={confirmSubmitting} onclick={cancelPreview}
+				>Cancel</Button
+			>
+		</div>
+	{:else}
+		<form
+			method="POST"
+			action="?/preview"
+			enctype="multipart/form-data"
+			use:enhance={() => {
+				previewSubmitting = true;
+				return async ({ update }) => {
+					await update();
+					previewSubmitting = false;
+				};
+			}}
+		>
+			<div
+				class="flex flex-col items-center gap-3 rounded-lg border border-dashed border-brass/40 bg-scorecard p-8 text-center"
+			>
+				<p class="font-data text-xs tracking-widest text-fairway uppercase">Player roster</p>
+				<p class="text-sm text-ink/70">
+					Choose a CSV file with each competitor's name, contact info, and flight.
+				</p>
+				<input
+					type="file"
+					name="file"
+					accept=".csv,text/csv"
+					required
+					disabled={previewSubmitting}
+					class="text-sm"
+				/>
+			</div>
+			<Button type="submit" variant="brass" class="mt-4" disabled={previewSubmitting}>
+				{previewSubmitting ? 'Processing…' : 'Preview import'}
+			</Button>
+		</form>
+	{/if}
+</div>

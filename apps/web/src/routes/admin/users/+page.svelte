@@ -5,7 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import { roleBadgeVariant, type Role } from '$lib/roles';
-	import PageHeader from '../PageHeader.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import type { UserRow } from './types';
 
 	let { data } = $props();
@@ -63,7 +63,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="Users" />
+	<PageHeader title="Users" eyebrow="Admin" />
 
 	{#if errorMessage}
 		<p class="text-sm text-destructive">{errorMessage}</p>

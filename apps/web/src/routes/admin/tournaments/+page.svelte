@@ -3,7 +3,7 @@
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
-	import PageHeader from '../PageHeader.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { statusBadgeVariant, type Tournament } from './shared';
 
 	let { data } = $props();
@@ -21,7 +21,7 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="Tournaments">
+	<PageHeader title="Tournaments" eyebrow="Admin">
 		{#snippet actions()}
 			<Button href={resolve('/admin/tournaments/new')} variant="brass">New tournament</Button>
 		{/snippet}
@@ -57,11 +57,11 @@
 						</Table.Cell>
 						<Table.Cell>
 							<Button
-								href={resolve('/admin/tournaments/[slug]/edit', { slug: tournament.slug })}
+								href={resolve('/admin/tournaments/[slug]', { slug: tournament.slug })}
 								variant="brass"
 								size="sm"
 							>
-								Edit
+								Manage
 							</Button>
 						</Table.Cell>
 					</Table.Row>
