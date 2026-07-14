@@ -62,6 +62,41 @@
 		{/if}
 	</div>
 
+	<div class="flex flex-col gap-2 rounded-lg border border-brass/30 bg-scorecard p-4">
+		<span class="text-sm text-muted-foreground">Live auction</span>
+		{#if data.tournament.live_auction_started_at}
+			<div class="flex items-center gap-2">
+				<Badge variant="fairway">Started</Badge>
+				<span class="text-sm text-ink/70">
+					{new Date(data.tournament.live_auction_started_at).toLocaleString()}
+				</span>
+			</div>
+		{:else}
+			<div class="flex items-center gap-2">
+				<form method="POST" action="?/startLiveAuction" use:enhance>
+					<Button
+						type="submit"
+						variant="brass"
+						size="sm"
+						disabled={new Date(data.tournament.silent_auction_end) > new Date()}
+					>
+						Start live auction
+					</Button>
+				</form>
+				{#if new Date(data.tournament.silent_auction_end) > new Date()}
+					<span class="text-xs text-ink/60">
+						Available once the silent auction ends ({new Date(
+							data.tournament.silent_auction_end
+						).toLocaleString()})
+					</span>
+				{/if}
+			</div>
+		{/if}
+		{#if form?.liveAuctionError}
+			<p class="text-sm text-destructive">{form.liveAuctionError}</p>
+		{/if}
+	</div>
+
 	<form method="POST" action="?/updateSettings" use:enhance>
 		<TournamentForm
 			values={(form?.values as TournamentFormValues | undefined) ?? defaultValues}

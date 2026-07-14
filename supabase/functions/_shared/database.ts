@@ -213,6 +213,7 @@ export type Database = {
           created_at: string;
           id: string;
           kind: string;
+          live_auction_started_at: string | null;
           min_increment: number;
           name: string;
           payout_structure: Json;
@@ -227,6 +228,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           kind?: string;
+          live_auction_started_at?: string | null;
           min_increment: number;
           name: string;
           payout_structure?: Json;
@@ -241,6 +243,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           kind?: string;
+          live_auction_started_at?: string | null;
           min_increment?: number;
           name?: string;
           payout_structure?: Json;
@@ -298,6 +301,7 @@ export type Database = {
       };
       open_live_lot: { Args: { lot_id: string }; Returns: undefined };
       slugify: { Args: { input: string }; Returns: string };
+      start_live_auction: { Args: { tournament_id: string }; Returns: undefined };
       swap_queue_position: {
         Args: { lot_a: string; lot_b: string };
         Returns: undefined;

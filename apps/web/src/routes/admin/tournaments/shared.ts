@@ -14,6 +14,7 @@ export interface Tournament {
 	min_increment: number;
 	anti_snipe_seconds: number;
 	payout_structure: Record<string, number>;
+	live_auction_started_at: string | null;
 	created_at: string;
 }
 
