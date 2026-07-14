@@ -3,13 +3,25 @@
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import PlayerForm from '../../PlayerForm.svelte';
+	import type { PlayerFormValues } from '../../shared';
 
 	let { data, form } = $props();
 
 	let errorMessage = $derived(form && 'error' in form ? (form.error as string) : null);
 
+	let defaultValues = $derived<PlayerFormValues>({
+		name: data.player.name,
+		contact_email: data.player.contact_email ?? '',
+		contact_phone: data.player.contact_phone ?? '',
+		flight: data.player.flight ?? '',
+		preferences: data.player.preferences ?? ''
+	});
+
 	let linkSubmitting = $state(false);
 	let unlinkSubmitting = $state(false);
+	let showRemoveConfirm = $state(false);
+	let removeSubmitting = $state(false);
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -26,17 +38,19 @@
 		<p class="text-sm text-destructive">{errorMessage}</p>
 	{/if}
 
+	<form method="POST" action="?/updateDetails" use:enhance>
+		<PlayerForm
+			values={(form && 'values' in form
+				? (form.values as PlayerFormValues | undefined)
+				: undefined) ?? defaultValues}
+			errors={form && 'errors' in form ? (form.errors as Record<string, string>) : {}}
+			submitLabel="Save changes"
+		/>
+	</form>
+
 	<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
-		<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-			<dt class="text-ink/60">Contact email</dt>
-			<dd>{data.player.contact_email ?? '—'}</dd>
-			<dt class="text-ink/60">Contact phone</dt>
-			<dd>{data.player.contact_phone ?? '—'}</dd>
-			<dt class="text-ink/60">Flight</dt>
-			<dd>{data.player.flight ?? '—'}</dd>
-			<dt class="text-ink/60">Status</dt>
-			<dd class="font-data">{data.player.status}</dd>
-		</dl>
+		<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Status</p>
+		<p class="font-data mt-1 text-sm">{data.player.status}</p>
 
 		<div class="mt-4 border-t border-brass/40"></div>
 
@@ -103,5 +117,41 @@
 				</form>
 			{/if}
 		</div>
+	</div>
+
+	<div class="border-t border-destructive/30 pt-4">
+		{#if !showRemoveConfirm}
+			<Button variant="destructive" size="sm" onclick={() => (showRemoveConfirm = true)}>
+				Remove player
+			</Button>
+		{:else}
+			<div class="flex items-center gap-2">
+				<p class="text-sm text-destructive">Remove {data.player.name}? This can't be undone.</p>
+				<form
+					method="POST"
+					action="?/remove"
+					use:enhance={() => {
+						removeSubmitting = true;
+						return async ({ update }) => {
+							await update();
+							removeSubmitting = false;
+						};
+					}}
+				>
+					<Button type="submit" variant="destructive" size="sm" disabled={removeSubmitting}>
+						{removeSubmitting ? 'Removing…' : 'Yes, remove'}
+					</Button>
+				</form>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={removeSubmitting}
+					onclick={() => (showRemoveConfirm = false)}
+				>
+					Cancel
+				</Button>
+			</div>
+		{/if}
 	</div>
 </div>

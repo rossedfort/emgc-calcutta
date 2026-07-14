@@ -54,13 +54,22 @@
 			{/if}
 		</div>
 
-		<Button
-			href={resolve('/admin/tournaments/[slug]/players/import', { slug: data.tournament.slug })}
-			variant="brass"
-			size="sm"
-		>
-			Import players
-		</Button>
+		<div class="flex items-center gap-2">
+			<Button
+				href={resolve('/admin/tournaments/[slug]/players/new', { slug: data.tournament.slug })}
+				variant="brass"
+				size="sm"
+			>
+				New player
+			</Button>
+			<Button
+				href={resolve('/admin/tournaments/[slug]/players/import', { slug: data.tournament.slug })}
+				variant="brass"
+				size="sm"
+			>
+				Import players
+			</Button>
+		</div>
 	</div>
 
 	{#if filteredPlayers.length === 0}

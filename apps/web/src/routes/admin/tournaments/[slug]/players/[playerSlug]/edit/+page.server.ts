@@ -1,5 +1,6 @@
-import { error, fail } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { parsePlayerForm } from '../../shared';
 
 export interface Player {
 	id: string;
@@ -7,6 +8,7 @@ export interface Player {
 	name: string;
 	contact_email: string | null;
 	contact_phone: string | null;
+	preferences: string | null;
 	flight: string | null;
 	status: string;
 	user_id: string | null;
@@ -23,7 +25,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 
 	const { data: player, error: playerError } = await supabase
 		.from('players')
-		.select('id, slug, name, contact_email, contact_phone, flight, status, user_id')
+		.select('id, slug, name, contact_email, contact_phone, preferences, flight, status, user_id')
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
 		.maybeSingle();
@@ -119,5 +121,62 @@ export const actions: Actions = {
 		if (updateError) {
 			return fail(400, { error: updateError.message });
 		}
+	},
+
+	updateDetails: async ({ request, params, locals: { supabase } }) => {
+		const formData = await request.formData();
+		const { data, errors } = parsePlayerForm(formData);
+		if (!data) {
+			return fail(400, { errors, values: Object.fromEntries(formData) });
+		}
+
+		const { data: tournament } = await supabase
+			.from('tournaments')
+			.select('id')
+			.eq('slug', params.slug)
+			.maybeSingle();
+		if (!tournament) {
+			return fail(404, {
+				errors: { form: 'Tournament not found' },
+				values: Object.fromEntries(formData)
+			});
+		}
+
+		// Deliberately doesn't touch slug — like tournaments, a Player's slug
+		// is set once at creation and edited explicitly if ever needed, not
+		// silently regenerated when the name changes.
+		const { error: updateError } = await supabase
+			.from('players')
+			.update(data)
+			.eq('tournament_id', tournament.id)
+			.eq('slug', params.playerSlug);
+		if (updateError) {
+			return fail(400, {
+				errors: { form: updateError.message },
+				values: Object.fromEntries(formData)
+			});
+		}
+	},
+
+	remove: async ({ params, locals: { supabase } }) => {
+		const { data: tournament } = await supabase
+			.from('tournaments')
+			.select('id')
+			.eq('slug', params.slug)
+			.maybeSingle();
+		if (!tournament) {
+			return fail(404, { error: 'Tournament not found' });
+		}
+
+		const { error: deleteError } = await supabase
+			.from('players')
+			.delete()
+			.eq('tournament_id', tournament.id)
+			.eq('slug', params.playerSlug);
+		if (deleteError) {
+			return fail(400, { error: deleteError.message });
+		}
+
+		redirect(303, `/admin/tournaments/${params.slug}/players`);
 	}
 };
