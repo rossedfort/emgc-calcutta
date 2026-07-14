@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -7,6 +8,11 @@
 	import { AUDIT_ACTIONS, auditActionLabel } from '$lib/auditActions';
 
 	let { data } = $props();
+
+	// Carries whatever filters are currently applied — export reflects the
+	// current view, not just the 200 rows shown on screen (the export
+	// endpoint itself re-runs the same filtered query uncapped).
+	let exportHref = $derived(`${resolve('/admin/audit/export')}${page.url.search}`);
 
 	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
 		year: 'numeric',
@@ -24,7 +30,11 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="Audit log" eyebrow="Admin" />
+	<PageHeader title="Audit log" eyebrow="Admin">
+		{#snippet actions()}
+			<Button variant="outline" size="sm" href={exportHref}>Export CSV</Button>
+		{/snippet}
+	</PageHeader>
 
 	<form
 		method="GET"
