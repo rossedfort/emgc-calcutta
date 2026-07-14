@@ -8,6 +8,7 @@
 	let errorMessage = $derived(form && 'error' in form ? (form.error as string) : null);
 
 	let pending = $state<Record<string, boolean>>({});
+	let sortPending = $state(false);
 </script>
 
 <div class="flex flex-col gap-6 pt-4">
@@ -16,7 +17,59 @@
 	{/if}
 
 	<div class="flex flex-col gap-2">
-		<p class="font-data text-xs tracking-widest text-fairway uppercase">Queue</p>
+		<div class="flex items-center justify-between gap-2">
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">Queue</p>
+			{#if data.queue.length > 1}
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-ink/60">Sort:</span>
+					<form
+						method="POST"
+						action="?/sortHandicapAsc"
+						use:enhance={() => {
+							sortPending = true;
+							return async ({ update }) => {
+								await update();
+								sortPending = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="outline" size="sm" disabled={sortPending}>
+							Handicap ascending
+						</Button>
+					</form>
+					<form
+						method="POST"
+						action="?/sortHandicapDesc"
+						use:enhance={() => {
+							sortPending = true;
+							return async ({ update }) => {
+								await update();
+								sortPending = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="outline" size="sm" disabled={sortPending}>
+							Handicap descending
+						</Button>
+					</form>
+					<form
+						method="POST"
+						action="?/sortShuffle"
+						use:enhance={() => {
+							sortPending = true;
+							return async ({ update }) => {
+								await update();
+								sortPending = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="outline" size="sm" disabled={sortPending}>
+							Shuffle
+						</Button>
+					</form>
+				</div>
+			{/if}
+		</div>
 		{#if data.queue.length === 0}
 			<p class="text-sm text-muted-foreground">
 				No players queued yet — players are added automatically as they cross the reserve

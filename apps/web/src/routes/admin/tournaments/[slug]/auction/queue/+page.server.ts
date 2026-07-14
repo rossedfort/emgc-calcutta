@@ -17,10 +17,18 @@ export interface QueueLot {
 export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
+	// Only not-yet-opened lots belong on this pre-event queue-management
+	// screen — once the live auction is underway, an already-opened/closed
+	// lot has moved on to the live-auction admin screen instead, and
+	// reordering/removing it here would be nonsensical (it's already
+	// resolved). Matters starting Phase 4.5: before sequential auction
+	// phases, this page was only ever visited before any lot could be
+	// opened, so the gap was latent, not reachable.
 	const { data: lots, error: lotsError } = await supabase
 		.from('live_lots')
 		.select('id, queue_position, player_id')
 		.eq('tournament_id', tournament.id)
+		.is('opened_at', null)
 		.order('queue_position');
 	if (lotsError) {
 		error(500, lotsError.message);
@@ -72,6 +80,7 @@ async function moveLot(
 		.select('id, queue_position')
 		.eq('id', lotId)
 		.eq('tournament_id', tournamentId)
+		.is('opened_at', null)
 		.maybeSingle();
 	if (!currentLot) {
 		return 'Lot not found';
@@ -83,6 +92,7 @@ async function moveLot(
 					.from('live_lots')
 					.select('id')
 					.eq('tournament_id', tournamentId)
+					.is('opened_at', null)
 					.lt('queue_position', currentLot.queue_position)
 					.order('queue_position', { ascending: false })
 					.limit(1)
@@ -91,6 +101,7 @@ async function moveLot(
 					.from('live_lots')
 					.select('id')
 					.eq('tournament_id', tournamentId)
+					.is('opened_at', null)
 					.gt('queue_position', currentLot.queue_position)
 					.order('queue_position', { ascending: true })
 					.limit(1)
@@ -106,6 +117,67 @@ async function moveLot(
 		lot_b: adjacentLot.id
 	});
 	return swapError ? swapError.message : null;
+}
+
+// Shared by the three sort presets below: re-fetches the current
+// not-yet-opened queue fresh (rather than trusting whatever the client
+// last rendered) so the sort is computed against up-to-the-moment state —
+// resequence_queue itself also re-validates this against the DB, but
+// there's no point handing it a list that's already stale by construction.
+async function fetchSortableQueue(
+	supabase: SupabaseClient<Database>,
+	tournamentId: string
+): Promise<{ id: string; handicap_index: number | null }[] | null> {
+	const { data: lots, error: lotsError } = await supabase
+		.from('live_lots')
+		.select('id, player_id')
+		.eq('tournament_id', tournamentId)
+		.is('opened_at', null);
+	if (lotsError || !lots) {
+		return null;
+	}
+
+	const playerIds = lots.map((lot) => lot.player_id);
+	const { data: players, error: playersError } =
+		playerIds.length > 0
+			? await supabase.from('players').select('id, handicap_index').in('id', playerIds)
+			: { data: [] as { id: string; handicap_index: number | null }[], error: null };
+	if (playersError || !players) {
+		return null;
+	}
+
+	const handicapByPlayerId = new Map(players.map((player) => [player.id, player.handicap_index]));
+	return lots.map((lot) => ({
+		id: lot.id,
+		handicap_index: handicapByPlayerId.get(lot.player_id) ?? null
+	}));
+}
+
+// Nulls (no handicap on record) always sort last regardless of direction —
+// "unknown" isn't meaningfully high or low, it's just not enough
+// information to place relative to the rest.
+function sortByHandicap(
+	queue: { id: string; handicap_index: number | null }[],
+	direction: 'asc' | 'desc'
+): string[] {
+	return [...queue]
+		.sort((a, b) => {
+			if (a.handicap_index === null) return 1;
+			if (b.handicap_index === null) return -1;
+			return direction === 'asc'
+				? a.handicap_index - b.handicap_index
+				: b.handicap_index - a.handicap_index;
+		})
+		.map((lot) => lot.id);
+}
+
+function shuffle<T>(items: T[]): T[] {
+	const result = [...items];
+	for (let i = result.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[result[i], result[j]] = [result[j], result[i]];
+	}
+	return result;
 }
 
 export const actions: Actions = {
@@ -135,6 +207,7 @@ export const actions: Actions = {
 			.select('player_id')
 			.eq('id', lotId)
 			.eq('tournament_id', tournament.id)
+			.is('opened_at', null)
 			.maybeSingle();
 		if (!lot) {
 			return fail(404, { error: 'Lot not found' });
@@ -206,6 +279,78 @@ export const actions: Actions = {
 		const moveError = await moveLot(supabase, tournament.id, lotId, 'down');
 		if (moveError) {
 			return fail(400, { error: moveError });
+		}
+	},
+
+	sortHandicapAsc: async ({ params, locals: { supabase } }) => {
+		const { data: tournament } = await supabase
+			.from('tournaments')
+			.select('id')
+			.eq('slug', params.slug)
+			.maybeSingle();
+		if (!tournament) {
+			return fail(404, { error: 'Tournament not found' });
+		}
+
+		const queue = await fetchSortableQueue(supabase, tournament.id);
+		if (!queue) {
+			return fail(500, { error: 'Could not load the queue to sort it' });
+		}
+
+		const { error: sortError } = await supabase.rpc('resequence_queue', {
+			p_tournament_id: tournament.id,
+			p_ordered_lot_ids: sortByHandicap(queue, 'asc')
+		});
+		if (sortError) {
+			return fail(400, { error: sortError.message });
+		}
+	},
+
+	sortHandicapDesc: async ({ params, locals: { supabase } }) => {
+		const { data: tournament } = await supabase
+			.from('tournaments')
+			.select('id')
+			.eq('slug', params.slug)
+			.maybeSingle();
+		if (!tournament) {
+			return fail(404, { error: 'Tournament not found' });
+		}
+
+		const queue = await fetchSortableQueue(supabase, tournament.id);
+		if (!queue) {
+			return fail(500, { error: 'Could not load the queue to sort it' });
+		}
+
+		const { error: sortError } = await supabase.rpc('resequence_queue', {
+			p_tournament_id: tournament.id,
+			p_ordered_lot_ids: sortByHandicap(queue, 'desc')
+		});
+		if (sortError) {
+			return fail(400, { error: sortError.message });
+		}
+	},
+
+	sortShuffle: async ({ params, locals: { supabase } }) => {
+		const { data: tournament } = await supabase
+			.from('tournaments')
+			.select('id')
+			.eq('slug', params.slug)
+			.maybeSingle();
+		if (!tournament) {
+			return fail(404, { error: 'Tournament not found' });
+		}
+
+		const queue = await fetchSortableQueue(supabase, tournament.id);
+		if (!queue) {
+			return fail(500, { error: 'Could not load the queue to sort it' });
+		}
+
+		const { error: sortError } = await supabase.rpc('resequence_queue', {
+			p_tournament_id: tournament.id,
+			p_ordered_lot_ids: shuffle(queue.map((lot) => lot.id))
+		});
+		if (sortError) {
+			return fail(400, { error: sortError.message });
 		}
 	}
 };

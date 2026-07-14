@@ -304,6 +304,10 @@ export type Database = {
         Returns: undefined;
       };
       open_live_lot: { Args: { lot_id: string }; Returns: undefined };
+      resequence_queue: {
+        Args: { p_ordered_lot_ids: string[]; p_tournament_id: string };
+        Returns: undefined;
+      };
       slugify: { Args: { input: string }; Returns: string };
       start_live_auction: { Args: { tournament_id: string }; Returns: undefined };
       swap_queue_position: {
