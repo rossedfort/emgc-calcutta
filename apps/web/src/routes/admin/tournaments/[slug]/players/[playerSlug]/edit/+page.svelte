@@ -15,6 +15,7 @@
 		contact_email: data.player.contact_email ?? '',
 		contact_phone: data.player.contact_phone ?? '',
 		flight: data.player.flight ?? '',
+		handicap_index: data.player.handicap_index !== null ? String(data.player.handicap_index) : '',
 		preferences: data.player.preferences ?? ''
 	});
 

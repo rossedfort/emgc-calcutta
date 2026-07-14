@@ -1,18 +1,21 @@
 import { error, fail, redirect } from '@sveltejs/kit';
+import type { Tables } from '@emgc-calcutta/shared-types';
 import type { Actions, PageServerLoad } from './$types';
 import { parsePlayerForm } from '../../shared';
 
-export interface Player {
-	id: string;
-	slug: string;
-	name: string;
-	contact_email: string | null;
-	contact_phone: string | null;
-	preferences: string | null;
-	flight: string | null;
-	status: string;
-	user_id: string | null;
-}
+export type Player = Pick<
+	Tables<'players'>,
+	| 'id'
+	| 'slug'
+	| 'name'
+	| 'contact_email'
+	| 'contact_phone'
+	| 'preferences'
+	| 'flight'
+	| 'handicap_index'
+	| 'status'
+	| 'user_id'
+>;
 
 export interface UserOption {
 	id: string;
@@ -25,7 +28,9 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 
 	const { data: player, error: playerError } = await supabase
 		.from('players')
-		.select('id, slug, name, contact_email, contact_phone, preferences, flight, status, user_id')
+		.select(
+			'id, slug, name, contact_email, contact_phone, preferences, flight, handicap_index, status, user_id'
+		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
 		.maybeSingle();

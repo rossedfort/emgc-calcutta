@@ -35,9 +35,25 @@
 		</div>
 	</div>
 
-	<div class="flex flex-col gap-1.5">
-		<Label for="flight">Flight</Label>
-		<Input id="flight" name="flight" class="max-w-40" value={values.flight} />
+	<div class="grid grid-cols-2 gap-4">
+		<div class="flex flex-col gap-1.5">
+			<Label for="flight">Flight</Label>
+			<Input id="flight" name="flight" class="max-w-40" value={values.flight} />
+		</div>
+		<div class="flex flex-col gap-1.5">
+			<Label for="handicap_index">Handicap index</Label>
+			<Input
+				id="handicap_index"
+				name="handicap_index"
+				type="number"
+				step="0.1"
+				class="max-w-40"
+				value={values.handicap_index}
+			/>
+			{#if errors.handicap_index}<p class="text-sm text-destructive">
+					{errors.handicap_index}
+				</p>{/if}
+		</div>
 	</div>
 
 	<div class="flex flex-col gap-1.5">
