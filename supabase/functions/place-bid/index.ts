@@ -35,13 +35,16 @@
 // After a successful silent bid, conditionally flips the player to
 // "reserved" if the amount crosses the tournament's threshold — a
 // silent-only concept, so live bids never trigger it (reserved is already
-// where they started). This is two sequential writes (insert the Bid,
-// then maybe update the Player), not a single atomic DB transaction —
+// where they started) — and, in the same step, auto-queues them for the
+// live auction via enqueue_player_for_live_auction (Phase 4.5, user
+// feedback: the queue builds itself, no Admin hand-add needed). This is
+// three sequential writes (insert the Bid, then maybe update the Player,
+// then maybe enqueue the lot), not a single atomic DB transaction —
 // matching spec 6.5's own description of place-bid as a plain sequence
 // within one Edge Function call, the same shape the original Fastify
-// design would have had. A crash between the two writes could in theory
-// leave a bid recorded without the reserved flip; revisit with a
-// transactional RPC if that ever proves to be a real problem.
+// design would have had. A crash partway through could in theory leave a
+// bid recorded without the reserved flip and/or the enqueue; revisit with
+// a transactional RPC if that ever proves to be a real problem.
 //
 // Every live bid also resets live_lots.closes_at, the anti-snipe
 // countdown (spec 4.4/182) — see the comment at that block below for the
@@ -266,7 +269,8 @@ export default {
       // already "reserved", the very status this flip moves *into*.
       // `player.status` was already confirmed "open" above for the silent
       // branch, so this is necessarily the first bid to cross it — no risk
-      // of double-reserving.
+      // of double-reserving (and so no risk of double-enqueuing below
+      // either).
       let reserved = false;
       if (phase === "silent" && body.amount >= tournament.threshold_amount) {
         const { error: reserveError } = await ctx.supabaseAdmin
@@ -279,6 +283,21 @@ export default {
           });
         }
         reserved = true;
+
+        // Auto-queue for the live auction (Phase 4.5, user feedback) — the
+        // queue builds itself as the silent auction progresses rather than
+        // needing an Admin to hand-add reserved players afterward. See the
+        // migration for why this is its own advisory-locked function
+        // rather than a plain insert here.
+        const { error: enqueueError } = await ctx.supabaseAdmin.rpc(
+          "enqueue_player_for_live_auction",
+          { p_tournament_id: player.tournament_id, p_player_id: body.playerId },
+        );
+        if (enqueueError) {
+          return Response.json({ error: enqueueError.message }, {
+            status: 500,
+          });
+        }
       }
 
       // Anti-snipe (spec 4.4/182): every live bid resets the lot's

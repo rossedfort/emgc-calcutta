@@ -50,22 +50,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		return player ? [{ id: lot.id, queue_position: lot.queue_position, player }] : [];
 	});
 
-	const { data: reservedPlayers, error: reservedError } = await supabase
-		.from('players')
-		.select('id, slug, name, flight, handicap_index')
-		.eq('tournament_id', tournament.id)
-		.eq('status', 'reserved')
-		.order('name');
-	if (reservedError) {
-		error(500, reservedError.message);
-	}
-
-	const queuedPlayerIds = new Set(lotPlayerIds);
-	const availablePlayers = (reservedPlayers ?? []).filter(
-		(player) => !queuedPlayerIds.has(player.id)
-	);
-
-	return { tournament, queue, availablePlayers };
+	return { tournament, queue };
 };
 
 // Shared by the moveUp/moveDown actions below: finds the lot immediately
@@ -124,41 +109,9 @@ async function moveLot(
 }
 
 export const actions: Actions = {
-	add: async ({ request, params, locals: { supabase } }) => {
-		const formData = await request.formData();
-		const playerId = String(formData.get('playerId') ?? '');
-		if (!playerId) {
-			return fail(400, { error: 'Choose a player to add' });
-		}
-
-		const { data: tournament } = await supabase
-			.from('tournaments')
-			.select('id')
-			.eq('slug', params.slug)
-			.maybeSingle();
-		if (!tournament) {
-			return fail(404, { error: 'Tournament not found' });
-		}
-
-		const { data: lastLot } = await supabase
-			.from('live_lots')
-			.select('queue_position')
-			.eq('tournament_id', tournament.id)
-			.order('queue_position', { ascending: false })
-			.limit(1)
-			.maybeSingle();
-		const nextPosition = (lastLot?.queue_position ?? 0) + 1;
-
-		const { error: insertError } = await supabase.from('live_lots').insert({
-			tournament_id: tournament.id,
-			player_id: playerId,
-			queue_position: nextPosition
-		});
-		if (insertError) {
-			return fail(400, { error: insertError.message });
-		}
-	},
-
+	// Every reserved player is queued automatically by place-bid the moment
+	// they cross the threshold (see enqueue_player_for_live_auction) — there's
+	// no manual "add" step anymore.
 	remove: async ({ request, params, locals: { supabase } }) => {
 		const formData = await request.formData();
 		const lotId = String(formData.get('lotId') ?? '');
@@ -175,6 +128,18 @@ export const actions: Actions = {
 			return fail(404, { error: 'Tournament not found' });
 		}
 
+		// Need the player before the lot row is gone, to revert their status
+		// below.
+		const { data: lot } = await supabase
+			.from('live_lots')
+			.select('player_id')
+			.eq('id', lotId)
+			.eq('tournament_id', tournament.id)
+			.maybeSingle();
+		if (!lot) {
+			return fail(404, { error: 'Lot not found' });
+		}
+
 		const { error: deleteError } = await supabase
 			.from('live_lots')
 			.delete()
@@ -182,6 +147,21 @@ export const actions: Actions = {
 			.eq('tournament_id', tournament.id);
 		if (deleteError) {
 			return fail(400, { error: deleteError.message });
+		}
+
+		// Revert to 'open' rather than leaving them 'reserved'-but-unqueued —
+		// the silent auction has necessarily already ended by the time an
+		// Admin is looking at this screen (the silent auction always
+		// precedes the live one now, see the "Sequential auction phases"
+		// task), so this un-reserved player is picked up by the existing
+		// close_silent_auctions() cron and swept to sold_silent on its next
+		// run, same as any other player who never crossed the threshold.
+		const { error: revertError } = await supabase
+			.from('players')
+			.update({ status: 'open' })
+			.eq('id', lot.player_id);
+		if (revertError) {
+			return fail(400, { error: revertError.message });
 		}
 	},
 

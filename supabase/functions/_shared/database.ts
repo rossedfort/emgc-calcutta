@@ -299,6 +299,10 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      enqueue_player_for_live_auction: {
+        Args: { p_player_id: string; p_tournament_id: string };
+        Returns: undefined;
+      };
       open_live_lot: { Args: { lot_id: string }; Returns: undefined };
       slugify: { Args: { input: string }; Returns: string };
       start_live_auction: { Args: { tournament_id: string }; Returns: undefined };

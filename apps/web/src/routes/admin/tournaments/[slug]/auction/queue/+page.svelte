@@ -19,7 +19,8 @@
 		<p class="font-data text-xs tracking-widest text-fairway uppercase">Queue</p>
 		{#if data.queue.length === 0}
 			<p class="text-sm text-muted-foreground">
-				No players queued yet — add reserved players from the list below.
+				No players queued yet — players are added automatically as they cross the reserve
+				threshold during the silent auction.
 			</p>
 		{:else}
 			<Table.Root>
@@ -107,55 +108,6 @@
 										</Button>
 									</form>
 								</div>
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		{/if}
-	</div>
-
-	<div class="flex flex-col gap-2">
-		<p class="font-data text-xs tracking-widest text-fairway uppercase">
-			Reserved players not yet queued
-		</p>
-		{#if data.availablePlayers.length === 0}
-			<p class="text-sm text-muted-foreground">
-				No reserved players waiting — everyone reserved is already in the queue.
-			</p>
-		{:else}
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head>Name</Table.Head>
-						<Table.Head>Flight</Table.Head>
-						<Table.Head>Handicap</Table.Head>
-						<Table.Head>Actions</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each data.availablePlayers as player (player.id)}
-						<Table.Row>
-							<Table.Cell class="font-medium text-ink">{player.name}</Table.Cell>
-							<Table.Cell>{player.flight ?? '—'}</Table.Cell>
-							<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
-							<Table.Cell>
-								<form
-									method="POST"
-									action="?/add"
-									use:enhance={() => {
-										pending[player.id] = true;
-										return async ({ update }) => {
-											await update();
-											pending[player.id] = false;
-										};
-									}}
-								>
-									<input type="hidden" name="playerId" value={player.id} />
-									<Button type="submit" variant="brass" size="sm" disabled={pending[player.id]}>
-										Add to queue
-									</Button>
-								</form>
 							</Table.Cell>
 						</Table.Row>
 					{/each}
