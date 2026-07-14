@@ -62,6 +62,22 @@
 	let isYou = $derived(currentPlayer?.user_id === data.currentUserId);
 	let high = $derived(currentLot ? currentHighBid(liveBids, currentLot.player_id) : null);
 
+	// The carousel strip below the current lot — every not-yet-opened lot,
+	// in queue order, so participants can see what's coming while the
+	// current player is being bid on. Skips a lot whose player can't be
+	// found the same way the queue admin screen does (can't happen today,
+	// player_id has no ON DELETE cascade — cheap insurance against a future
+	// inconsistency, not a real case).
+	let upcoming = $derived(
+		liveLots
+			.filter((lot) => lot.opened_at === null)
+			.sort((a, b) => a.queue_position - b.queue_position)
+			.flatMap((lot) => {
+				const player = players.find((p) => p.id === lot.player_id);
+				return player ? [{ lot, player }] : [];
+			})
+	);
+
 	let secondsRemaining = $derived.by(() => {
 		if (!currentLot?.closes_at) return null;
 		const ms = new Date(currentLot.closes_at).getTime() - now.getTime();
@@ -116,7 +132,7 @@
 	}
 </script>
 
-<div class="flex flex-col gap-4">
+<div class="mx-auto flex max-w-3xl flex-col gap-4">
 	<PageHeader title="Live auction" eyebrow={data.tournament.name} />
 
 	{#if !currentLot || !currentPlayer}
@@ -205,6 +221,50 @@
 					<p class="text-xs text-flag">{bidError}</p>
 				{/if}
 			</form>
+		</div>
+	{/if}
+
+	{#if upcoming.length > 0}
+		<div class="flex flex-col gap-2">
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">Up next</p>
+			<!-- Bounded and scrollable rather than growing the page to fit the
+			     whole queue (which could be 100+ players) — all upcoming players
+			     are still reachable by scrolling this box, just not all visible
+			     at once. -->
+			<div class="max-h-[32rem] overflow-y-auto">
+				<div class="flex flex-col gap-4">
+					{#each upcoming as { lot, player } (lot.id)}
+						<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink">
+							<div class="flex items-start justify-between gap-2">
+								<div class="flex flex-col gap-1">
+									<a
+										href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+											slug: data.tournament.slug,
+											playerSlug: player.slug
+										})}
+										class="font-display text-3xl font-semibold text-ink hover:underline"
+									>
+										{player.name}
+									</a>
+									{#if player.flight || player.handicap_index !== null}
+										<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+											{[
+												player.flight ? `Flight ${player.flight}` : null,
+												player.handicap_index !== null ? `HCP ${player.handicap_index}` : null
+											]
+												.filter(Boolean)
+												.join(' · ')}
+										</span>
+									{/if}
+								</div>
+								{#if player.user_id === data.currentUserId}
+									<Badge variant="brass">This is you</Badge>
+								{/if}
+							</div>
+						</div>
+					{/each}
+				</div>
+			</div>
 		</div>
 	{/if}
 </div>
