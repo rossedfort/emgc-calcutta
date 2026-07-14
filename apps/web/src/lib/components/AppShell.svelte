@@ -91,6 +91,10 @@
 					{@render navDot('/admin/users')}
 					<span>Users</span>
 				</a>
+				<a href={resolve('/admin/audit')} class={navLinkClass('/admin/audit')}>
+					{@render navDot('/admin/audit')}
+					<span>Audit log</span>
+				</a>
 			{/if}
 		</nav>
 
