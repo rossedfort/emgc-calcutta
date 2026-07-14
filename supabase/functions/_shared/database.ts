@@ -89,6 +89,61 @@ export type Database = {
           },
         ];
       };
+      live_lots: {
+        Row: {
+          closed_at: string | null;
+          closes_at: string | null;
+          id: string;
+          opened_at: string | null;
+          player_id: string;
+          queue_position: number;
+          tournament_id: string;
+          winning_bid_id: string | null;
+        };
+        Insert: {
+          closed_at?: string | null;
+          closes_at?: string | null;
+          id?: string;
+          opened_at?: string | null;
+          player_id: string;
+          queue_position: number;
+          tournament_id: string;
+          winning_bid_id?: string | null;
+        };
+        Update: {
+          closed_at?: string | null;
+          closes_at?: string | null;
+          id?: string;
+          opened_at?: string | null;
+          player_id?: string;
+          queue_position?: number;
+          tournament_id?: string;
+          winning_bid_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "live_lots_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_lots_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "live_lots_winning_bid_id_fkey";
+            columns: ["winning_bid_id"];
+            isOneToOne: false;
+            referencedRelation: "bids";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       players: {
         Row: {
           contact_email: string | null;
@@ -241,6 +296,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"];
       };
       slugify: { Args: { input: string }; Returns: string };
+      swap_queue_position: {
+        Args: { lot_a: string; lot_b: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       auth_provider: "google" | "azure" | "apple";
