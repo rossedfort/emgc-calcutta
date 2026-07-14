@@ -207,6 +207,12 @@
 			{#each filteredPlayers as player (player.id)}
 				{@const high = currentHighBid(liveBids, player.id)}
 				{@const isYou = player.user_id === data.currentUserId}
+				{@const metaLine = [
+					player.flight ? `Flight ${player.flight}` : null,
+					player.handicap_index !== null ? `HCP ${player.handicap_index}` : null
+				]
+					.filter(Boolean)
+					.join(' · ')}
 				<div
 					class={[
 						'flex flex-col gap-3 rounded-lg border bg-scorecard p-4 text-ink',
@@ -224,9 +230,9 @@
 							>
 								{player.name}
 							</a>
-							{#if player.flight}
+							{#if metaLine}
 								<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
-									Flight {player.flight}
+									{metaLine}
 								</span>
 							{/if}
 						</div>
