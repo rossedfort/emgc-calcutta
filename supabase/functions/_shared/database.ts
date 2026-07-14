@@ -53,6 +53,7 @@ export type Database = {
           entity_type: string;
           id: string;
           ip: string | null;
+          player_id: string | null;
           reason: string | null;
           tournament_id: string | null;
           user_agent: string | null;
@@ -68,6 +69,7 @@ export type Database = {
           entity_type: string;
           id?: string;
           ip?: string | null;
+          player_id?: string | null;
           reason?: string | null;
           tournament_id?: string | null;
           user_agent?: string | null;
@@ -83,6 +85,7 @@ export type Database = {
           entity_type?: string;
           id?: string;
           ip?: string | null;
+          player_id?: string | null;
           reason?: string | null;
           tournament_id?: string | null;
           user_agent?: string | null;
@@ -93,6 +96,13 @@ export type Database = {
             columns: ["actor_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "audit_events_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
             referencedColumns: ["id"];
           },
           {
