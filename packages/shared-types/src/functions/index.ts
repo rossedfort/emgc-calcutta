@@ -5,3 +5,4 @@ export * from './import-csv-preview';
 export * from './import-csv-confirm';
 export * from './void-bid';
 export * from './dispatch-notification';
+export * from './mark-bid-paid';

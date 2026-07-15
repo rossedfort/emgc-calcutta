@@ -51,6 +51,13 @@
 				false
 			)}>Live auction</a
 		>
+		<a
+			href={resolve('/admin/tournaments/[slug]/bookkeeping', { slug: data.tournament.slug })}
+			class={tabClass(
+				resolve('/admin/tournaments/[slug]/bookkeeping', { slug: data.tournament.slug }),
+				false
+			)}>Bookkeeping</a
+		>
 	</nav>
 
 	{@render children()}
