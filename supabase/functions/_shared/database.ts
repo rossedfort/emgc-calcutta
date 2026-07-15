@@ -217,6 +217,38 @@ export type Database = {
           },
         ];
       };
+      notification_prefs: {
+        Row: {
+          created_at: string;
+          email_enabled: boolean;
+          id: string;
+          triggers: Json;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          email_enabled?: boolean;
+          id?: string;
+          triggers?: Json;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          email_enabled?: boolean;
+          id?: string;
+          triggers?: Json;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notification_prefs_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       players: {
         Row: {
           contact_email: string | null;
