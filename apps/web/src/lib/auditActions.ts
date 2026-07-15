@@ -15,6 +15,8 @@ export const AUDIT_ACTIONS = [
 	'role_change',
 	'settings_change',
 	'notification_sent',
+	'notification_failed',
+	'notification_skipped',
 	'bid_marked_paid',
 	'placement_set'
 ] as const;

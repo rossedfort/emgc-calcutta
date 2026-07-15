@@ -66,6 +66,11 @@
 						<a href={resolve('/profile')} {...props}>View profile</a>
 					{/snippet}
 				</DropdownMenu.Item>
+				<DropdownMenu.Item>
+					{#snippet child({ props })}
+						<a href={resolve('/settings/notifications')} {...props}>Notification settings</a>
+					{/snippet}
+				</DropdownMenu.Item>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item onSelect={signOut}>Log out</DropdownMenu.Item>
 			</DropdownMenu.Content>
