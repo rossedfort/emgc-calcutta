@@ -107,7 +107,10 @@
 				variant="brass">View the field</Button
 			>
 			{#if isAdmin}
-				<Button href={resolve('/admin/tournaments')} variant="brass">Manage tournament</Button>
+				<Button
+					href={resolve('/admin/tournaments/[slug]', { slug: tournament.slug })}
+					variant="brass">Manage tournament</Button
+				>
 			{/if}
 		</div>
 	{:else}

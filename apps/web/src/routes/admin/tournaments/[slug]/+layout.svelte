@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { invalidateAll } from '$app/navigation';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { Button } from '$lib/components/ui/button';
+	import EnterResultsModal from '$lib/components/EnterResultsModal.svelte';
 
 	let { data, children } = $props();
+
+	let resultsModalOpen = $state(false);
 
 	function tabClass(href: string, exact: boolean): string {
 		const current = exact
@@ -21,8 +26,19 @@
 			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline"
 				>Back to tournaments</a
 			>
+			<Button variant="brass" size="sm" onclick={() => (resultsModalOpen = true)}
+				>Enter results</Button
+			>
 		{/snippet}
 	</PageHeader>
+
+	<EnterResultsModal
+		bind:open={resultsModalOpen}
+		supabase={data.supabase}
+		tournamentId={data.tournament.id}
+		payoutStructure={data.tournament.payout_structure}
+		onSuccess={() => invalidateAll()}
+	/>
 
 	<nav class="flex gap-4 border-b border-brass/30">
 		<a
