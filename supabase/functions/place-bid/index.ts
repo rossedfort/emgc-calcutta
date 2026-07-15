@@ -50,12 +50,15 @@
 // countdown (spec 4.4/182) — see the comment at that block below for the
 // exact semantics.
 //
-// AuditEvent logging (for both the bid and the reserve event) is a
-// separate, later backlog task — the table doesn't exist until Phase 5.
+// Logs an AuditEvent for both the bid and the reserve event (Phase 5's
+// review pass) — awaited before responding, same reasoning as every other
+// write in this function: this is meant to be a reliable trail, not
+// best-effort background work an Edge Function isolate might not finish.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
+import { logAuditEvent, requestMetadata } from "../_shared/audit.ts";
 import type { Database } from "../_shared/database.ts";
 import type {
   PlaceBidRequest,
@@ -263,6 +266,24 @@ export default {
         });
       }
 
+      const { ip, user_agent } = requestMetadata(req);
+      await logAuditEvent(ctx.supabaseAdmin, {
+        tournament_id: player.tournament_id,
+        player_id: body.playerId,
+        actor_id: ctx.userClaims!.id,
+        actor_identity: ctx.userClaims?.email ?? null,
+        action: "bid_placed",
+        entity_type: "Bid",
+        entity_id: bid.id,
+        after: {
+          amount: bid.amount,
+          phase: bid.phase,
+          placed_at: bid.placed_at,
+        },
+        ip,
+        user_agent,
+      });
+
       // Crossing the threshold pulls the player from the silent pool and
       // freezes further silent bidding on them (spec 4.3) — a silent-only
       // concept, so this never runs for live bids: a live-phase player is
@@ -283,6 +304,20 @@ export default {
           });
         }
         reserved = true;
+
+        await logAuditEvent(ctx.supabaseAdmin, {
+          tournament_id: player.tournament_id,
+          player_id: body.playerId,
+          actor_id: ctx.userClaims!.id,
+          actor_identity: ctx.userClaims?.email ?? null,
+          action: "player_reserved",
+          entity_type: "Player",
+          entity_id: body.playerId,
+          before: { status: "open" },
+          after: { status: "reserved" },
+          ip,
+          user_agent,
+        });
 
         // Auto-queue for the live auction (Phase 4.5, user feedback) — the
         // queue builds itself as the silent auction progresses rather than
