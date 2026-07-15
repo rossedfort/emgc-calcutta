@@ -2,29 +2,32 @@
 // 4.7/6.7) — email-only per the Phase 6 header's confirmed deviation
 // (Twilio/SMS dropped, SendGrid swapped for Resend).
 //
-// Invoked internally by Database Webhook / Postgres trigger logic (later
-// backlog tasks build the actual triggers on Bid/LiveLot/Player changes)
-// — not by end users, so this uses `auth: "secret"` rather than the
-// `auth: "user"` every other function in this project uses: the caller
-// presents the project's own secret/service-role key directly, proving
-// it's a trusted internal caller, not someone's browser session. The
-// caller already knows *who* to notify and *why* (current-high-bid,
-// Player.userId, tournament roster — all doable in plain SQL from a
-// trigger); this function's only job is "send it, and log what
-// happened."
+// Invoked internally by Database Webhook / Postgres trigger logic (the
+// triggers on Bid/LiveLot/Player changes) — not by end users, so this
+// uses `auth: "secret"` rather than the `auth: "user"` every other
+// function in this project uses: the caller presents the project's own
+// secret/service-role key directly, proving it's a trusted internal
+// caller, not someone's browser session. The caller already knows *who*
+// to notify and *why* (current-high-bid, Player.userId, tournament
+// roster — all doable in plain SQL from a trigger); this function's only
+// job is "check whether they want it, send it if so, and log what
+// happened either way."
 //
-// Deliberately does NOT yet check NotificationPref (opt-out) — that's
-// its own separate backlog line ("Respect opt-out"), and nothing calls
-// this function for real yet (the Database Webhook tasks haven't landed),
-// so there's no user-facing gap left temporarily open by building this
-// piece first.
+// Respects NotificationPref opt-out (spec 4.7) before doing any of the
+// recipient/tournament/player lookups a send would otherwise need —
+// checked first, not last, so an opted-out Participant's notifications
+// cost one query instead of several. A missing NotificationPref row
+// (never visited /settings/notifications) defaults to the same
+// all-enabled state that table's own column defaults establish, same
+// reasoning as that page's own load function.
 //
 // Per spec 4.7's "failed sends are logged, not retried indefinitely, and
 // don't block the real-time broadcast or UI update": a failed Resend
 // call is a normal, logged outcome (audit action 'notification_failed',
 // response { sent: false }), never an HTTP error — there's nothing to
 // retry, and nothing waiting on this call should be blocked by an email
-// provider hiccup.
+// provider hiccup. An opt-out skip is logged the same non-error way
+// (audit action 'notification_skipped').
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { Resend } from "resend";
@@ -111,6 +114,55 @@ export default {
         );
       }
 
+      // entity_type/entity_id describe what the notification is *about*
+      // (a Player for every trigger except the tournament-wide
+      // live_starting), not the notification mechanism itself — more
+      // useful for dispute/debugging than a generic 'NotificationPref'
+      // entity would be. Computed early (no DB lookup needed) so the
+      // opt-out check below can log a skip without doing the recipient/
+      // tournament/player lookups a send would otherwise need first.
+      const entityType = body.playerId ? "Player" : "Tournament";
+      const entityId = body.playerId ?? body.tournamentId;
+
+      // Respect opt-out (spec 4.7) before doing any of the lookup/send
+      // work below. A Participant with no notification_prefs row yet
+      // (hasn't visited /settings/notifications) defaults to the same
+      // all-enabled state the migration's own column defaults establish
+      // — `?? true` on both checks, not `?? false`, so a missing row (or
+      // a trigger key some future migration hasn't backfilled onto older
+      // rows yet) never silently suppresses a notification nobody
+      // actually opted out of.
+      const { data: prefs, error: prefsError } = await ctx.supabaseAdmin
+        .from("notification_prefs")
+        .select("email_enabled, triggers")
+        .eq("user_id", body.userId)
+        .maybeSingle();
+      if (prefsError) {
+        return Response.json({ error: prefsError.message }, { status: 500 });
+      }
+
+      const emailEnabled = prefs?.email_enabled ?? true;
+      const triggers = (prefs?.triggers as Record<string, boolean> | null) ??
+        {};
+      const triggerEnabled = triggers[body.trigger] ?? true;
+
+      if (!emailEnabled || !triggerEnabled) {
+        await logAuditEvent(ctx.supabaseAdmin, {
+          tournament_id: body.tournamentId,
+          player_id: body.playerId ?? null,
+          action: "notification_skipped",
+          entity_type: entityType,
+          entity_id: entityId,
+          reason: !emailEnabled
+            ? "Email notifications disabled"
+            : `'${body.trigger}' notifications disabled`,
+          after: { trigger: body.trigger },
+        });
+        return Response.json(
+          { sent: false } satisfies DispatchNotificationResponse,
+        );
+      }
+
       const { data: recipient, error: recipientError } = await ctx
         .supabaseAdmin
         .from("users")
@@ -166,14 +218,6 @@ export default {
         tournament.name,
         body.amount,
       );
-
-      // entity_type/entity_id describe what the notification is *about*
-      // (a Player for every trigger except the tournament-wide
-      // live_starting), not the notification mechanism itself — more
-      // useful for dispute/debugging than a generic 'NotificationPref'
-      // entity would be.
-      const entityType = body.playerId ? "Player" : "Tournament";
-      const entityId = body.playerId ?? body.tournamentId;
 
       const { error: sendError } = await resend.emails.send({
         from: Deno.env.get("RESEND_FROM_EMAIL")!,
