@@ -24,6 +24,14 @@ export interface ResultsRow {
 // bidder:users(...) mirror the bookkeeping page's own disambiguated
 // embeds (players<->bids has two FK paths; see that page's load
 // function for the full explanation).
+//
+// Sorted by placement ascending (1st, 2nd, 3rd... in finishing order),
+// nulls last so not-yet-placed players trail the list rather than
+// scattering among the placed ones; name is a secondary sort so the
+// not-yet-placed group has a stable order across reloads instead of
+// shuffling arbitrarily. Every successful set-placement call triggers
+// invalidateAll() on the client, so a row visibly moves to its new
+// position in the list the moment a placement is saved.
 export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
@@ -34,6 +42,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live'])
+		.order('placement', { ascending: true, nullsFirst: false })
 		.order('name');
 	if (playersError) {
 		error(500, playersError.message);
