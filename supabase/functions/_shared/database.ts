@@ -251,6 +251,8 @@ export type Database = {
       };
       players: {
         Row: {
+          buyer_marked_paid_at: string | null;
+          buyer_marked_paid_by: string | null;
           contact_email: string | null;
           contact_phone: string | null;
           created_at: string;
@@ -259,13 +261,17 @@ export type Database = {
           id: string;
           name: string;
           photo_url: string | null;
+          placement: number | null;
           preferences: string | null;
           slug: string;
           status: Database["public"]["Enums"]["player_status"];
           tournament_id: string;
           user_id: string | null;
+          winning_bid_id: string | null;
         };
         Insert: {
+          buyer_marked_paid_at?: string | null;
+          buyer_marked_paid_by?: string | null;
           contact_email?: string | null;
           contact_phone?: string | null;
           created_at?: string;
@@ -274,13 +280,17 @@ export type Database = {
           id?: string;
           name: string;
           photo_url?: string | null;
+          placement?: number | null;
           preferences?: string | null;
           slug?: string;
           status?: Database["public"]["Enums"]["player_status"];
           tournament_id: string;
           user_id?: string | null;
+          winning_bid_id?: string | null;
         };
         Update: {
+          buyer_marked_paid_at?: string | null;
+          buyer_marked_paid_by?: string | null;
           contact_email?: string | null;
           contact_phone?: string | null;
           created_at?: string;
@@ -289,13 +299,22 @@ export type Database = {
           id?: string;
           name?: string;
           photo_url?: string | null;
+          placement?: number | null;
           preferences?: string | null;
           slug?: string;
           status?: Database["public"]["Enums"]["player_status"];
           tournament_id?: string;
           user_id?: string | null;
+          winning_bid_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "players_buyer_marked_paid_by_fkey";
+            columns: ["buyer_marked_paid_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "players_tournament_id_fkey";
             columns: ["tournament_id"];
@@ -308,6 +327,13 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "players_winning_bid_id_fkey";
+            columns: ["winning_bid_id"];
+            isOneToOne: false;
+            referencedRelation: "bids";
             referencedColumns: ["id"];
           },
         ];

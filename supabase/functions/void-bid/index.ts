@@ -20,6 +20,13 @@
 // place-bid's own high-bid lookup already excludes voided bids, so an
 // open lot's "current high" self-corrects on the next bid with no
 // immediate recompute needed here.
+//
+// The recompute also keeps players.winning_bid_id in sync (Phase 7) —
+// not called out in that column's own backlog line (which only names
+// close_silent_auctions/close_live_lot), but leaving it stale here would
+// undermine the exact thing the column exists for: pot calculation needs
+// it to reflect who *actually* won, and a void-triggered recompute is a
+// real, already-reachable way for the two to drift apart.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
@@ -58,9 +65,17 @@ export default {
         );
       }
 
+      // players!bids_player_id_fkey disambiguates the embed: Phase 7 added
+      // players.winning_bid_id -> bids.id, a second FK path between these
+      // two tables (the other direction from this one, bids.player_id ->
+      // players.id) — PostgREST can no longer infer which relationship
+      // this embed means without the hint, and fails the whole query with
+      // "more than one relationship was found" instead of guessing wrong.
       const { data: bid, error: bidError } = await ctx.supabaseAdmin
         .from("bids")
-        .select("id, player_id, voided_at, amount, players(tournament_id)")
+        .select(
+          "id, player_id, voided_at, amount, players!bids_player_id_fkey(tournament_id)",
+        )
         .eq("id", body.bidId)
         .maybeSingle();
       if (bidError) {
@@ -131,7 +146,10 @@ export default {
 
         const { error: updatePlayerError } = await ctx.supabaseAdmin
           .from("players")
-          .update({ status: newHighBid ? "sold_live" : "no_bid" })
+          .update({
+            status: newHighBid ? "sold_live" : "no_bid",
+            winning_bid_id: newHighBid?.id ?? null,
+          })
           .eq("id", bid.player_id);
         if (updatePlayerError) {
           return Response.json({ error: updatePlayerError.message }, {
