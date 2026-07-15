@@ -27,6 +27,16 @@
 // undermine the exact thing the column exists for: pot calculation needs
 // it to reflect who *actually* won, and a void-triggered recompute is a
 // real, already-reachable way for the two to drift apart.
+//
+// Blocks voiding a player's current winning bid once any Payout exists
+// in the tournament (Phase 7, set-placement task) — confirmed with the
+// user rather than assumed: the total pot (spec 4.8) is a tournament-wide
+// sum across every sold player's winning bid, so voiding one after
+// payouts have already been calculated would silently invalidate every
+// other placed player's payout amount too, not just this bid's own
+// player. Rather than cascade-recompute every existing Payout
+// automatically, an Admin must correct or remove the affected payout(s)
+// first — the void is rejected outright until then.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
@@ -74,7 +84,7 @@ export default {
       const { data: bid, error: bidError } = await ctx.supabaseAdmin
         .from("bids")
         .select(
-          "id, player_id, voided_at, amount, players!bids_player_id_fkey(tournament_id)",
+          "id, player_id, voided_at, amount, players!bids_player_id_fkey(tournament_id, winning_bid_id)",
         )
         .eq("id", body.bidId)
         .maybeSingle();
@@ -88,6 +98,35 @@ export default {
         return Response.json({ error: "This bid is already voided" }, {
           status: 400,
         });
+      }
+
+      // See the header comment: once any Payout exists in this
+      // tournament, voiding this player's current winning bid would
+      // silently invalidate the tournament-wide pot every existing
+      // Payout was calculated from — blocked outright rather than
+      // cascade-recomputed.
+      if (bid.players?.winning_bid_id === bid.id) {
+        const { data: existingPayout, error: payoutCheckError } = await ctx
+          .supabaseAdmin
+          .from("payouts")
+          .select("id")
+          .eq("tournament_id", bid.players.tournament_id)
+          .limit(1)
+          .maybeSingle();
+        if (payoutCheckError) {
+          return Response.json({ error: payoutCheckError.message }, {
+            status: 500,
+          });
+        }
+        if (existingPayout) {
+          return Response.json(
+            {
+              error:
+                "Cannot void this bid: payouts have already been calculated for this tournament, and they depend on the total pot. Correct or remove the affected payout(s) first.",
+            },
+            { status: 400 },
+          );
+        }
       }
 
       const { data: voidedBid, error: voidError } = await ctx.supabaseAdmin
