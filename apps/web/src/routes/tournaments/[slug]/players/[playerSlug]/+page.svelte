@@ -37,7 +37,7 @@
 
 		<dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
 			<dt class="text-ink/60">Flight</dt>
-			<dd>{data.player.flight ?? '—'}</dd>
+			<dd>{data.player.flight || '—'}</dd>
 			<dt class="text-ink/60">Handicap</dt>
 			<dd class="font-data">{data.player.handicap_index ?? '—'}</dd>
 			<dt class="text-ink/60">Contact email</dt>

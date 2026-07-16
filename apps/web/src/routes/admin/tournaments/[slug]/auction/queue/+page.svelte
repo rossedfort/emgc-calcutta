@@ -91,7 +91,7 @@
 						<Table.Row>
 							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">{lot.player.name}</Table.Cell>
-							<Table.Cell>{lot.player.flight ?? '—'}</Table.Cell>
+							<Table.Cell>{lot.player.flight || '—'}</Table.Cell>
 							<Table.Cell class="font-data">{lot.player.handicap_index ?? '—'}</Table.Cell>
 							<Table.Cell>
 								<div class="flex items-center gap-1">

@@ -89,7 +89,7 @@
 				{#each filteredPlayers as player (player.id)}
 					<Table.Row>
 						<Table.Cell class="font-medium text-ink">{player.name}</Table.Cell>
-						<Table.Cell>{player.flight ?? '—'}</Table.Cell>
+						<Table.Cell>{player.flight || '—'}</Table.Cell>
 						<Table.Cell>
 							<Badge variant={playerStatusBadgeVariant(player.status)}>
 								{playerStatusLabel(player.status)}

@@ -148,7 +148,7 @@
 								<br /><span class="text-muted-foreground">{row.contact_phone}</span>
 							{/if}
 						</Table.Cell>
-						<Table.Cell>{row.flight ?? '—'}</Table.Cell>
+						<Table.Cell>{row.flight || '—'}</Table.Cell>
 						<Table.Cell class="font-data">{row.handicap_index ?? '—'}</Table.Cell>
 						<Table.Cell>
 							{#if row.matchedUserId}

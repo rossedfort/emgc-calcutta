@@ -79,7 +79,7 @@
 								class="hover:underline">{player.name}</a
 							>
 						</Table.Cell>
-						<Table.Cell>{player.flight ?? '—'}</Table.Cell>
+						<Table.Cell>{player.flight || '—'}</Table.Cell>
 						<Table.Cell>
 							<Badge variant={playerStatusBadgeVariant(player.status)}>
 								{playerStatusLabel(player.status)}
