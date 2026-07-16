@@ -1,9 +1,11 @@
 import { error } from '@sveltejs/kit';
+import { deriveFlightDivisionGroups, type FlightDivisionGroup } from '$lib/flightGroups';
 import type { PageServerLoad } from './$types';
 
 export interface ResultsRow {
 	id: string;
 	name: string;
+	flight: string;
 	division: string;
 	status: 'sold_silent' | 'sold_live';
 	placement: number | null;
@@ -12,6 +14,11 @@ export interface ResultsRow {
 		bidder: { id: string; name: string | null; email: string } | null;
 	} | null;
 	payout: { pot_share: number; amount: number } | null;
+}
+
+export interface ResultsGroup {
+	group: FlightDivisionGroup;
+	players: ResultsRow[];
 }
 
 // Route deliberately deviates from spec 6.9's flat /admin/results, same
@@ -33,13 +40,22 @@ export interface ResultsRow {
 // shuffling arbitrarily. Every successful set-placement call triggers
 // invalidateAll() on the client, so a row visibly moves to its new
 // position in the list the moment a placement is saved.
+//
+// Phase 7.5: grouped by (flight, division) — one placement list per
+// group (in tournaments.flights order, Championship expanding into
+// Gross/Net) instead of one flat tournament-wide list, matching
+// EnterResultsModal's own grouping (deriveFlightDivisionGroups). The DB
+// query itself doesn't need to change beyond selecting `flight` — the
+// existing placement/name ordering already gives each group's own slice
+// a correctly-sorted order once bucketed, since filtering an
+// already-sorted array preserves relative order.
 export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
 	const { data: players, error: playersError } = await supabase
 		.from('players')
 		.select(
-			'id, name, division, status, placement, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, name, email))'
+			'id, name, flight, division, status, placement, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, name, email))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live'])
@@ -65,8 +81,16 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		})
 	);
 
+	const flights = tournament.flights as string[];
+	const championshipFlight = tournament.championship_flight as string | null;
+	const groups = deriveFlightDivisionGroups(flights, championshipFlight);
+	const results: ResultsGroup[] = groups.map((group) => ({
+		group,
+		players: rows.filter((p) => p.flight === group.flight && p.division === group.division)
+	}));
+
 	return {
 		payoutStructure: tournament.payout_structure as Record<string, number>,
-		players: rows
+		results
 	};
 };

@@ -36,6 +36,8 @@
 		bind:open={resultsModalOpen}
 		supabase={data.supabase}
 		tournamentId={data.tournament.id}
+		flights={data.tournament.flights}
+		championshipFlight={data.tournament.championship_flight}
 		payoutStructure={data.tournament.payout_structure}
 		onSuccess={() => invalidateAll()}
 	/>
