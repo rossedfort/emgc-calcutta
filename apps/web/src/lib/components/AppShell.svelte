@@ -83,6 +83,10 @@
 				{@render navDot('/')}
 				<span>Home</span>
 			</a>
+			<a href={resolve('/me/balance')} class={navLinkClass('/me/balance')}>
+				{@render navDot('/me/balance')}
+				<span>My balance</span>
+			</a>
 
 			{#if isAdmin}
 				<div class="mt-3 mb-1 border-t border-brass/30 pt-3">

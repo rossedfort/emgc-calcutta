@@ -249,8 +249,78 @@ export type Database = {
           },
         ];
       };
+      payouts: {
+        Row: {
+          amount: number;
+          bidder_id: string;
+          calculated_at: string;
+          id: string;
+          marked_paid_at: string | null;
+          marked_paid_by: string | null;
+          placement: number;
+          player_id: string;
+          pot_share: number;
+          tournament_id: string;
+        };
+        Insert: {
+          amount: number;
+          bidder_id: string;
+          calculated_at?: string;
+          id?: string;
+          marked_paid_at?: string | null;
+          marked_paid_by?: string | null;
+          placement: number;
+          player_id: string;
+          pot_share: number;
+          tournament_id: string;
+        };
+        Update: {
+          amount?: number;
+          bidder_id?: string;
+          calculated_at?: string;
+          id?: string;
+          marked_paid_at?: string | null;
+          marked_paid_by?: string | null;
+          placement?: number;
+          player_id?: string;
+          pot_share?: number;
+          tournament_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payouts_bidder_id_fkey";
+            columns: ["bidder_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payouts_marked_paid_by_fkey";
+            columns: ["marked_paid_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payouts_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payouts_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       players: {
         Row: {
+          buyer_marked_paid_at: string | null;
+          buyer_marked_paid_by: string | null;
           contact_email: string | null;
           contact_phone: string | null;
           created_at: string;
@@ -259,13 +329,17 @@ export type Database = {
           id: string;
           name: string;
           photo_url: string | null;
+          placement: number | null;
           preferences: string | null;
           slug: string;
           status: Database["public"]["Enums"]["player_status"];
           tournament_id: string;
           user_id: string | null;
+          winning_bid_id: string | null;
         };
         Insert: {
+          buyer_marked_paid_at?: string | null;
+          buyer_marked_paid_by?: string | null;
           contact_email?: string | null;
           contact_phone?: string | null;
           created_at?: string;
@@ -274,13 +348,17 @@ export type Database = {
           id?: string;
           name: string;
           photo_url?: string | null;
+          placement?: number | null;
           preferences?: string | null;
           slug?: string;
           status?: Database["public"]["Enums"]["player_status"];
           tournament_id: string;
           user_id?: string | null;
+          winning_bid_id?: string | null;
         };
         Update: {
+          buyer_marked_paid_at?: string | null;
+          buyer_marked_paid_by?: string | null;
           contact_email?: string | null;
           contact_phone?: string | null;
           created_at?: string;
@@ -289,13 +367,22 @@ export type Database = {
           id?: string;
           name?: string;
           photo_url?: string | null;
+          placement?: number | null;
           preferences?: string | null;
           slug?: string;
           status?: Database["public"]["Enums"]["player_status"];
           tournament_id?: string;
           user_id?: string | null;
+          winning_bid_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "players_buyer_marked_paid_by_fkey";
+            columns: ["buyer_marked_paid_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "players_tournament_id_fkey";
             columns: ["tournament_id"];
@@ -308,6 +395,13 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "players_winning_bid_id_fkey";
+            columns: ["winning_bid_id"];
+            isOneToOne: false;
+            referencedRelation: "bids";
             referencedColumns: ["id"];
           },
         ];

@@ -18,6 +18,7 @@ export const AUDIT_ACTIONS = [
 	'notification_failed',
 	'notification_skipped',
 	'bid_marked_paid',
+	'payout_marked_paid',
 	'placement_set'
 ] as const;
 

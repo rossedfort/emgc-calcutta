@@ -10,8 +10,8 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 	const { data } = await supabase
 		.from('tournaments')
 		.select('*')
-		.order('created_at', { ascending: false })
-		.limit(1);
+		.neq('status', 'complete')
+		.order('created_at', { ascending: false });
 
-	return { tournament: (data?.[0] as Tournament | undefined) ?? null };
+	return { tournaments: (data as Tournament[] | null) ?? [] };
 };
