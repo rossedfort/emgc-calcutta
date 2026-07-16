@@ -2,7 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { Player } from '$lib/players';
 import type { PageServerLoad } from './$types';
 
-export type PlayerRow = Pick<Player, 'id' | 'slug' | 'name' | 'flight' | 'status'>;
+export type PlayerRow = Pick<Player, 'id' | 'slug' | 'name' | 'flight' | 'division' | 'status'>;
 
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
 	if (!session) {
@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	const { data: players, error: playersError } = await supabase
 		.from('players')
-		.select('id, slug, name, flight, status')
+		.select('id, slug, name, flight, division, status')
 		.eq('tournament_id', tournament.id)
 		.order('name');
 	if (playersError) {

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import * as Table from '$lib/components/ui/table';
@@ -78,6 +79,7 @@
 								})}
 								class="hover:underline">{player.name}</a
 							>
+							<DivisionBadge division={player.division} />
 						</Table.Cell>
 						<Table.Cell>{player.flight || '—'}</Table.Cell>
 						<Table.Cell>

@@ -10,6 +10,7 @@
 		RealtimePlayer
 	} from '@emgc-calcutta/shared-types';
 	import { resolve } from '$app/paths';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -146,15 +147,18 @@
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink">
 			<div class="flex items-start justify-between gap-2">
 				<div class="flex flex-col gap-1">
-					<a
-						href={resolve('/tournaments/[slug]/players/[playerSlug]', {
-							slug: data.tournament.slug,
-							playerSlug: currentPlayer.slug
-						})}
-						class="font-display text-3xl font-semibold text-ink hover:underline"
-					>
-						{currentPlayer.name}
-					</a>
+					<span class="flex items-center gap-2">
+						<a
+							href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+								slug: data.tournament.slug,
+								playerSlug: currentPlayer.slug
+							})}
+							class="font-display text-3xl font-semibold text-ink hover:underline"
+						>
+							{currentPlayer.name}
+						</a>
+						<DivisionBadge division={currentPlayer.division} />
+					</span>
 					{#if currentPlayer.flight || currentPlayer.handicap_index !== null}
 						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 							{[

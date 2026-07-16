@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 
@@ -90,7 +91,10 @@
 					{#each data.queue as lot, index (lot.id)}
 						<Table.Row>
 							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
-							<Table.Cell class="font-medium text-ink">{lot.player.name}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								{lot.player.name}
+								<DivisionBadge division={lot.player.division} />
+							</Table.Cell>
 							<Table.Cell>{lot.player.flight || '—'}</Table.Cell>
 							<Table.Cell class="font-data">{lot.player.handicap_index ?? '—'}</Table.Cell>
 							<Table.Cell>

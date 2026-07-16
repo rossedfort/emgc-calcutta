@@ -4,7 +4,7 @@ import type { PageServerLoad } from './$types';
 
 export type LiveAuctionPlayerRow = Pick<
 	Player,
-	'id' | 'slug' | 'name' | 'flight' | 'handicap_index' | 'status' | 'user_id'
+	'id' | 'slug' | 'name' | 'flight' | 'division' | 'handicap_index' | 'status' | 'user_id'
 >;
 
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
@@ -33,7 +33,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	// against whichever lot the store says is currently open.
 	const { data: players, error: playersError } = await supabase
 		.from('players')
-		.select('id, slug, name, flight, handicap_index, status, user_id')
+		.select('id, slug, name, flight, division, handicap_index, status, user_id')
 		.eq('tournament_id', tournament.id)
 		.order('name');
 	if (playersError) {

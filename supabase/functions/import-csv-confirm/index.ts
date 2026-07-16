@@ -57,7 +57,7 @@ export default {
       const { data: tournament, error: tournamentError } = await ctx
         .supabaseAdmin
         .from("tournaments")
-        .select("id")
+        .select("id, championship_flight")
         .eq("id", body.tournamentId)
         .maybeSingle();
       if (tournamentError) {
@@ -85,17 +85,41 @@ export default {
         });
       }
 
-      const insertRows = body.rows.map((row) => ({
-        tournament_id: body.tournamentId!,
-        name: row.name!.trim(),
-        contact_email: row.contact_email || null,
-        contact_phone: row.contact_phone || null,
-        flight: row.flight || null,
-        handicap_index: row.handicap_index ?? null,
-        preferences: row.preferences || null,
-        photo_url: row.photo_url || null,
-        user_id: row.userId || null,
-      }));
+      // A roster row whose flight is the tournament's Championship flight
+      // becomes *two* players rows — one per division — since that flight's
+      // golfers are auctioned separately for Gross and Net (Phase 7.5).
+      // Every other row stays a single 'overall' row, unchanged. A linked
+      // userId is carried onto both Championship rows (confirmed decision):
+      // the relaxed (tournament_id, user_id, division) uniqueness (see this
+      // task's own migration) is exactly what makes that possible without
+      // colliding with the Gross/Net counterpart.
+      const insertRows = body.rows.flatMap((row) => {
+        const base = {
+          tournament_id: body.tournamentId!,
+          name: row.name!.trim(),
+          contact_email: row.contact_email || null,
+          contact_phone: row.contact_phone || null,
+          // '' (not null) — players.flight is not-null-default-'' as of the
+          // flighting schema task; a raw `|| null` here would violate that
+          // constraint for any row with no flight in the CSV.
+          flight: row.flight || "",
+          handicap_index: row.handicap_index ?? null,
+          preferences: row.preferences || null,
+          photo_url: row.photo_url || null,
+          user_id: row.userId || null,
+        };
+
+        if (
+          tournament.championship_flight &&
+          row.flight === tournament.championship_flight
+        ) {
+          return [
+            { ...base, division: "gross" },
+            { ...base, division: "net" },
+          ];
+        }
+        return [{ ...base, division: "overall" }];
+      });
 
       const { data, error: insertError } = await ctx.supabaseAdmin
         .from("players")

@@ -4,6 +4,7 @@ import type { PageServerLoad } from './$types';
 export interface ResultsRow {
 	id: string;
 	name: string;
+	division: string;
 	status: 'sold_silent' | 'sold_live';
 	placement: number | null;
 	winning_bid: {
@@ -38,7 +39,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: players, error: playersError } = await supabase
 		.from('players')
 		.select(
-			'id, name, status, placement, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, name, email))'
+			'id, name, division, status, placement, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, name, email))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live'])

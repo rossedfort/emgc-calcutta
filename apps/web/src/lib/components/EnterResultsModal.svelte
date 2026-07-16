@@ -3,12 +3,14 @@
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import type { Database } from '@emgc-calcutta/shared-types';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 
 	interface PlayerOption {
 		id: string;
 		name: string;
+		division: string;
 	}
 
 	type Selection = PlayerOption | null;
@@ -60,14 +62,14 @@
 		loadingExisting = true;
 		const { data } = await supabase
 			.from('players')
-			.select('id, name, placement')
+			.select('id, name, division, placement')
 			.eq('tournament_id', tournamentId)
 			.not('placement', 'is', null);
 
 		const next: Record<number, Selection> = {};
 		for (const row of data ?? []) {
 			if (row.placement !== null) {
-				next[row.placement as number] = { id: row.id, name: row.name };
+				next[row.placement as number] = { id: row.id, name: row.name, division: row.division };
 			}
 		}
 		selections = next;
@@ -112,7 +114,7 @@
 	async function runSearch(placement: number, value: string) {
 		const { data } = await supabase
 			.from('players')
-			.select('id, name')
+			.select('id, name, division')
 			.eq('tournament_id', tournamentId)
 			.in('status', ['sold_silent', 'sold_live'])
 			.ilike('name', `%${value}%`)
@@ -197,7 +199,10 @@
 							<div
 								class="flex items-center justify-between rounded-md border border-input px-3 py-1.5 text-sm"
 							>
-								<span class="text-ink">{selections[spot.placement]?.name}</span>
+								<span class="flex items-center gap-2 text-ink">
+									{selections[spot.placement]?.name}
+									<DivisionBadge division={selections[spot.placement]?.division ?? 'overall'} />
+								</span>
 								<button
 									type="button"
 									class="text-xs text-brass hover:underline"
@@ -221,10 +226,11 @@
 										{#each suggestions[spot.placement] as player (player.id)}
 											<button
 												type="button"
-												class="block w-full px-3 py-1.5 text-left text-sm hover:bg-brass/10"
+												class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-brass/10"
 												onclick={() => selectPlayer(spot.placement, player)}
 											>
 												{player.name}
+												<DivisionBadge division={player.division} />
 											</button>
 										{/each}
 									</div>

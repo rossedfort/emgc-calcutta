@@ -1,4 +1,5 @@
 <script lang="ts">
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -53,7 +54,10 @@
 					{#each owed as row (row.id)}
 						<Table.Row>
 							<Table.Cell>{row.tournament?.name ?? '—'}</Table.Cell>
-							<Table.Cell class="font-medium text-ink">{row.name}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								{row.name}
+								<DivisionBadge division={row.division} />
+							</Table.Cell>
 							<Table.Cell class="font-data">
 								{row.winning_bid ? formatCurrency(row.winning_bid.amount) : '—'}
 							</Table.Cell>
@@ -96,7 +100,12 @@
 					{#each won as row (row.id)}
 						<Table.Row>
 							<Table.Cell>{row.tournament?.name ?? '—'}</Table.Cell>
-							<Table.Cell class="font-medium text-ink">{row.player?.name ?? '—'}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								{row.player?.name ?? '—'}
+								{#if row.player}
+									<DivisionBadge division={row.player.division} />
+								{/if}
+							</Table.Cell>
 							<Table.Cell class="font-data">{ordinal(row.placement)}</Table.Cell>
 							<Table.Cell class="font-data">{formatCurrency(row.amount)}</Table.Cell>
 							<Table.Cell>

@@ -9,6 +9,7 @@
 		RealtimePlayer
 	} from '@emgc-calcutta/shared-types';
 	import { resolve } from '$app/paths';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -230,6 +231,7 @@
 							>
 								{player.name}
 							</a>
+							<DivisionBadge division={player.division} />
 							{#if metaLine}
 								<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 									{metaLine}
