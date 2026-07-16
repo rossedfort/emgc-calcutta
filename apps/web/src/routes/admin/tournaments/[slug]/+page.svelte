@@ -31,7 +31,8 @@
 		silent_auction_end: toLocalInput(data.tournament.silent_auction_end),
 		threshold_amount: String(data.tournament.threshold_amount),
 		min_increment: String(data.tournament.min_increment),
-		anti_snipe_seconds: String(data.tournament.anti_snipe_seconds)
+		anti_snipe_seconds: String(data.tournament.anti_snipe_seconds),
+		championship_flight: data.tournament.championship_flight ?? ''
 	});
 
 	let defaultPayoutRows = $derived<PayoutRow[]>(
@@ -101,6 +102,7 @@
 		<TournamentForm
 			values={(form?.values as TournamentFormValues | undefined) ?? defaultValues}
 			payoutRows={defaultPayoutRows}
+			flights={data.tournament.flights}
 			errors={form?.errors ?? {}}
 			submitLabel="Save changes"
 		/>

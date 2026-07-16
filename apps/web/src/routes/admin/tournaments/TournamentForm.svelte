@@ -8,11 +8,18 @@
 	interface Props {
 		values: TournamentFormValues;
 		payoutRows: PayoutRow[];
+		flights: string[];
 		errors: Record<string, string>;
 		submitLabel: string;
 	}
 
-	let { values, payoutRows: initialPayoutRows, errors, submitLabel }: Props = $props();
+	let {
+		values,
+		payoutRows: initialPayoutRows,
+		flights: initialFlights,
+		errors,
+		submitLabel
+	}: Props = $props();
 
 	// Seeds local, independently-editable row state from the prop once — not
 	// a live mirror of it, since the user adds/removes/edits rows from here.
@@ -37,6 +44,42 @@
 			)
 		)
 	);
+
+	// Flights (Phase 7.5) — order matters (it's the display/ranking order
+	// used everywhere else), so add/remove/reorder rather than a plain set.
+	let flightRows = $state<string[]>(
+		untrack(() => (initialFlights.length > 0 ? [...initialFlights] : ['']))
+	);
+
+	function addFlight() {
+		flightRows = [...flightRows, ''];
+	}
+
+	function removeFlight(index: number) {
+		flightRows = flightRows.filter((_, i) => i !== index);
+	}
+
+	function moveFlight(index: number, direction: -1 | 1) {
+		const target = index + direction;
+		if (target < 0 || target >= flightRows.length) return;
+		const next = [...flightRows];
+		[next[index], next[target]] = [next[target], next[index]];
+		flightRows = next;
+	}
+
+	let flightNames = $derived(flightRows.map((f) => f.trim()).filter(Boolean));
+	let flightsJson = $derived(JSON.stringify(flightNames));
+
+	let championshipFlight = $state(untrack(() => values.championship_flight));
+
+	// The Championship flight (if any) must always be one of the currently
+	// entered flight names — if it's renamed or removed out from under it,
+	// fall back to "none" rather than silently submitting a stale value.
+	$effect(() => {
+		if (championshipFlight && !flightNames.includes(championshipFlight)) {
+			championshipFlight = '';
+		}
+	});
 </script>
 
 <div class="flex flex-col gap-4">
@@ -147,6 +190,60 @@
 				{errors.anti_snipe_seconds}
 			</p>{/if}
 	</div>
+
+	<div class="flex flex-col gap-2">
+		<Label>Flights (optional — order determines display/ranking order everywhere else)</Label>
+		{#each flightRows.keys() as i (i)}
+			<div class="flex items-center gap-2">
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					disabled={i === 0}
+					onclick={() => moveFlight(i, -1)}>↑</Button
+				>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					disabled={i === flightRows.length - 1}
+					onclick={() => moveFlight(i, 1)}>↓</Button
+				>
+				<Input placeholder="Flight name" bind:value={flightRows[i]} class="max-w-64" />
+				<Button type="button" variant="ghost" size="sm" onclick={() => removeFlight(i)}
+					>Remove</Button
+				>
+			</div>
+		{/each}
+		<Button type="button" variant="outline" size="sm" class="w-fit" onclick={addFlight}
+			>Add flight</Button
+		>
+		{#if errors.flights}<p class="text-sm text-destructive">{errors.flights}</p>{/if}
+	</div>
+
+	<div class="flex flex-col gap-1.5">
+		<Label for="championship_flight">Championship flight (optional)</Label>
+		<select
+			id="championship_flight"
+			name="championship_flight"
+			bind:value={championshipFlight}
+			disabled={flightNames.length === 0}
+			class="h-9 max-w-64 rounded-md border border-input bg-transparent px-3 text-sm"
+		>
+			<option value="">— None —</option>
+			{#each flightNames as name (name)}
+				<option value={name}>{name}</option>
+			{/each}
+		</select>
+		<p class="text-xs text-muted-foreground">
+			Players in this flight are auctioned twice — once for Gross, once for Net.
+		</p>
+		{#if errors.championship_flight}<p class="text-sm text-destructive">
+				{errors.championship_flight}
+			</p>{/if}
+	</div>
+
+	<input type="hidden" name="flights" value={flightsJson} />
 
 	<div class="flex flex-col gap-2">
 		<Label>Payout structure (optional — can be finalized later, before results are entered)</Label>
