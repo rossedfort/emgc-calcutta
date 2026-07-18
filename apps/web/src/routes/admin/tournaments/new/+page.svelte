@@ -14,7 +14,8 @@
 		silent_auction_end: '',
 		threshold_amount: '',
 		min_increment: '',
-		anti_snipe_seconds: '15'
+		anti_snipe_seconds: '15',
+		championship_flight: ''
 	};
 </script>
 
@@ -29,6 +30,7 @@
 		<TournamentForm
 			values={(form?.values as TournamentFormValues | undefined) ?? emptyValues}
 			payoutRows={[]}
+			flights={[]}
 			errors={form?.errors ?? {}}
 			submitLabel="Create tournament"
 		/>

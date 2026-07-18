@@ -5,6 +5,21 @@
 // every placement it wants filled, and any payout_structure place left
 // out is treated as intentionally vacant.
 //
+// Phase 7.5 (flighted results): placements, clearing, and pot are all
+// scoped per (flight, division) group, not per tournament — a flighted
+// tournament has one full 1st/2nd/3rd... per flight (and, for the
+// Championship flight, per division within it), each with its own pot
+// (confirmed decision: pot is per-flight/division, not one tournament-
+// wide pot split across flights). `SetPlacementEntry` itself is
+// unchanged (`{playerId, placement}`) — flight/division aren't
+// client-supplied, they're read off each targeted player's own row,
+// since a player's flight/division is fixed once sold. This means two
+// entries in the same request can legitimately share a placement number
+// (Flight A's 1st and Flight B's 1st), so every uniqueness/clearing/pot
+// computation below groups by (flight, division) instead of comparing
+// placement numbers directly — the flat tournament-wide version of this
+// logic would incorrectly collide unrelated flights' placements.
+//
 // This replaces an earlier single-player version of this function.
 // Rebuilt as bulk for two reasons, both surfaced by real usage of the
 // results-entry modal rather than anticipated up front: (1) the modal was
@@ -26,17 +41,19 @@
 // is those are often different people.
 //
 // Pot is the sum of winning_bid_id-referenced bid amounts across every
-// sold_silent/sold_live player in the tournament (spec 4.8), not just
-// live-auction winners, and not scoped to already-placed players — the
-// pot total is fixed once every player is sold, independent of how many
-// have been placed so far, so recomputing it fresh on every call is both
-// correct and cheap.
+// sold_silent/sold_live player *in the same (flight, division) group*
+// (spec 4.8 plus the Phase 7.5 per-group scoping above), not just
+// live-auction winners, and not scoped to already-placed players — each
+// group's pot total is fixed once every one of its players is sold,
+// independent of how many have been placed so far, so recomputing it
+// fresh on every call is both correct and cheap.
 //
-// Placement ties stay disallowed (players_tournament_id_placement_key,
-// the original per-player version's migration) — checked here too via
-// the "no duplicate placement in the payload" validation, so a
-// same-request collision surfaces as a clear message rather than a raw
-// constraint error.
+// Placement ties stay disallowed within a (flight, division) group
+// (players_tournament_id_placement_key, now `(tournament_id, flight,
+// division, placement)` as of the flighting schema task) — checked here
+// too via the "no duplicate (flight, division, placement) in the
+// payload" validation, so a same-request collision surfaces as a clear
+// message rather than a raw constraint error.
 //
 // Reassigning a placement away from a player whose payout is already
 // marked paid is blocked outright, not silently allowed — confirmed as
@@ -112,15 +129,14 @@ export default {
           { status: 400 },
         );
       }
-      const placementNumbers = placements.map((p) => p.placement);
-      if (new Set(placementNumbers).size !== placementNumbers.length) {
-        return Response.json(
-          {
-            error: "The same placement was submitted for more than one player",
-          },
-          { status: 400 },
-        );
-      }
+
+      // (flight, division, placement) — not just placement — since two
+      // entries can legitimately share a placement number as long as
+      // they're in different flight/division groups. Checked again below
+      // once each entry's player (and therefore flight/division) is
+      // confirmed to exist.
+      const groupKey = (flight: string, division: string, placement: number) =>
+        JSON.stringify([flight, division, placement]);
 
       const { data: tournament, error: tournamentError } = await ctx
         .supabaseAdmin
@@ -164,7 +180,7 @@ export default {
         .supabaseAdmin
         .from("players")
         .select(
-          "id, tournament_id, status, placement, winning_bid_id, winning_bid:bids!players_winning_bid_id_fkey(bidder_id)",
+          "id, tournament_id, flight, division, status, placement, winning_bid_id, winning_bid:bids!players_winning_bid_id_fkey(bidder_id)",
         )
         .in(
           "id",
@@ -223,10 +239,28 @@ export default {
         }
       }
 
+      // Now that every entry's player (and therefore flight/division) is
+      // confirmed valid: two entries may share a placement number as long
+      // as they're in different (flight, division) groups, but not within
+      // the same one.
+      const entryGroupKeys = placements.map((p) => {
+        const player = targetById.get(p.playerId)!;
+        return groupKey(player.flight, player.division, p.placement);
+      });
+      if (new Set(entryGroupKeys).size !== entryGroupKeys.length) {
+        return Response.json(
+          {
+            error:
+              "The same placement was submitted for more than one player within the same flight/division",
+          },
+          { status: 400 },
+        );
+      }
+
       const { data: currentlyPlaced, error: currentlyPlacedError } = await ctx
         .supabaseAdmin
         .from("players")
-        .select("id, placement")
+        .select("id, flight, division, placement")
         .eq("tournament_id", tournamentId)
         .not("placement", "is", null);
       if (currentlyPlacedError) {
@@ -235,15 +269,27 @@ export default {
         });
       }
 
-      // A currently-placed player is cleared unless this submission
-      // keeps *them specifically* on *their current* placement number —
-      // moved to a different number, or their number handed to someone
-      // else, or simply dropped, all resolve to "clear."
-      const desiredByPlacement = new Map(
-        placements.map((p) => [p.placement, p.playerId]),
+      // A currently-placed player is cleared unless this submission keeps
+      // *them specifically* on *their current* (flight, division,
+      // placement) — moved to a different number, their spot handed to a
+      // different player *within the same flight/division*, or simply
+      // dropped, all resolve to "clear." Keying by the group (not just
+      // placement) is what keeps this scoped correctly: a request that
+      // only touches Flight A must never clear Flight B's placement
+      // holders just because they happen to share a placement number.
+      const desiredByGroupPlacement = new Map(
+        placements.map((p) => {
+          const player = targetById.get(p.playerId)!;
+          return [
+            groupKey(player.flight, player.division, p.placement),
+            p.playerId,
+          ];
+        }),
       );
       const toClear = (currentlyPlaced ?? []).filter((p) =>
-        desiredByPlacement.get(p.placement as number) !== p.id
+        desiredByGroupPlacement.get(
+          groupKey(p.flight, p.division, p.placement as number),
+        ) !== p.id
       );
 
       if (toClear.length > 0) {
@@ -297,10 +343,18 @@ export default {
         }
       }
 
+      // Pot per (flight, division) group, not one tournament-wide pot —
+      // e.g. Flight A's pot is the sum of winning bids for Flight A's own
+      // sold players only, independent of what Flight B raised. Every
+      // ordinary flight has exactly one group (division always
+      // 'overall'); the Championship flight has two ('gross' and 'net'),
+      // each with its own separate pot, per the confirmed decision.
       const { data: soldPlayers, error: soldPlayersError } = await ctx
         .supabaseAdmin
         .from("players")
-        .select("winning_bid:bids!players_winning_bid_id_fkey(amount)")
+        .select(
+          "flight, division, winning_bid:bids!players_winning_bid_id_fkey(amount)",
+        )
         .eq("tournament_id", tournamentId)
         .in("status", ["sold_silent", "sold_live"]);
       if (soldPlayersError) {
@@ -308,10 +362,14 @@ export default {
           status: 500,
         });
       }
-      const pot = (soldPlayers ?? []).reduce(
-        (sum, p) => sum + (p.winning_bid?.amount ?? 0),
-        0,
-      );
+      const potByGroup = new Map<string, number>();
+      for (const p of soldPlayers ?? []) {
+        const key = JSON.stringify([p.flight, p.division]);
+        potByGroup.set(
+          key,
+          (potByGroup.get(key) ?? 0) + (p.winning_bid?.amount ?? 0),
+        );
+      }
 
       const { ip, user_agent } = requestMetadata(req);
       const results: SetPlacementResultEntry[] = [];
@@ -343,6 +401,9 @@ export default {
         }
 
         const potShare = payoutStructure[String(entry.placement)];
+        const pot = potByGroup.get(
+          JSON.stringify([player.flight, player.division]),
+        ) ?? 0;
         const amount = Math.round(pot * potShare * 100) / 100;
 
         const { data: payout, error: payoutError } = await ctx.supabaseAdmin

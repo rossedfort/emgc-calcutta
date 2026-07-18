@@ -4,6 +4,7 @@ import type { PageServerLoad } from './$types';
 export interface OwedRow {
 	id: string;
 	name: string;
+	division: string;
 	status: 'sold_silent' | 'sold_live';
 	buyer_marked_paid_at: string | null;
 	tournament: { name: string } | null;
@@ -16,7 +17,7 @@ export interface WonRow {
 	amount: number;
 	marked_paid_at: string | null;
 	tournament: { name: string } | null;
-	player: { name: string } | null;
+	player: { name: string; division: string } | null;
 }
 
 // Spec 4.8/6.9: "Self" access — any authenticated user, not just
@@ -47,7 +48,7 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 	const { data: owed, error: owedError } = await supabase
 		.from('players')
 		.select(
-			'id, name, status, buyer_marked_paid_at, tournament:tournaments(name), winning_bid:bids!players_winning_bid_id_fkey!inner(amount, bidder_id)'
+			'id, name, division, status, buyer_marked_paid_at, tournament:tournaments(name), winning_bid:bids!players_winning_bid_id_fkey!inner(amount, bidder_id)'
 		)
 		.eq('winning_bid.bidder_id', userId)
 		.order('name');
@@ -58,7 +59,7 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 	const { data: won, error: wonError } = await supabase
 		.from('payouts')
 		.select(
-			'id, placement, amount, marked_paid_at, tournament:tournaments(name), player:players(name)'
+			'id, placement, amount, marked_paid_at, tournament:tournaments(name), player:players(name, division)'
 		)
 		.eq('bidder_id', userId)
 		.order('placement');

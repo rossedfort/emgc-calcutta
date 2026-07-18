@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
@@ -24,6 +25,7 @@
 			<Badge variant={playerStatusBadgeVariant(data.player.status)}>
 				{playerStatusLabel(data.player.status)}
 			</Badge>
+			<DivisionBadge division={data.player.division} />
 			{#if data.isYou}
 				<Badge variant="brass">This is you</Badge>
 			{:else if data.player.user_id}
@@ -37,7 +39,7 @@
 
 		<dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
 			<dt class="text-ink/60">Flight</dt>
-			<dd>{data.player.flight ?? '—'}</dd>
+			<dd>{data.player.flight || '—'}</dd>
 			<dt class="text-ink/60">Handicap</dt>
 			<dd class="font-data">{data.player.handicap_index ?? '—'}</dd>
 			<dt class="text-ink/60">Contact email</dt>

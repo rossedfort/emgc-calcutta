@@ -12,6 +12,7 @@ export type PlayerProfile = Pick<
 	| 'preferences'
 	| 'photo_url'
 	| 'flight'
+	| 'division'
 	| 'handicap_index'
 	| 'status'
 	| 'user_id'
@@ -40,7 +41,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	const { data: player, error: playerError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, name, contact_email, contact_phone, preferences, photo_url, flight, handicap_index, status, user_id'
+			'id, slug, name, contact_email, contact_phone, preferences, photo_url, flight, division, handicap_index, status, user_id'
 		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)

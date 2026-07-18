@@ -9,9 +9,13 @@
 // migration that changes the public schema (swap `--local` for
 // `--linked` to generate from the remote project instead), then keep
 // packages/shared-types/src/database.ts's re-export as-is.
-export type Json = string | number | boolean | null | {
-  [key: string]: Json | undefined;
-} | Json[];
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export type Database = {
   graphql_public: {
@@ -324,7 +328,8 @@ export type Database = {
           contact_email: string | null;
           contact_phone: string | null;
           created_at: string;
-          flight: string | null;
+          division: string;
+          flight: string;
           handicap_index: number | null;
           id: string;
           name: string;
@@ -343,7 +348,8 @@ export type Database = {
           contact_email?: string | null;
           contact_phone?: string | null;
           created_at?: string;
-          flight?: string | null;
+          division?: string;
+          flight?: string;
           handicap_index?: number | null;
           id?: string;
           name: string;
@@ -362,7 +368,8 @@ export type Database = {
           contact_email?: string | null;
           contact_phone?: string | null;
           created_at?: string;
-          flight?: string | null;
+          division?: string;
+          flight?: string;
           handicap_index?: number | null;
           id?: string;
           name?: string;
@@ -409,7 +416,9 @@ export type Database = {
       tournaments: {
         Row: {
           anti_snipe_seconds: number;
+          championship_flight: string | null;
           created_at: string;
+          flights: string[];
           id: string;
           kind: string;
           live_auction_started_at: string | null;
@@ -424,7 +433,9 @@ export type Database = {
         };
         Insert: {
           anti_snipe_seconds?: number;
+          championship_flight?: string | null;
           created_at?: string;
+          flights?: string[];
           id?: string;
           kind?: string;
           live_auction_started_at?: string | null;
@@ -439,7 +450,9 @@ export type Database = {
         };
         Update: {
           anti_snipe_seconds?: number;
+          championship_flight?: string | null;
           created_at?: string;
+          flights?: string[];
           id?: string;
           kind?: string;
           live_auction_started_at?: string | null;
@@ -492,6 +505,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      call_dispatch_notification: {
+        Args: { payload: Json };
+        Returns: undefined;
+      };
       close_live_lot: { Args: { lot_id: string }; Returns: undefined };
       close_silent_auctions: { Args: never; Returns: undefined };
       current_user_role: {
@@ -508,7 +525,10 @@ export type Database = {
         Returns: undefined;
       };
       slugify: { Args: { input: string }; Returns: string };
-      start_live_auction: { Args: { tournament_id: string }; Returns: undefined };
+      start_live_auction: {
+        Args: { tournament_id: string };
+        Returns: undefined;
+      };
       swap_queue_position: {
         Args: { lot_a: string; lot_b: string };
         Returns: undefined;
@@ -540,7 +560,7 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   } ? keyof (
       & DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
@@ -550,7 +570,7 @@ export type Tables<
         "Views"
       ]
     )
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 } ? (
@@ -564,26 +584,28 @@ export type Tables<
     Row: infer R;
   } ? R
   : never
-  : DefaultSchemaTableNameOrOptions extends
-    keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[
-      DefaultSchemaTableNameOrOptions
-    ] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (
+    & DefaultSchema["Tables"]
+    & DefaultSchema["Views"]
+  ) ? (
+      & DefaultSchema["Tables"]
+      & DefaultSchema["Views"]
+    )[DefaultSchemaTableNameOrOptions] extends {
       Row: infer R;
     } ? R
     : never
   : never;
 
 export type TablesInsert<
-  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | {
-    schema: keyof DatabaseWithoutInternals;
-  },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   } ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
       "Tables"
     ]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 } ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
@@ -600,15 +622,15 @@ export type TablesInsert<
   : never;
 
 export type TablesUpdate<
-  DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"] | {
-    schema: keyof DatabaseWithoutInternals;
-  },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   } ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
       "Tables"
     ]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 } ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]][
@@ -625,15 +647,15 @@ export type TablesUpdate<
   : never;
 
 export type Enums<
-  DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"] | {
-    schema: keyof DatabaseWithoutInternals;
-  },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   } ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]][
       "Enums"
     ]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 } ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][
@@ -647,12 +669,12 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   } ? keyof DatabaseWithoutInternals[
       PublicCompositeTypeNameOrOptions["schema"]
     ]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 } ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]][

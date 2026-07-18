@@ -3,48 +3,66 @@
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import type { Database } from '@emgc-calcutta/shared-types';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { deriveFlightDivisionGroups, type FlightDivisionGroup } from '$lib/flightGroups';
 
 	interface PlayerOption {
 		id: string;
 		name: string;
+		division: string;
 	}
 
 	type Selection = PlayerOption | null;
+	type Group = FlightDivisionGroup;
 
 	let {
 		open = $bindable(false),
 		supabase,
 		tournamentId,
+		flights,
+		championshipFlight,
 		payoutStructure,
 		onSuccess
 	}: {
 		open?: boolean;
 		supabase: SupabaseClient<Database>;
 		tournamentId: string;
+		flights: string[];
+		championshipFlight: string | null;
 		payoutStructure: Record<string, number>;
 		onSuccess?: () => void;
 	} = $props();
 
-	// One row per configured payout place — spots come entirely from
-	// payout_structure, not from any existing placement data, so an
-	// unconfigured place never gets a row and a configured-but-unfilled
-	// place always does.
+	let groups = $derived(deriveFlightDivisionGroups(flights, championshipFlight));
+
+	// One row per configured payout place, shared by every group — the
+	// same payout_structure percentages apply independently to each
+	// group's own pot (confirmed decision), so there's only ever one
+	// `spots` list, not one per group.
 	let spots = $derived(
 		Object.entries(payoutStructure)
 			.map(([place, share]) => ({ placement: Number(place), share }))
 			.sort((a, b) => a.placement - b.placement)
 	);
 
-	let selections: Record<number, Selection> = $state({});
-	let queries: Record<number, string> = $state({});
-	let suggestions: Record<number, PlayerOption[]> = $state({});
+	// Two different groups can legitimately share a placement number
+	// (Flight A's 1st and Flight B's 1st are different rows), so every
+	// per-spot state map below is keyed by (flight, division, placement)
+	// together, not placement alone.
+	function spotKey(group: { flight: string; division: string }, placement: number): string {
+		return JSON.stringify([group.flight, group.division, placement]);
+	}
+
+	let selections: Record<string, Selection> = $state({});
+	let queries: Record<string, string> = $state({});
+	let suggestions: Record<string, PlayerOption[]> = $state({});
 	let submitting = $state(false);
 	let loadingExisting = $state(false);
 	let errorMessage = $state('');
 
-	const debounceTimers: Record<number, ReturnType<typeof setTimeout>> = {};
+	const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
 	function ordinal(n: number): string {
 		const suffixes = ['th', 'st', 'nd', 'rd'];
@@ -60,14 +78,15 @@
 		loadingExisting = true;
 		const { data } = await supabase
 			.from('players')
-			.select('id, name, placement')
+			.select('id, name, flight, division, placement')
 			.eq('tournament_id', tournamentId)
 			.not('placement', 'is', null);
 
-		const next: Record<number, Selection> = {};
+		const next: Record<string, Selection> = {};
 		for (const row of data ?? []) {
 			if (row.placement !== null) {
-				next[row.placement as number] = { id: row.id, name: row.name };
+				const key = spotKey({ flight: row.flight, division: row.division }, row.placement);
+				next[key] = { id: row.id, name: row.name, division: row.division };
 			}
 		}
 		selections = next;
@@ -86,67 +105,84 @@
 	// A player already chosen for a different spot is excluded from every
 	// other spot's suggestions — nothing stops the same player being typed
 	// into two boxes otherwise, which would just silently overwrite one
-	// placement with the other on submit.
-	function usedPlayerIds(excludePlacement: number): Set<string> {
+	// placement with the other on submit. Checked across every group, not
+	// just the current one, though a player could only ever plausibly show
+	// up in their own group's suggestions anyway (the search itself is
+	// already scoped to the group's flight/division).
+	function usedPlayerIds(excludeKey: string): Set<string> {
 		return new Set(
 			Object.entries(selections)
-				.filter(([placement]) => Number(placement) !== excludePlacement)
+				.filter(([key]) => key !== excludeKey)
 				.map(([, sel]) => sel?.id)
 				.filter((id): id is string => !!id)
 		);
 	}
 
-	function onQueryInput(placement: number, value: string) {
-		queries[placement] = value;
-		clearTimeout(debounceTimers[placement]);
+	function onQueryInput(group: Group, placement: number, value: string) {
+		const key = spotKey(group, placement);
+		queries[key] = value;
+		clearTimeout(debounceTimers[key]);
 		if (!value.trim()) {
-			suggestions[placement] = [];
+			suggestions[key] = [];
 			return;
 		}
-		debounceTimers[placement] = setTimeout(() => runSearch(placement, value), 300);
+		debounceTimers[key] = setTimeout(() => runSearch(group, placement, value), 300);
 	}
 
 	// Only sold players are eligible for a placement — set-placement itself
 	// rejects anything else, so the type-ahead never offers a choice
-	// guaranteed to fail.
-	async function runSearch(placement: number, value: string) {
+	// guaranteed to fail. Scoped to this group's own flight/division so a
+	// search from one group's box can never suggest another group's player.
+	async function runSearch(group: Group, placement: number, value: string) {
+		const key = spotKey(group, placement);
 		const { data } = await supabase
 			.from('players')
-			.select('id, name')
+			.select('id, name, division')
 			.eq('tournament_id', tournamentId)
+			.eq('flight', group.flight)
+			.eq('division', group.division)
 			.in('status', ['sold_silent', 'sold_live'])
 			.ilike('name', `%${value}%`)
 			.order('name')
 			.limit(8);
 
-		const exclude = usedPlayerIds(placement);
-		suggestions[placement] = ((data ?? []) as PlayerOption[]).filter((p) => !exclude.has(p.id));
+		const exclude = usedPlayerIds(key);
+		suggestions[key] = ((data ?? []) as PlayerOption[]).filter((p) => !exclude.has(p.id));
 	}
 
-	function selectPlayer(placement: number, player: PlayerOption) {
-		selections[placement] = player;
-		queries[placement] = '';
-		suggestions[placement] = [];
+	function selectPlayer(group: Group, placement: number, player: PlayerOption) {
+		const key = spotKey(group, placement);
+		selections[key] = player;
+		queries[key] = '';
+		suggestions[key] = [];
 	}
 
-	function clearSpot(placement: number) {
-		selections[placement] = null;
+	function clearSpot(group: Group, placement: number) {
+		selections[spotKey(group, placement)] = null;
 	}
 
-	// One bulk call carrying the full desired state, not one call per
-	// filled spot — set-placement resolves reassignments (vacating a spot
-	// before handing it to a different player) server-side, which a
-	// sequence of independent per-spot calls from here couldn't do
-	// correctly no matter what order they ran in. Any configured place
-	// left empty in this form is implicitly "clear whoever holds it,"
-	// handled the same way on the server.
+	// One bulk call carrying the full desired state across every group, not
+	// one call per filled spot or per group — set-placement resolves
+	// reassignments (vacating a spot before handing it to a different
+	// player) server-side, which a sequence of independent per-spot calls
+	// from here couldn't do correctly no matter what order they ran in.
+	// Any configured place left empty in this form is implicitly "clear
+	// whoever holds it," handled the same way on the server. flight/
+	// division aren't sent — set-placement reads them off each targeted
+	// player's own row, so this payload is exactly the same shape
+	// regardless of how many groups are involved.
 	async function submit() {
 		submitting = true;
 		errorMessage = '';
 
-		const placements = spots
-			.filter((s) => selections[s.placement])
-			.map((s) => ({ playerId: selections[s.placement]!.id, placement: s.placement }));
+		const placements = groups.flatMap((group) =>
+			spots
+				.filter((s) => selections[spotKey(group, s.placement)])
+				.map((s) => ({
+					playerId: selections[spotKey(group, s.placement)]!.id,
+					placement: s.placement
+				}))
+		);
 
 		const { error } = await supabase.functions.invoke('set-placement', {
 			body: { tournamentId, placements }
@@ -186,51 +222,63 @@
 				<p class="text-sm text-destructive">{errorMessage}</p>
 			{/if}
 
-			<div class="flex flex-col gap-3">
-				{#each spots as spot (spot.placement)}
-					<div class="flex flex-col gap-1">
-						<span class="font-data text-xs tracking-wide text-muted-foreground uppercase">
-							{ordinal(spot.placement)} &middot; {(spot.share * 100).toFixed(0)}%
-						</span>
+			<div class="flex flex-col gap-6">
+				{#each groups as group (`${group.flight}::${group.division}`)}
+					<div class="flex flex-col gap-3">
+						<h3 class="font-data text-xs tracking-widest text-fairway uppercase">
+							{group.label}
+						</h3>
+						{#each spots as spot (spot.placement)}
+							{@const key = spotKey(group, spot.placement)}
+							<div class="flex flex-col gap-1">
+								<span class="font-data text-xs tracking-wide text-muted-foreground uppercase">
+									{ordinal(spot.placement)} &middot; {(spot.share * 100).toFixed(0)}%
+								</span>
 
-						{#if selections[spot.placement]}
-							<div
-								class="flex items-center justify-between rounded-md border border-input px-3 py-1.5 text-sm"
-							>
-								<span class="text-ink">{selections[spot.placement]?.name}</span>
-								<button
-									type="button"
-									class="text-xs text-brass hover:underline"
-									onclick={() => clearSpot(spot.placement)}
-								>
-									Change
-								</button>
-							</div>
-						{:else}
-							<div class="relative">
-								<Input
-									type="text"
-									placeholder="Search players..."
-									value={queries[spot.placement] ?? ''}
-									oninput={(e) => onQueryInput(spot.placement, e.currentTarget.value)}
-								/>
-								{#if (suggestions[spot.placement]?.length ?? 0) > 0}
+								{#if selections[key]}
 									<div
-										class="absolute z-10 mt-1 w-full rounded-md border border-input bg-scorecard shadow-md"
+										class="flex items-center justify-between rounded-md border border-input px-3 py-1.5 text-sm"
 									>
-										{#each suggestions[spot.placement] as player (player.id)}
-											<button
-												type="button"
-												class="block w-full px-3 py-1.5 text-left text-sm hover:bg-brass/10"
-												onclick={() => selectPlayer(spot.placement, player)}
+										<span class="flex items-center gap-2 text-ink">
+											{selections[key]?.name}
+											<DivisionBadge division={selections[key]?.division ?? 'overall'} />
+										</span>
+										<button
+											type="button"
+											class="text-xs text-brass hover:underline"
+											onclick={() => clearSpot(group, spot.placement)}
+										>
+											Change
+										</button>
+									</div>
+								{:else}
+									<div class="relative">
+										<Input
+											type="text"
+											placeholder="Search players..."
+											value={queries[key] ?? ''}
+											oninput={(e) => onQueryInput(group, spot.placement, e.currentTarget.value)}
+										/>
+										{#if (suggestions[key]?.length ?? 0) > 0}
+											<div
+												class="absolute z-10 mt-1 w-full rounded-md border border-input bg-scorecard shadow-md"
 											>
-												{player.name}
-											</button>
-										{/each}
+												{#each suggestions[key] as player (player.id)}
+													<button
+														type="button"
+														class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-brass/10"
+														onclick={() => selectPlayer(group, spot.placement, player)}
+													>
+														{player.name}
+														<DivisionBadge division={player.division} />
+													</button>
+												{/each}
+											</div>
+										{/if}
 									</div>
 								{/if}
 							</div>
-						{/if}
+						{/each}
 					</div>
 				{/each}
 			</div>

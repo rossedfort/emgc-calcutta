@@ -48,6 +48,15 @@
 
 	let includedCount = $derived(Object.values(included).filter(Boolean).length);
 
+	// A Championship-flight row becomes two players rows on confirm — this
+	// is the actual number of rows that will be created, not just the
+	// number of CSV lines selected.
+	let entryCount = $derived(
+		(previewData?.rows ?? [])
+			.filter((row) => included[row.rowNumber])
+			.reduce((sum, row) => sum + (isChampionshipRow(row.flight) ? 2 : 1), 0)
+	);
+
 	let confirmRows = $derived(
 		JSON.stringify(
 			(previewData?.rows ?? [])
@@ -68,6 +77,13 @@
 	function cancelPreview() {
 		step = 'upload';
 		previewData = null;
+	}
+
+	// A row whose flight is the tournament's Championship flight becomes two
+	// players rows on confirm (Gross + Net) — flagged here so the preview
+	// isn't a silent surprise about the eventual player count.
+	function isChampionshipRow(flight: string | null): boolean {
+		return !!data.tournament.championship_flight && flight === data.tournament.championship_flight;
 	}
 
 	let previewSubmitting = $state(false);
@@ -148,7 +164,12 @@
 								<br /><span class="text-muted-foreground">{row.contact_phone}</span>
 							{/if}
 						</Table.Cell>
-						<Table.Cell>{row.flight ?? '—'}</Table.Cell>
+						<Table.Cell>
+							{row.flight || '—'}
+							{#if isChampionshipRow(row.flight)}
+								<Badge variant="brass">Gross + Net</Badge>
+							{/if}
+						</Table.Cell>
 						<Table.Cell class="font-data">{row.handicap_index ?? '—'}</Table.Cell>
 						<Table.Cell>
 							{#if row.matchedUserId}
@@ -187,7 +208,11 @@
 			>
 				<input type="hidden" name="rows" value={confirmRows} />
 				<Button type="submit" variant="brass" disabled={includedCount === 0 || confirmSubmitting}>
-					{confirmSubmitting ? 'Importing…' : `Confirm import (${includedCount})`}
+					{confirmSubmitting
+						? 'Importing…'
+						: entryCount === includedCount
+							? `Confirm import (${includedCount})`
+							: `Confirm import (${includedCount} rows → ${entryCount} players)`}
 				</Button>
 			</form>
 			<Button type="button" variant="outline" disabled={confirmSubmitting} onclick={cancelPreview}

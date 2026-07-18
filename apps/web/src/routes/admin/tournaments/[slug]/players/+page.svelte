@@ -1,18 +1,16 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import { groupPlayersByFlight } from '$lib/flightGroups';
 
 	let { data } = $props();
 
 	let statusFilter = $state('all');
 	let flightFilter = $state('all');
-
-	let flights = $derived(
-		[...new Set(data.players.map((p) => p.flight).filter((f): f is string => !!f))].sort()
-	);
 
 	let filteredPlayers = $derived(
 		data.players.filter((p) => {
@@ -21,6 +19,8 @@
 			return true;
 		})
 	);
+
+	let groupedPlayers = $derived(groupPlayersByFlight(filteredPlayers, data.tournament.flights));
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -38,7 +38,7 @@
 					{/each}
 				</select>
 			</label>
-			{#if flights.length > 0}
+			{#if data.tournament.flights.length > 0}
 				<label class="flex items-center gap-2">
 					<span class="text-muted-foreground">Flight</span>
 					<select
@@ -46,7 +46,7 @@
 						class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
 					>
 						<option value="all">All</option>
-						{#each flights as flight (flight)}
+						{#each data.tournament.flights as flight (flight)}
 							<option value={flight}>{flight}</option>
 						{/each}
 					</select>
@@ -79,42 +79,55 @@
 			<Table.Header>
 				<Table.Row>
 					<Table.Head>Name</Table.Head>
-					<Table.Head>Flight</Table.Head>
+					<Table.Head>Handicap</Table.Head>
 					<Table.Head>Status</Table.Head>
 					<Table.Head>Linked</Table.Head>
 					<Table.Head>Actions</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each filteredPlayers as player (player.id)}
-					<Table.Row>
-						<Table.Cell class="font-medium text-ink">{player.name}</Table.Cell>
-						<Table.Cell>{player.flight ?? '—'}</Table.Cell>
-						<Table.Cell>
-							<Badge variant={playerStatusBadgeVariant(player.status)}>
-								{playerStatusLabel(player.status)}
-							</Badge>
-						</Table.Cell>
-						<Table.Cell>
-							{#if player.user_id}
-								<Badge variant="fairway">Linked</Badge>
-							{:else}
-								<span class="text-muted-foreground">—</span>
-							{/if}
-						</Table.Cell>
-						<Table.Cell>
-							<Button
-								href={resolve('/admin/tournaments/[slug]/players/[playerSlug]/edit', {
-									slug: data.tournament.slug,
-									playerSlug: player.slug
-								})}
-								variant="brass"
-								size="sm"
-							>
-								Edit
-							</Button>
+				{#each groupedPlayers as { group, players } (group.flight)}
+					<Table.Row class="bg-sand/20 hover:bg-sand/20">
+						<Table.Cell
+							colspan={5}
+							class="font-data text-xs tracking-widest text-fairway uppercase"
+						>
+							{group.label}
 						</Table.Cell>
 					</Table.Row>
+					{#each players as player (player.id)}
+						<Table.Row>
+							<Table.Cell class="font-medium text-ink">
+								{player.name}
+								<DivisionBadge division={player.division} />
+							</Table.Cell>
+							<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
+							<Table.Cell>
+								<Badge variant={playerStatusBadgeVariant(player.status)}>
+									{playerStatusLabel(player.status)}
+								</Badge>
+							</Table.Cell>
+							<Table.Cell>
+								{#if player.user_id}
+									<Badge variant="fairway">Linked</Badge>
+								{:else}
+									<span class="text-muted-foreground">—</span>
+								{/if}
+							</Table.Cell>
+							<Table.Cell>
+								<Button
+									href={resolve('/admin/tournaments/[slug]/players/[playerSlug]/edit', {
+										slug: data.tournament.slug,
+										playerSlug: player.slug
+									})}
+									variant="brass"
+									size="sm"
+								>
+									Edit
+								</Button>
+							</Table.Cell>
+						</Table.Row>
+					{/each}
 				{/each}
 			</Table.Body>
 		</Table.Root>

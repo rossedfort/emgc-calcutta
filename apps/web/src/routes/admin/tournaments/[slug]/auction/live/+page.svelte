@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
 	import type { RealtimeBid, RealtimeLiveLot, RealtimePlayer } from '@emgc-calcutta/shared-types';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { currentHighBid } from '$lib/bids';
@@ -79,7 +80,10 @@
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
 			<div class="flex items-start justify-between gap-2">
 				<div class="flex flex-col gap-1">
-					<p class="font-display text-xl font-semibold text-ink">{currentPlayer.name}</p>
+					<p class="flex items-center gap-2 font-display text-xl font-semibold text-ink">
+						{currentPlayer.name}
+						<DivisionBadge division={currentPlayer.division} />
+					</p>
 					{#if currentPlayer.flight || currentPlayer.handicap_index !== null}
 						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 							{[
@@ -142,7 +146,10 @@
 	{:else if nextQueuedLot && nextQueuedPlayer}
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
 			<p class="font-data text-xs tracking-widest text-fairway uppercase">Up next</p>
-			<p class="mt-1 font-display text-xl font-semibold text-ink">{nextQueuedPlayer.name}</p>
+			<p class="mt-1 flex items-center gap-2 font-display text-xl font-semibold text-ink">
+				{nextQueuedPlayer.name}
+				<DivisionBadge division={nextQueuedPlayer.division} />
+			</p>
 			<form
 				method="POST"
 				action="?/advance"

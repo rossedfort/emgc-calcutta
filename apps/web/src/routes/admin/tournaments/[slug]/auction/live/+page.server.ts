@@ -4,7 +4,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export type LiveAdminPlayer = Pick<
 	Tables<'players'>,
-	'id' | 'slug' | 'name' | 'flight' | 'handicap_index' | 'status' | 'user_id'
+	'id' | 'slug' | 'name' | 'flight' | 'division' | 'handicap_index' | 'status' | 'user_id'
 >;
 
 // No own tournament lookup — inherits it from the [slug] layout's load via
@@ -18,7 +18,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 
 	const { data: players } = await supabase
 		.from('players')
-		.select('id, slug, name, flight, handicap_index, status, user_id')
+		.select('id, slug, name, flight, division, handicap_index, status, user_id')
 		.eq('tournament_id', tournament.id)
 		.order('name');
 

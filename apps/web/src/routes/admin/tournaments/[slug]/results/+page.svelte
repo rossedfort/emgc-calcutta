@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import EnterResultsModal from '$lib/components/EnterResultsModal.svelte';
 
 	let { data } = $props();
-	let { supabase, players, payoutStructure } = $derived(data);
+	let { supabase, results, payoutStructure } = $derived(data);
 
 	let editModalOpen = $state(false);
 
@@ -19,6 +20,12 @@
 			.map(([place, share]) => [Number(place), share] as const)
 			.sort((a, b) => a[0] - b[0])
 	);
+
+	// Empty groups (a flight with no sold players yet) are skipped rather
+	// than rendered as a heading over nothing — but if *every* group is
+	// empty, that's the page-level "nothing sold yet" state, not N
+	// individually-empty sections.
+	let nonEmptyResults = $derived(results.filter((r) => r.players.length > 0));
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -45,46 +52,58 @@
 		<Button variant="brass" size="sm" onclick={() => (editModalOpen = true)}>Edit results</Button>
 	</div>
 
-	{#if players.length === 0}
+	{#if nonEmptyResults.length === 0}
 		<p class="text-sm text-muted-foreground">No sold players yet.</p>
 	{:else}
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.Head>Placement</Table.Head>
-					<Table.Head>Player</Table.Head>
-					<Table.Head>Buyer</Table.Head>
-					<Table.Head>Winning bid</Table.Head>
-					<Table.Head>Payout</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
-				{#each players as player (player.id)}
-					<Table.Row>
-						<Table.Cell class="font-data">{player.placement ?? '—'}</Table.Cell>
-						<Table.Cell class="font-medium text-ink">{player.name}</Table.Cell>
-						<Table.Cell>
-							{#if player.winning_bid?.bidder}
-								{player.winning_bid.bidder.name ?? player.winning_bid.bidder.email}
-							{:else}
-								<span class="text-muted-foreground">—</span>
-							{/if}
-						</Table.Cell>
-						<Table.Cell class="font-data">
-							{player.winning_bid ? formatCurrency(player.winning_bid.amount) : '—'}
-						</Table.Cell>
-						<Table.Cell class="font-data">
-							{#if player.payout}
-								{formatCurrency(player.payout.amount)}
-								<Badge variant="fairway">{(player.payout.pot_share * 100).toFixed(0)}%</Badge>
-							{:else}
-								<span class="text-muted-foreground">—</span>
-							{/if}
-						</Table.Cell>
-					</Table.Row>
-				{/each}
-			</Table.Body>
-		</Table.Root>
+		<div class="flex flex-col gap-6">
+			{#each nonEmptyResults as { group, players } (`${group.flight}::${group.division}`)}
+				<div class="flex flex-col gap-2">
+					<h3 class="font-data text-xs tracking-widest text-fairway uppercase">
+						{group.label}
+					</h3>
+					<Table.Root>
+						<Table.Header>
+							<Table.Row>
+								<Table.Head>Placement</Table.Head>
+								<Table.Head>Player</Table.Head>
+								<Table.Head>Buyer</Table.Head>
+								<Table.Head>Winning bid</Table.Head>
+								<Table.Head>Payout</Table.Head>
+							</Table.Row>
+						</Table.Header>
+						<Table.Body>
+							{#each players as player (player.id)}
+								<Table.Row>
+									<Table.Cell class="font-data">{player.placement ?? '—'}</Table.Cell>
+									<Table.Cell class="font-medium text-ink">
+										{player.name}
+										<DivisionBadge division={player.division} />
+									</Table.Cell>
+									<Table.Cell>
+										{#if player.winning_bid?.bidder}
+											{player.winning_bid.bidder.name ?? player.winning_bid.bidder.email}
+										{:else}
+											<span class="text-muted-foreground">—</span>
+										{/if}
+									</Table.Cell>
+									<Table.Cell class="font-data">
+										{player.winning_bid ? formatCurrency(player.winning_bid.amount) : '—'}
+									</Table.Cell>
+									<Table.Cell class="font-data">
+										{#if player.payout}
+											{formatCurrency(player.payout.amount)}
+											<Badge variant="fairway">{(player.payout.pot_share * 100).toFixed(0)}%</Badge>
+										{:else}
+											<span class="text-muted-foreground">—</span>
+										{/if}
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						</Table.Body>
+					</Table.Root>
+				</div>
+			{/each}
+		</div>
 	{/if}
 </div>
 
@@ -92,6 +111,8 @@
 	bind:open={editModalOpen}
 	{supabase}
 	tournamentId={data.tournament.id}
+	flights={data.tournament.flights}
+	championshipFlight={data.tournament.championship_flight}
 	{payoutStructure}
 	onSuccess={() => invalidateAll()}
 />

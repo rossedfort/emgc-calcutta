@@ -14,6 +14,8 @@ export interface Tournament {
 	min_increment: number;
 	anti_snipe_seconds: number;
 	payout_structure: Record<string, number>;
+	flights: string[];
+	championship_flight: string | null;
 	live_auction_started_at: string | null;
 	created_at: string;
 }
@@ -26,6 +28,7 @@ export interface TournamentFormValues {
 	threshold_amount: string;
 	min_increment: string;
 	anti_snipe_seconds: string;
+	championship_flight: string;
 }
 
 export interface PayoutRow {
@@ -53,6 +56,8 @@ export interface ParsedTournament {
 	min_increment: number;
 	anti_snipe_seconds: number;
 	payout_structure: Record<string, number>;
+	flights: string[];
+	championship_flight: string | null;
 }
 
 // Shared by the new/create and [slug]/edit/update form actions — same fields,
@@ -113,6 +118,37 @@ export function parseTournamentForm(formData: FormData): {
 		errors.payout_structure = 'Payout structure is invalid — each place must have a percentage';
 	}
 
+	// Flights (Phase 7.5): an ordered list of unique, non-empty names — order
+	// matters (it's the display/ranking order per flight elsewhere), so this
+	// is a JSON array, not a Set. Client-side duplicate/empty filtering
+	// happens too (TournamentForm.svelte), but this is the authoritative
+	// check, same reasoning as payout_structure above.
+	let flights: string[] = [];
+	const flightsRaw = String(formData.get('flights') ?? '[]');
+	try {
+		const parsed = JSON.parse(flightsRaw || '[]');
+		if (!Array.isArray(parsed) || !parsed.every((f) => typeof f === 'string' && f.trim())) {
+			throw new Error('invalid flights entry');
+		}
+		const trimmed = parsed.map((f: string) => f.trim());
+		if (new Set(trimmed).size !== trimmed.length) {
+			throw new Error('duplicate flight name');
+		}
+		flights = trimmed;
+	} catch {
+		errors.flights = 'Flights must be a list of unique, non-empty names';
+	}
+
+	// '' means "no Championship flight" (tournaments.championship_flight is
+	// nullable) — validated against `flights` here too, ahead of the DB's
+	// own check constraint, so a bad combination surfaces as a clear form
+	// error rather than a raw constraint violation.
+	const championshipFlightRaw = String(formData.get('championship_flight') ?? '').trim();
+	const championship_flight = championshipFlightRaw || null;
+	if (championship_flight && !flights.includes(championship_flight)) {
+		errors.championship_flight = 'Championship flight must be one of the flights listed above';
+	}
+
 	if (Object.keys(errors).length > 0) {
 		return { data: null, errors };
 	}
@@ -126,7 +162,9 @@ export function parseTournamentForm(formData: FormData): {
 			threshold_amount,
 			min_increment,
 			anti_snipe_seconds,
-			payout_structure
+			payout_structure,
+			flights,
+			championship_flight
 		},
 		errors
 	};

@@ -5,7 +5,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export type QueuePlayer = Pick<
 	Tables<'players'>,
-	'id' | 'slug' | 'name' | 'flight' | 'handicap_index'
+	'id' | 'slug' | 'name' | 'flight' | 'division' | 'handicap_index'
 >;
 
 export interface QueueLot {
@@ -40,7 +40,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		lotPlayerIds.length > 0
 			? await supabase
 					.from('players')
-					.select('id, slug, name, flight, handicap_index')
+					.select('id, slug, name, flight, division, handicap_index')
 					.in('id', lotPlayerIds)
 			: { data: [] as QueuePlayer[], error: null };
 	if (lotPlayersError) {

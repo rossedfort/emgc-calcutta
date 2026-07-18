@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import { invalidateAll } from '$app/navigation';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
@@ -82,7 +83,10 @@
 				<Table.Body>
 					{#each players as player (player.id)}
 						<Table.Row>
-							<Table.Cell class="font-medium text-ink">{player.name}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								{player.name}
+								<DivisionBadge division={player.division} />
+							</Table.Cell>
 							<Table.Cell>
 								{#if player.winning_bid?.bidder}
 									{player.winning_bid.bidder.name ?? player.winning_bid.bidder.email}
@@ -141,7 +145,12 @@
 					{#each payouts as payout (payout.id)}
 						<Table.Row>
 							<Table.Cell class="font-data">{payout.placement}</Table.Cell>
-							<Table.Cell class="font-medium text-ink">{payout.player?.name ?? '—'}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								{payout.player?.name ?? '—'}
+								{#if payout.player}
+									<DivisionBadge division={payout.player.division} />
+								{/if}
+							</Table.Cell>
 							<Table.Cell>
 								{#if payout.bidder}
 									{payout.bidder.name ?? payout.bidder.email}
