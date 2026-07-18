@@ -137,14 +137,14 @@
 	<PageHeader title="Live auction" eyebrow={data.tournament.name} />
 
 	{#if !currentLot || !currentPlayer}
-		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-center text-ink">
+		<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-center text-ink sm:p-8">
 			<p class="font-display text-xl font-semibold text-ink">Waiting for the next lot</p>
 			<p class="mt-2 text-sm text-ink/70">
 				The Admin hasn't opened a player for live bidding yet — check back shortly.
 			</p>
 		</div>
 	{:else}
-		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink">
+		<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-ink sm:p-8">
 			<div class="flex items-start justify-between gap-2">
 				<div class="flex flex-col gap-1">
 					<span class="flex items-center gap-2">
@@ -178,21 +178,21 @@
 			<div
 				class="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40"
 			>
-				<div class="flex flex-col gap-1 bg-scorecard p-4">
+				<div class="flex flex-col gap-1 bg-scorecard p-3 sm:p-4">
 					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
 						Current high
 					</span>
-					<span class="font-data text-2xl text-ink">
+					<span class="font-data text-lg text-ink sm:text-2xl">
 						{high ? formatCurrency(high.amount) : 'No bids yet'}
 					</span>
 				</div>
-				<div class="flex flex-col gap-1 bg-scorecard p-4">
+				<div class="flex flex-col gap-1 bg-scorecard p-3 sm:p-4">
 					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
 						Closes in
 					</span>
 					<span
 						class={[
-							'font-data text-2xl',
+							'font-data text-lg sm:text-2xl',
 							secondsRemaining !== null && secondsRemaining <= 5 ? 'text-flag' : 'text-ink'
 						]}
 					>
@@ -238,7 +238,7 @@
 			<div class="max-h-[32rem] overflow-y-auto">
 				<div class="flex flex-col gap-4">
 					{#each upcoming as { lot, player } (lot.id)}
-						<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink">
+						<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-ink sm:p-8">
 							<div class="flex items-start justify-between gap-2">
 								<div class="flex flex-col gap-1">
 									<a

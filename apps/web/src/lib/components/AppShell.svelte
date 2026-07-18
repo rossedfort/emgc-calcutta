@@ -1,9 +1,10 @@
 <script lang="ts">
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import type { Snippet } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { afterNavigate, goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import MenuIcon from '@lucide/svelte/icons/menu';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { initials } from '$lib/initials';
@@ -18,6 +19,15 @@
 	let { profile, supabase, children }: Props = $props();
 
 	let isAdmin = $derived(profile?.role === 'admin' || profile?.role === 'owner');
+
+	// The sidebar nav is a full-width panel that pushes main content down on
+	// mobile (below `md`) rather than a permanent column — at phone widths
+	// there's no room for both side by side. Closes itself on navigation so
+	// picking a link doesn't leave the panel stuck open over the new page.
+	let mobileNavOpen = $state(false);
+	afterNavigate(() => {
+		mobileNavOpen = false;
+	});
 
 	async function signOut() {
 		const { error } = await supabase.auth.signOut();
@@ -46,10 +56,21 @@
 {/snippet}
 
 <div class="flex min-h-screen flex-col">
-	<header class="flex items-center justify-between bg-fairway px-6 py-3">
-		<span class="font-data text-xs tracking-widest text-brass uppercase"
-			>EMGC &middot; Calcutta</span
-		>
+	<header class="flex items-center justify-between bg-fairway px-4 py-3 sm:px-6">
+		<div class="flex items-center gap-2">
+			<button
+				type="button"
+				class="text-brass md:hidden"
+				aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+				aria-expanded={mobileNavOpen}
+				onclick={() => (mobileNavOpen = !mobileNavOpen)}
+			>
+				<MenuIcon class="size-5" />
+			</button>
+			<span class="font-data text-xs tracking-widest text-brass uppercase"
+				>EMGC &middot; Calcutta</span
+			>
+		</div>
 
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
@@ -77,8 +98,13 @@
 		</DropdownMenu.Root>
 	</header>
 
-	<div class="flex flex-1">
-		<nav class="flex w-56 shrink-0 flex-col gap-1 border-r border-brass/30 bg-sand/25 p-4 text-sm">
+	<div class="flex flex-1 flex-col md:flex-row">
+		<nav
+			class={[
+				mobileNavOpen ? 'flex' : 'hidden',
+				'w-full shrink-0 flex-col gap-1 border-b border-brass/30 bg-sand/25 p-4 text-sm md:flex md:w-56 md:border-r md:border-b-0'
+			]}
+		>
 			<a href={resolve('/')} class={navLinkClass('/')}>
 				{@render navDot('/')}
 				<span>Home</span>
@@ -107,7 +133,7 @@
 			{/if}
 		</nav>
 
-		<main class="flex-1 p-8">
+		<main class="min-w-0 flex-1 p-4 sm:p-8">
 			{@render children()}
 		</main>
 	</div>
