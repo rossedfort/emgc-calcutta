@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { AUDIT_ACTIONS, auditActionLabel } from '$lib/auditActions';
 
@@ -85,7 +86,7 @@
 	</form>
 
 	{#if data.events.length === 0}
-		<p class="text-sm text-muted-foreground">No audit events match these filters.</p>
+		<EmptyState title="No audit events match these filters" />
 	{:else}
 		<Table.Root>
 			<Table.Header>

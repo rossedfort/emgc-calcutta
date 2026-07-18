@@ -1,5 +1,6 @@
 <script lang="ts">
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -39,7 +40,7 @@
 		</div>
 
 		{#if owed.length === 0}
-			<p class="text-sm text-muted-foreground">You haven't won any players yet.</p>
+			<EmptyState title="You haven't won any players yet" />
 		{:else}
 			<Table.Root>
 				<Table.Header>
@@ -84,7 +85,7 @@
 		</div>
 
 		{#if won.length === 0}
-			<p class="text-sm text-muted-foreground">No payouts yet.</p>
+			<EmptyState title="No payouts yet" />
 		{:else}
 			<Table.Root>
 				<Table.Header>

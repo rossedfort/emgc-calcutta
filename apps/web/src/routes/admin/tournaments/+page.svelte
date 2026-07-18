@@ -3,6 +3,7 @@
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { statusBadgeVariant, type Tournament } from './shared';
 
@@ -28,7 +29,13 @@
 	</PageHeader>
 
 	{#if tournaments.length === 0}
-		<p class="text-sm text-muted-foreground">No tournaments have been created yet.</p>
+		<EmptyState title="No tournaments have been created yet">
+			{#snippet actions()}
+				<Button href={resolve('/admin/tournaments/new')} variant="brass" size="sm">
+					New tournament
+				</Button>
+			{/snippet}
+		</EmptyState>
 	{:else}
 		<Table.Root>
 			<Table.Header>

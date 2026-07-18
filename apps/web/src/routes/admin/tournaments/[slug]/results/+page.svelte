@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
@@ -53,7 +54,7 @@
 	</div>
 
 	{#if nonEmptyResults.length === 0}
-		<p class="text-sm text-muted-foreground">No sold players yet.</p>
+		<EmptyState title="No sold players yet" />
 	{:else}
 		<div class="flex flex-col gap-6">
 			{#each nonEmptyResults as { group, players } (`${group.flight}::${group.division}`)}

@@ -3,6 +3,7 @@
 	import { enhance } from '$app/forms';
 	import type { RealtimeBid, RealtimeLiveLot, RealtimePlayer } from '@emgc-calcutta/shared-types';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -175,11 +176,9 @@
 			</form>
 		</div>
 	{:else}
-		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-center text-ink">
-			<p class="font-display text-xl font-semibold text-ink">Queue is empty</p>
-			<p class="mt-2 text-sm text-ink/70">
-				Add reserved players to the queue before starting the live auction.
-			</p>
-		</div>
+		<EmptyState
+			title="Queue is empty"
+			description="Add reserved players to the queue before starting the live auction."
+		/>
 	{/if}
 </div>

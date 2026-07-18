@@ -2,6 +2,7 @@
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import { invalidateAll } from '$app/navigation';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
@@ -68,7 +69,7 @@
 	<div class="flex flex-col gap-2">
 		<h2 class="font-display text-lg font-semibold text-ink">Winning bids — owed to the pot</h2>
 		{#if players.length === 0}
-			<p class="text-sm text-muted-foreground">No sold players yet.</p>
+			<EmptyState title="No sold players yet" />
 		{:else}
 			<Table.Root>
 				<Table.Header>
@@ -126,9 +127,7 @@
 	<div class="flex flex-col gap-2">
 		<h2 class="font-display text-lg font-semibold text-ink">Payouts — owed from the pot</h2>
 		{#if payouts.length === 0}
-			<p class="text-sm text-muted-foreground">
-				No payouts yet — these appear once placements are entered.
-			</p>
+			<EmptyState title="No payouts yet" description="These appear once placements are entered." />
 		{:else}
 			<Table.Root>
 				<Table.Header>

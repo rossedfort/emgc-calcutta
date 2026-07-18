@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 
@@ -72,10 +73,10 @@
 			{/if}
 		</div>
 		{#if data.queue.length === 0}
-			<p class="text-sm text-muted-foreground">
-				No players queued yet — players are added automatically as they cross the reserve threshold
-				during the silent auction.
-			</p>
+			<EmptyState
+				title="No players queued yet"
+				description="Players are added automatically as they cross the reserve threshold during the silent auction."
+			/>
 		{:else}
 			<Table.Root>
 				<Table.Header>

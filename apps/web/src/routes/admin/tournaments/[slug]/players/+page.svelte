@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -59,7 +60,7 @@
 	</div>
 
 	{#if filteredPlayers.length === 0}
-		<p class="text-sm text-muted-foreground">No players match these filters.</p>
+		<EmptyState title="No players match these filters" />
 	{:else}
 		<Table.Root>
 			<Table.Header>

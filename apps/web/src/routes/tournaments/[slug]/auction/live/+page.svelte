@@ -11,6 +11,7 @@
 	} from '@emgc-calcutta/shared-types';
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -143,12 +144,10 @@
 	<RealtimeStatusBanner status={connectionStatus} />
 
 	{#if !currentLot || !currentPlayer}
-		<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-center text-ink sm:p-8">
-			<p class="font-display text-xl font-semibold text-ink">Waiting for the next lot</p>
-			<p class="mt-2 text-sm text-ink/70">
-				The Admin hasn't opened a player for live bidding yet — check back shortly.
-			</p>
-		</div>
+		<EmptyState
+			title="Waiting for the next lot"
+			description="The Admin hasn't opened a player for live bidding yet — check back shortly."
+		/>
 	{:else}
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-ink sm:p-8">
 			<div class="flex items-start justify-between gap-2">
