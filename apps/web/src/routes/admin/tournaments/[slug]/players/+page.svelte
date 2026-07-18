@@ -79,7 +79,7 @@
 			<Table.Header>
 				<Table.Row>
 					<Table.Head>Name</Table.Head>
-					<Table.Head>Flight</Table.Head>
+					<Table.Head>Handicap</Table.Head>
 					<Table.Head>Status</Table.Head>
 					<Table.Head>Linked</Table.Head>
 					<Table.Head>Actions</Table.Head>
@@ -101,7 +101,7 @@
 								{player.name}
 								<DivisionBadge division={player.division} />
 							</Table.Cell>
-							<Table.Cell>{player.flight || '—'}</Table.Cell>
+							<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
 							<Table.Cell>
 								<Badge variant={playerStatusBadgeVariant(player.status)}>
 									{playerStatusLabel(player.status)}
