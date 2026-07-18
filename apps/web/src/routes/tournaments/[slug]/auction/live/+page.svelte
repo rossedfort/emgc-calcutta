@@ -11,18 +11,20 @@
 	} from '@emgc-calcutta/shared-types';
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
-	import { createTournamentRealtime } from '$lib/stores/realtime';
+	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data } = $props();
 
 	let liveBids = $state<RealtimeBid[]>([]);
 	let livePlayers = $state<RealtimePlayer[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
+	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
 	// Ticks every second so the anti-snipe countdown stays live — same
 	// reasoning as the silent auction board's own ticking clock.
 	let now = $state(new Date());
@@ -32,11 +34,13 @@
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
 		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
+		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubPlayers();
 			unsubLots();
+			unsubConnection();
 			rt.destroy();
 			clearInterval(tick);
 		};
@@ -135,6 +139,8 @@
 
 <div class="mx-auto flex max-w-3xl flex-col gap-4">
 	<PageHeader title="Live auction" eyebrow={data.tournament.name} />
+
+	<RealtimeStatusBanner status={connectionStatus} />
 
 	{#if !currentLot || !currentPlayer}
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-center text-ink sm:p-8">

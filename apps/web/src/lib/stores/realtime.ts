@@ -7,10 +7,20 @@ import type {
 	RealtimePlayer
 } from '@emgc-calcutta/shared-types';
 
+// 'connecting' is the initial state before the channel has ever joined
+// (a normal part of first page load, not a problem worth surfacing).
+// 'reconnecting' means a previously-established connection was lost —
+// realtime-js's own channel rejoin logic (exponential backoff, driven by
+// the underlying socket) retries automatically without any app code
+// needing to call subscribe() again; this store exists purely so the UI
+// can show that a retry is in progress instead of silently going stale.
+export type RealtimeConnectionStatus = 'connecting' | 'connected' | 'reconnecting';
+
 export interface TournamentRealtime {
 	bids: Readable<RealtimeBid[]>;
 	players: Readable<RealtimePlayer[]>;
 	liveLots: Readable<RealtimeLiveLot[]>;
+	connectionStatus: Readable<RealtimeConnectionStatus>;
 	/** Unsubscribes and tears down the channel — call on component unmount. */
 	destroy: () => void;
 }
@@ -31,6 +41,7 @@ export function createTournamentRealtime(
 	const bids = writable<RealtimeBid[]>([]);
 	const players = writable<RealtimePlayer[]>([]);
 	const liveLots = writable<RealtimeLiveLot[]>([]);
+	const connectionStatus = writable<RealtimeConnectionStatus>('connecting');
 
 	async function reconcile() {
 		const { data: playerRows } = await supabase
@@ -116,7 +127,14 @@ export function createTournamentRealtime(
 		)
 		.subscribe((status) => {
 			if (status === 'SUBSCRIBED') {
+				connectionStatus.set('connected');
+				// Runs on the initial join *and* every rejoin after a dropped
+				// connection — both land on this same callback, so a reconnect
+				// re-syncs from a fresh query rather than trusting whatever
+				// events did or didn't arrive while disconnected.
 				reconcile();
+			} else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+				connectionStatus.set('reconnecting');
 			}
 		});
 
@@ -124,6 +142,7 @@ export function createTournamentRealtime(
 		bids,
 		players,
 		liveLots,
+		connectionStatus,
 		destroy: () => {
 			supabase.removeChannel(channel);
 		}

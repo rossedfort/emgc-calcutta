@@ -11,6 +11,7 @@
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -19,12 +20,13 @@
 	import { currentHighBid } from '$lib/bids';
 	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
 	import { groupPlayersByFlight } from '$lib/flightGroups';
-	import { createTournamentRealtime } from '$lib/stores/realtime';
+	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data } = $props();
 
 	let liveBids = $state<RealtimeBid[]>([]);
 	let livePlayers = $state<RealtimePlayer[]>([]);
+	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
 	// Ticks every second so both auctionOpen and the countdown stay live —
 	// without this, auctionOpen would freeze at whatever it evaluated to on
 	// first render, since `new Date()` alone isn't a tracked reactive
@@ -35,10 +37,12 @@
 		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
 		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
+		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubPlayers();
+			unsubConnection();
 			rt.destroy();
 			clearInterval(tick);
 		};
@@ -149,6 +153,8 @@
 
 <div class="flex flex-col gap-4">
 	<PageHeader title="Silent auction" eyebrow={data.tournament.name} />
+
+	<RealtimeStatusBanner status={connectionStatus} />
 
 	<div class="flex items-center gap-2 text-sm">
 		<span class={['inline-block size-2 rounded-full', auctionOpen ? 'bg-fairway' : 'bg-brass/60']}

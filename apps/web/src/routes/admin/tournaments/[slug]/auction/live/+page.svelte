@@ -3,11 +3,12 @@
 	import { enhance } from '$app/forms';
 	import type { RealtimeBid, RealtimeLiveLot, RealtimePlayer } from '@emgc-calcutta/shared-types';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { currentHighBid } from '$lib/bids';
 	import { playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
-	import { createTournamentRealtime } from '$lib/stores/realtime';
+	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data, form } = $props();
 
@@ -16,6 +17,7 @@
 	let liveBids = $state<RealtimeBid[]>([]);
 	let livePlayers = $state<RealtimePlayer[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
+	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
 	let now = $state(new Date());
 
 	onMount(() => {
@@ -23,11 +25,13 @@
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
 		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
+		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubPlayers();
 			unsubLots();
+			unsubConnection();
 			rt.destroy();
 			clearInterval(tick);
 		};
@@ -72,6 +76,8 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
+	<RealtimeStatusBanner status={connectionStatus} />
+
 	{#if errorMessage}
 		<p class="text-sm text-destructive">{errorMessage}</p>
 	{/if}
