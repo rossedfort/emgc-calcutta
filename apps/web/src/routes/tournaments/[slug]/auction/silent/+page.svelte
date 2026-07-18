@@ -13,9 +13,11 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
 	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import { groupPlayersByFlight } from '$lib/flightGroups';
 	import { createTournamentRealtime } from '$lib/stores/realtime';
 
 	let { data } = $props();
@@ -76,10 +78,6 @@
 	let statusFilter = $state('all');
 	let flightFilter = $state('all');
 
-	let flights = $derived(
-		[...new Set(players.map((p) => p.flight).filter((f): f is string => !!f))].sort()
-	);
-
 	let filteredPlayers = $derived(
 		players.filter((p) => {
 			if (statusFilter !== 'all' && p.status !== statusFilter) return false;
@@ -90,6 +88,8 @@
 			return true;
 		})
 	);
+
+	let groupedPlayers = $derived(groupPlayersByFlight(filteredPlayers, data.tournament.flights));
 
 	function suggestedBid(playerId: string): number {
 		const high = currentHighBid(liveBids, playerId);
@@ -185,7 +185,7 @@
 				{/each}
 			</select>
 		</label>
-		{#if flights.length > 0}
+		{#if data.tournament.flights.length > 0}
 			<label class="flex items-center gap-2">
 				<span class="text-muted-foreground">Flight</span>
 				<select
@@ -193,7 +193,7 @@
 					class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
 				>
 					<option value="all">All</option>
-					{#each flights as flight (flight)}
+					{#each data.tournament.flights as flight (flight)}
 						<option value={flight}>{flight}</option>
 					{/each}
 				</select>
@@ -204,90 +204,89 @@
 	{#if filteredPlayers.length === 0}
 		<p class="text-sm text-muted-foreground">No players match these filters.</p>
 	{:else}
-		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-			{#each filteredPlayers as player (player.id)}
-				{@const high = currentHighBid(liveBids, player.id)}
-				{@const isYou = player.user_id === data.currentUserId}
-				{@const metaLine = [
-					player.flight ? `Flight ${player.flight}` : null,
-					player.handicap_index !== null ? `HCP ${player.handicap_index}` : null
-				]
-					.filter(Boolean)
-					.join(' · ')}
-				<div
-					class={[
-						'flex flex-col gap-3 rounded-lg border bg-scorecard p-4 text-ink',
-						player.status === 'reserved' ? 'border-flag/50 ring-1 ring-flag/30' : 'border-brass/30'
-					]}
-				>
-					<div class="flex items-start justify-between gap-2">
-						<div class="flex flex-col gap-0.5">
-							<a
-								href={resolve('/tournaments/[slug]/players/[playerSlug]', {
-									slug: data.tournament.slug,
-									playerSlug: player.slug
-								})}
-								class="font-display text-lg font-semibold text-ink hover:underline"
-							>
-								{player.name}
-							</a>
-							<DivisionBadge division={player.division} />
-							{#if metaLine}
-								<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
-									{metaLine}
-								</span>
-							{/if}
-						</div>
-						<Badge variant={playerStatusBadgeVariant(player.status)}>
-							{playerStatusLabel(player.status)}
-						</Badge>
-					</div>
-
-					{#if isYou}
-						<Badge variant="brass">This is you</Badge>
-					{/if}
-
-					<div class="flex flex-col gap-1 border-t border-brass/40 pt-3">
-						<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
-							Current high
-						</span>
-						<span class="font-data text-lg text-ink">
-							{high ? formatCurrency(high.amount) : 'No bids yet'}
-						</span>
-					</div>
-
-					{#if player.status === 'open' && auctionOpen}
-						<form
-							class="flex flex-col gap-2"
-							onsubmit={(event) => {
-								event.preventDefault();
-								placeBid(player.id);
-							}}
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					<Table.Head>Player</Table.Head>
+					<Table.Head>Handicap</Table.Head>
+					<Table.Head>Status</Table.Head>
+					<Table.Head>Current high</Table.Head>
+					<Table.Head>Bid</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each groupedPlayers as { group, players } (group.flight)}
+					<Table.Row class="bg-sand/20 hover:bg-sand/20">
+						<Table.Cell
+							colspan={5}
+							class="font-data text-xs tracking-widest text-fairway uppercase"
 						>
-							<div class="flex items-center gap-2">
-								<Input
-									type="number"
-									step="0.01"
-									min="0.01"
-									placeholder={suggestedBid(player.id).toFixed(2)}
-									bind:value={bidAmounts[player.id]}
-									disabled={bidPending[player.id]}
-								/>
-								<Button type="submit" variant="brass" disabled={bidPending[player.id]}>
-									{bidPending[player.id] ? 'Bidding…' : 'Bid'}
-								</Button>
-							</div>
-							{#if bidErrors[player.id]}
-								<p class="text-xs text-flag">{bidErrors[player.id]}</p>
-							{/if}
-						</form>
-					{:else if player.status === 'open'}
-						<p class="text-xs text-ink/60">The silent auction isn't open.</p>
-					{:else}
-						<p class="text-xs text-ink/60">Not open for silent bidding.</p>
-					{/if}
-				</div>
-			{/each}
-		</div>
+							{group.label}
+						</Table.Cell>
+					</Table.Row>
+					{#each players as player (player.id)}
+						{@const high = currentHighBid(liveBids, player.id)}
+						{@const isYou = player.user_id === data.currentUserId}
+						<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
+							<Table.Cell class="font-medium text-ink">
+								<a
+									href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+										slug: data.tournament.slug,
+										playerSlug: player.slug
+									})}
+									class="hover:underline">{player.name}</a
+								>
+								<DivisionBadge division={player.division} />
+								{#if isYou}
+									<Badge variant="brass">This is you</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
+							<Table.Cell>
+								<Badge variant={playerStatusBadgeVariant(player.status)}>
+									{playerStatusLabel(player.status)}
+								</Badge>
+							</Table.Cell>
+							<Table.Cell class="font-data">
+								{high ? formatCurrency(high.amount) : 'No bids yet'}
+							</Table.Cell>
+							<Table.Cell>
+								{#if player.status === 'open' && auctionOpen}
+									<form
+										class="flex flex-col gap-2"
+										onsubmit={(event) => {
+											event.preventDefault();
+											placeBid(player.id);
+										}}
+									>
+										<div class="flex items-center gap-2">
+											<Input
+												type="number"
+												step="0.01"
+												min="0.01"
+												placeholder={suggestedBid(player.id).toFixed(2)}
+												bind:value={bidAmounts[player.id]}
+												disabled={bidPending[player.id]}
+												class="w-32"
+											/>
+											<Button type="submit" variant="brass" disabled={bidPending[player.id]}>
+												{bidPending[player.id] ? 'Bidding…' : 'Bid'}
+											</Button>
+										</div>
+										{#if bidErrors[player.id]}
+											<p class="text-xs text-flag">{bidErrors[player.id]}</p>
+										{/if}
+									</form>
+								{:else if player.status === 'open'}
+									<p class="text-xs text-ink/60">Auction isn't open.</p>
+								{:else}
+									<p class="text-xs text-ink/60">Not open for bidding.</p>
+								{/if}
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				{/each}
+			</Table.Body>
+		</Table.Root>
 	{/if}
 </div>
