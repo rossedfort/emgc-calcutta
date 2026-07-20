@@ -8,7 +8,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { currentHighBid } from '$lib/bids';
-	import { playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import { formatPlayerName, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data, form } = $props();
@@ -88,7 +88,7 @@
 			<div class="flex items-start justify-between gap-2">
 				<div class="flex flex-col gap-1">
 					<p class="flex items-center gap-2 font-display text-xl font-semibold text-ink">
-						{currentPlayer.name}
+						{formatPlayerName(currentPlayer)}
 						<DivisionBadge division={currentPlayer.division} />
 					</p>
 					{#if currentPlayer.flight || currentPlayer.handicap_index !== null}
@@ -154,7 +154,7 @@
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
 			<p class="font-data text-xs tracking-widest text-fairway uppercase">Up next</p>
 			<p class="mt-1 flex items-center gap-2 font-display text-xl font-semibold text-ink">
-				{nextQueuedPlayer.name}
+				{formatPlayerName(nextQueuedPlayer)}
 				<DivisionBadge division={nextQueuedPlayer.division} />
 			</p>
 			<form
@@ -171,7 +171,7 @@
 			>
 				<input type="hidden" name="lotId" value={nextQueuedLot.id} />
 				<Button type="submit" variant="brass" disabled={advanceSubmitting}>
-					{advanceSubmitting ? 'Opening…' : `Advance to ${nextQueuedPlayer.name}`}
+					{advanceSubmitting ? 'Opening…' : `Advance to ${formatPlayerName(nextQueuedPlayer)}`}
 				</Button>
 			</form>
 		</div>

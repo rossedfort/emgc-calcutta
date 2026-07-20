@@ -329,10 +329,11 @@ export type Database = {
           contact_phone: string | null;
           created_at: string;
           division: string;
+          first_name: string;
           flight: string;
           handicap_index: number | null;
           id: string;
-          name: string;
+          last_name: string;
           photo_url: string | null;
           placement: number | null;
           preferences: string | null;
@@ -349,10 +350,11 @@ export type Database = {
           contact_phone?: string | null;
           created_at?: string;
           division?: string;
+          first_name: string;
           flight?: string;
           handicap_index?: number | null;
           id?: string;
-          name: string;
+          last_name: string;
           photo_url?: string | null;
           placement?: number | null;
           preferences?: string | null;
@@ -369,10 +371,11 @@ export type Database = {
           contact_phone?: string | null;
           created_at?: string;
           division?: string;
+          first_name?: string;
           flight?: string;
           handicap_index?: number | null;
           id?: string;
-          name?: string;
+          last_name?: string;
           photo_url?: string | null;
           placement?: number | null;
           preferences?: string | null;

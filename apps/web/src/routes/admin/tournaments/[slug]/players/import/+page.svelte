@@ -63,7 +63,8 @@
 			(previewData?.rows ?? [])
 				.filter((row) => included[row.rowNumber])
 				.map((row) => ({
-					name: row.name,
+					first_name: row.first_name,
+					last_name: row.last_name,
 					contact_email: row.contact_email,
 					contact_phone: row.contact_phone,
 					flight: row.flight,
@@ -137,7 +138,8 @@
 			<Table.Header>
 				<Table.Row>
 					<Table.Head>Include</Table.Head>
-					<Table.Head>Name</Table.Head>
+					<Table.Head>First name</Table.Head>
+					<Table.Head>Last name</Table.Head>
 					<Table.Head>Contact</Table.Head>
 					<Table.Head>Flight</Table.Head>
 					<Table.Head>Handicap</Table.Head>
@@ -152,13 +154,15 @@
 							<input
 								type="checkbox"
 								class="accent-brass"
-								aria-label="Include {row.name ?? `row ${row.rowNumber}`}"
+								aria-label="Include {[row.first_name, row.last_name].filter(Boolean).join(' ') ||
+									`row ${row.rowNumber}`}"
 								disabled={row.errors.length > 0}
 								checked={included[row.rowNumber] ?? false}
 								onchange={(e) => (included[row.rowNumber] = e.currentTarget.checked)}
 							/>
 						</Table.Cell>
-						<Table.Cell class="font-medium text-ink">{row.name ?? '—'}</Table.Cell>
+						<Table.Cell class="font-medium text-ink">{row.first_name ?? '—'}</Table.Cell>
+						<Table.Cell class="font-medium text-ink">{row.last_name ?? '—'}</Table.Cell>
 						<Table.Cell class="text-sm">
 							{row.contact_email ?? '—'}
 							{#if row.contact_phone}
@@ -241,7 +245,8 @@
 			>
 				<p class="font-data text-xs tracking-widest text-fairway uppercase">Player roster</p>
 				<p class="text-sm text-ink/70">
-					Choose a CSV file with each competitor's name, contact info, and flight.
+					Choose a CSV file with First Name and Last Name columns for each competitor, plus contact
+					info and flight.
 				</p>
 				<input
 					type="file"

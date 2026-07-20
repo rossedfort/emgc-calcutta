@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Tables } from '@emgc-calcutta/shared-types';
+import { formatPlayerName } from '$lib/players';
 import type { Actions, PageServerLoad } from './$types';
 import { parsePlayerForm } from '../../shared';
 
@@ -7,7 +8,8 @@ export type Player = Pick<
 	Tables<'players'>,
 	| 'id'
 	| 'slug'
-	| 'name'
+	| 'first_name'
+	| 'last_name'
 	| 'contact_email'
 	| 'contact_phone'
 	| 'preferences'
@@ -29,7 +31,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 	const { data: player, error: playerError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, name, contact_email, contact_phone, preferences, flight, handicap_index, status, user_id'
+			'id, slug, first_name, last_name, contact_email, contact_phone, preferences, flight, handicap_index, status, user_id'
 		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
@@ -71,8 +73,8 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 		player: player as Player,
 		linkedUser,
 		users: ((users as UserOption[] | null) ?? []).filter((user) => !takenUserIds.has(user.id)),
-		title: `Edit ${player.name} · ${tournament.name} · EMGC Calcutta`,
-		description: `Edit ${player.name}'s roster entry in ${tournament.name}.`
+		title: `Edit ${formatPlayerName(player)} · ${tournament.name} · EMGC Calcutta`,
+		description: `Edit ${formatPlayerName(player)}'s roster entry in ${tournament.name}.`
 	};
 };
 

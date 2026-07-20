@@ -6,7 +6,12 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
-	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import {
+		PLAYER_STATUSES,
+		formatPlayerName,
+		playerStatusBadgeVariant,
+		playerStatusLabel
+	} from '$lib/players';
 	import { groupPlayersByFlight } from '$lib/flightGroups';
 
 	let { data } = $props();
@@ -85,7 +90,7 @@
 					{#each players as player (player.id)}
 						<Table.Row>
 							<Table.Cell class="font-medium text-ink">
-								{player.name}
+								{formatPlayerName(player)}
 								<DivisionBadge division={player.division} />
 							</Table.Cell>
 							<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>

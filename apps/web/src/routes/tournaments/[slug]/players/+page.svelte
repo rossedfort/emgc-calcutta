@@ -6,7 +6,12 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import * as Table from '$lib/components/ui/table';
-	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import {
+		PLAYER_STATUSES,
+		formatPlayerName,
+		playerStatusBadgeVariant,
+		playerStatusLabel
+	} from '$lib/players';
 	import { groupPlayersByFlight } from '$lib/flightGroups';
 
 	let { data } = $props();
@@ -72,7 +77,7 @@
 										slug: data.tournament.slug,
 										playerSlug: player.slug
 									})}
-									class="hover:underline">{player.name}</a
+									class="hover:underline">{formatPlayerName(player)}</a
 								>
 								<DivisionBadge division={player.division} />
 							</Table.Cell>

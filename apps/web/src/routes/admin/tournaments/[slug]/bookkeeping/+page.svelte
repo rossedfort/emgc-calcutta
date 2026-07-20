@@ -6,6 +6,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
+	import { formatPlayerName } from '$lib/players';
 
 	let { data } = $props();
 	let { supabase, players, payouts } = $derived(data);
@@ -85,7 +86,7 @@
 					{#each players as player (player.id)}
 						<Table.Row>
 							<Table.Cell class="font-medium text-ink">
-								{player.name}
+								{formatPlayerName(player)}
 								<DivisionBadge division={player.division} />
 							</Table.Cell>
 							<Table.Cell>
@@ -145,7 +146,7 @@
 						<Table.Row>
 							<Table.Cell class="font-data">{payout.placement}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
-								{payout.player?.name ?? '—'}
+								{payout.player ? formatPlayerName(payout.player) : '—'}
 								{#if payout.player}
 									<DivisionBadge division={payout.player.division} />
 								{/if}

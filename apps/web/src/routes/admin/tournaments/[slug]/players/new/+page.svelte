@@ -8,7 +8,8 @@
 	let { data, form } = $props();
 
 	const emptyValues: PlayerFormValues = {
-		name: '',
+		first_name: '',
+		last_name: '',
 		contact_email: '',
 		contact_phone: '',
 		flight: '',

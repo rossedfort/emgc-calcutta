@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { formatPlayerName } from '$lib/players';
 	import PlayerForm from '../../PlayerForm.svelte';
 	import type { PlayerFormValues } from '../../shared';
 
@@ -11,7 +12,8 @@
 	let errorMessage = $derived(form && 'error' in form ? (form.error as string) : null);
 
 	let defaultValues = $derived<PlayerFormValues>({
-		name: data.player.name,
+		first_name: data.player.first_name,
+		last_name: data.player.last_name,
 		contact_email: data.player.contact_email ?? '',
 		contact_phone: data.player.contact_phone ?? '',
 		flight: data.player.flight,
@@ -26,7 +28,7 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
-	<PageHeader title={data.player.name}>
+	<PageHeader title={formatPlayerName(data.player)}>
 		{#snippet actions()}
 			<a
 				href={resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug })}
@@ -127,7 +129,9 @@
 			</Button>
 		{:else}
 			<div class="flex items-center gap-2">
-				<p class="text-sm text-destructive">Remove {data.player.name}? This can't be undone.</p>
+				<p class="text-sm text-destructive">
+					Remove {formatPlayerName(data.player)}? This can't be undone.
+				</p>
 				<form
 					method="POST"
 					action="?/remove"

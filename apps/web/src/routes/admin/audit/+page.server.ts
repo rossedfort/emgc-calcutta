@@ -1,4 +1,5 @@
 import { error } from '@sveltejs/kit';
+import { formatPlayerName } from '$lib/players';
 import type { PageServerLoad } from './$types';
 import { parseAuditFilters, queryAuditEvents, type AuditFilters } from './shared';
 
@@ -33,7 +34,9 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 		actor_identity: row.actor_identity,
 		created_at: row.created_at,
 		tournament_name: (row.tournaments as { name: string } | null)?.name ?? null,
-		player_name: (row.players as { name: string } | null)?.name ?? null
+		player_name: row.players
+			? formatPlayerName(row.players as { first_name: string; last_name: string })
+			: null
 	}));
 
 	return {

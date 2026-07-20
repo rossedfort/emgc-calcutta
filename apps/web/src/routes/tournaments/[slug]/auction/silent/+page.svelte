@@ -19,7 +19,12 @@
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
-	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import {
+		PLAYER_STATUSES,
+		formatPlayerName,
+		playerStatusBadgeVariant,
+		playerStatusLabel
+	} from '$lib/players';
 	import { groupPlayersByFlight } from '$lib/flightGroups';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
@@ -95,7 +100,10 @@
 		players.filter((p) => {
 			if (statusFilters.length > 0 && !statusFilters.includes(p.status)) return false;
 			if (flightFilters.length > 0 && !flightFilters.includes(p.flight)) return false;
-			if (searchQuery.trim() && !p.name.toLowerCase().includes(searchQuery.trim().toLowerCase())) {
+			if (
+				searchQuery.trim() &&
+				!formatPlayerName(p).toLowerCase().includes(searchQuery.trim().toLowerCase())
+			) {
 				return false;
 			}
 			return true;
@@ -227,7 +235,7 @@
 										slug: data.tournament.slug,
 										playerSlug: player.slug
 									})}
-									class="hover:underline">{player.name}</a
+									class="hover:underline">{formatPlayerName(player)}</a
 								>
 								<DivisionBadge division={player.division} />
 								{#if isYou}

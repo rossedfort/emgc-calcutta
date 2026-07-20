@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { Json } from '@emgc-calcutta/shared-types';
+import { formatPlayerName } from '$lib/players';
 import type { PageServerLoad } from './$types';
 
 export interface AuditEventDetail {
@@ -26,7 +27,7 @@ export const load: PageServerLoad = async ({ params, locals: { supabase } }) => 
 	const { data, error: queryError } = await supabase
 		.from('audit_events')
 		.select(
-			'id, action, entity_type, entity_id, actor_identity, reason, ip, user_agent, before, after, created_at, tournaments(name), players(name)'
+			'id, action, entity_type, entity_id, actor_identity, reason, ip, user_agent, before, after, created_at, tournaments(name), players(first_name, last_name)'
 		)
 		.eq('id', params.id)
 		.maybeSingle();
@@ -50,7 +51,9 @@ export const load: PageServerLoad = async ({ params, locals: { supabase } }) => 
 		after: data.after,
 		created_at: data.created_at,
 		tournament_name: (data.tournaments as { name: string } | null)?.name ?? null,
-		player_name: (data.players as { name: string } | null)?.name ?? null
+		player_name: data.players
+			? formatPlayerName(data.players as { first_name: string; last_name: string })
+			: null
 	};
 
 	return {

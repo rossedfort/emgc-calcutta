@@ -1,5 +1,6 @@
 export interface PlayerFormValues {
-	name: string;
+	first_name: string;
+	last_name: string;
 	contact_email: string;
 	contact_phone: string;
 	flight: string;
@@ -8,7 +9,8 @@ export interface PlayerFormValues {
 }
 
 export interface ParsedPlayer {
-	name: string;
+	first_name: string;
+	last_name: string;
 	contact_email: string | null;
 	contact_phone: string | null;
 	flight: string;
@@ -27,8 +29,11 @@ export function parsePlayerForm(formData: FormData): {
 } {
 	const errors: Record<string, string> = {};
 
-	const name = String(formData.get('name') ?? '').trim();
-	if (!name) errors.name = 'Name is required';
+	const first_name = String(formData.get('first_name') ?? '').trim();
+	if (!first_name) errors.first_name = 'First name is required';
+
+	const last_name = String(formData.get('last_name') ?? '').trim();
+	if (!last_name) errors.last_name = 'Last name is required';
 
 	const handicapRaw = String(formData.get('handicap_index') ?? '').trim();
 	let handicap_index: number | null = null;
@@ -47,7 +52,8 @@ export function parsePlayerForm(formData: FormData): {
 
 	return {
 		data: {
-			name,
+			first_name,
+			last_name,
 			contact_email: String(formData.get('contact_email') ?? '').trim() || null,
 			contact_phone: String(formData.get('contact_phone') ?? '').trim() || null,
 			flight: String(formData.get('flight') ?? '').trim(),

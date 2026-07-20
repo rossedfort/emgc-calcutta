@@ -20,7 +20,7 @@ export function parseAuditFilters(url: URL): AuditFilters {
 }
 
 export const AUDIT_EVENT_SELECT =
-	'id, action, entity_type, entity_id, actor_identity, reason, before, after, created_at, tournaments(name), players(name)';
+	'id, action, entity_type, entity_id, actor_identity, reason, before, after, created_at, tournaments(name), players(first_name, last_name)';
 
 // Shared by the list page and the CSV export endpoint — both need the exact
 // same filtered query, just with a different row cap: the list caps at 200
@@ -62,7 +62,7 @@ export async function queryAuditEvents(
 		const { data: matchingPlayers, error: playersError } = await supabase
 			.from('players')
 			.select('id')
-			.ilike('name', `%${filters.player}%`);
+			.or(`first_name.ilike.%${filters.player}%,last_name.ilike.%${filters.player}%`);
 		if (playersError) {
 			throw playersError;
 		}

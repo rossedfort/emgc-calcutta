@@ -18,10 +18,17 @@
 		<p class="text-sm text-destructive">{errors.form}</p>
 	{/if}
 
-	<div class="flex flex-col gap-1.5">
-		<Label for="name">Name</Label>
-		<Input id="name" name="name" value={values.name} />
-		{#if errors.name}<p class="text-sm text-destructive">{errors.name}</p>{/if}
+	<div class="grid grid-cols-2 gap-4">
+		<div class="flex flex-col gap-1.5">
+			<Label for="first_name">First name</Label>
+			<Input id="first_name" name="first_name" value={values.first_name} />
+			{#if errors.first_name}<p class="text-sm text-destructive">{errors.first_name}</p>{/if}
+		</div>
+		<div class="flex flex-col gap-1.5">
+			<Label for="last_name">Last name</Label>
+			<Input id="last_name" name="last_name" value={values.last_name} />
+			{#if errors.last_name}<p class="text-sm text-destructive">{errors.last_name}</p>{/if}
+		</div>
 	</div>
 
 	<div class="grid grid-cols-2 gap-4">

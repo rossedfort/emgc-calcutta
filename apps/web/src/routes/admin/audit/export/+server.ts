@@ -1,5 +1,6 @@
 import { error } from '@sveltejs/kit';
 import type { WhoamiResponse } from '@emgc-calcutta/shared-types';
+import { formatPlayerName } from '$lib/players';
 import type { RequestHandler } from './$types';
 import { parseAuditFilters, queryAuditEvents } from '../shared';
 
@@ -59,7 +60,8 @@ export const GET: RequestHandler = async ({ url, locals: { session, supabase } }
 
 	const rows = (data ?? []).map((row) => {
 		const tournamentName = (row.tournaments as { name: string } | null)?.name ?? '';
-		const playerName = (row.players as { name: string } | null)?.name ?? '';
+		const playerRow = row.players as { first_name: string; last_name: string } | null;
+		const playerName = playerRow ? formatPlayerName(playerRow) : '';
 		return [
 			row.created_at,
 			row.action,

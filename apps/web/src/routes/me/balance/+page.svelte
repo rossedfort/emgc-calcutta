@@ -4,6 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { formatPlayerName } from '$lib/players';
 
 	let { data } = $props();
 	let { owed, won } = $derived(data);
@@ -56,7 +57,7 @@
 						<Table.Row>
 							<Table.Cell>{row.tournament?.name ?? '—'}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
-								{row.name}
+								{formatPlayerName(row)}
 								<DivisionBadge division={row.division} />
 							</Table.Cell>
 							<Table.Cell class="font-data">
@@ -102,7 +103,7 @@
 						<Table.Row>
 							<Table.Cell>{row.tournament?.name ?? '—'}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
-								{row.player?.name ?? '—'}
+								{row.player ? formatPlayerName(row.player) : '—'}
 								{#if row.player}
 									<DivisionBadge division={row.player.division} />
 								{/if}

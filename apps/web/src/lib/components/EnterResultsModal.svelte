@@ -7,10 +7,12 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { deriveFlightDivisionGroups, type FlightDivisionGroup } from '$lib/flightGroups';
+	import { formatPlayerName } from '$lib/players';
 
 	interface PlayerOption {
 		id: string;
-		name: string;
+		first_name: string;
+		last_name: string;
 		division: string;
 	}
 
@@ -78,7 +80,7 @@
 		loadingExisting = true;
 		const { data } = await supabase
 			.from('players')
-			.select('id, name, flight, division, placement')
+			.select('id, first_name, last_name, flight, division, placement')
 			.eq('tournament_id', tournamentId)
 			.not('placement', 'is', null);
 
@@ -86,7 +88,12 @@
 		for (const row of data ?? []) {
 			if (row.placement !== null) {
 				const key = spotKey({ flight: row.flight, division: row.division }, row.placement);
-				next[key] = { id: row.id, name: row.name, division: row.division };
+				next[key] = {
+					id: row.id,
+					first_name: row.first_name,
+					last_name: row.last_name,
+					division: row.division
+				};
 			}
 		}
 		selections = next;
@@ -137,13 +144,14 @@
 		const key = spotKey(group, placement);
 		const { data } = await supabase
 			.from('players')
-			.select('id, name, division')
+			.select('id, first_name, last_name, division')
 			.eq('tournament_id', tournamentId)
 			.eq('flight', group.flight)
 			.eq('division', group.division)
 			.in('status', ['sold_silent', 'sold_live'])
-			.ilike('name', `%${value}%`)
-			.order('name')
+			.or(`first_name.ilike.%${value}%,last_name.ilike.%${value}%`)
+			.order('first_name')
+			.order('last_name')
 			.limit(8);
 
 		const exclude = usedPlayerIds(key);
@@ -240,7 +248,7 @@
 										class="flex items-center justify-between rounded-md border border-input px-3 py-1.5 text-sm"
 									>
 										<span class="flex items-center gap-2 text-ink">
-											{selections[key]?.name}
+											{selections[key] ? formatPlayerName(selections[key]) : ''}
 											<DivisionBadge division={selections[key]?.division ?? 'overall'} />
 										</span>
 										<button
@@ -269,7 +277,7 @@
 														class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-brass/10"
 														onclick={() => selectPlayer(group, spot.placement, player)}
 													>
-														{player.name}
+														{formatPlayerName(player)}
 														<DivisionBadge division={player.division} />
 													</button>
 												{/each}

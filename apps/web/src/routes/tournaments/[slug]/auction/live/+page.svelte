@@ -18,6 +18,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
+	import { formatPlayerName } from '$lib/players';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data } = $props();
@@ -160,7 +161,7 @@
 							})}
 							class="font-display text-3xl font-semibold text-ink hover:underline"
 						>
-							{currentPlayer.name}
+							{formatPlayerName(currentPlayer)}
 						</a>
 						<DivisionBadge division={currentPlayer.division} />
 					</span>
@@ -253,7 +254,7 @@
 										})}
 										class="font-display text-3xl font-semibold text-ink hover:underline"
 									>
-										{player.name}
+										{formatPlayerName(player)}
 									</a>
 									{#if player.flight || player.handicap_index !== null}
 										<span class="font-data text-xs tracking-wide text-ink/60 uppercase">

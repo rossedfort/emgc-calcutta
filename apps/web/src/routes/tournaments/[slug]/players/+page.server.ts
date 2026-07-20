@@ -4,7 +4,7 @@ import type { PageServerLoad } from './$types';
 
 export type PlayerRow = Pick<
 	Player,
-	'id' | 'slug' | 'name' | 'flight' | 'division' | 'handicap_index' | 'status'
+	'id' | 'slug' | 'first_name' | 'last_name' | 'flight' | 'division' | 'handicap_index' | 'status'
 >;
 
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
@@ -29,9 +29,10 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	const { data: players, error: playersError } = await supabase
 		.from('players')
-		.select('id, slug, name, flight, division, handicap_index, status')
+		.select('id, slug, first_name, last_name, flight, division, handicap_index, status')
 		.eq('tournament_id', tournament.id)
-		.order('name');
+		.order('first_name')
+		.order('last_name');
 	if (playersError) {
 		error(500, playersError.message);
 	}

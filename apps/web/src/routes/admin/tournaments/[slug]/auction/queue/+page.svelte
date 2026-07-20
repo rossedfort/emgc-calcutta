@@ -4,6 +4,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
+	import { formatPlayerName } from '$lib/players';
 
 	let { data, form } = $props();
 
@@ -93,7 +94,7 @@
 						<Table.Row>
 							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
-								{lot.player.name}
+								{formatPlayerName(lot.player)}
 								<DivisionBadge division={lot.player.division} />
 							</Table.Cell>
 							<Table.Cell>{lot.player.flight || '—'}</Table.Cell>
@@ -117,7 +118,7 @@
 											variant="outline"
 											size="icon-sm"
 											disabled={index === 0 || pending[lot.id]}
-											aria-label="Move {lot.player.name} up"
+											aria-label="Move {formatPlayerName(lot.player)} up"
 										>
 											↑
 										</Button>
@@ -139,7 +140,7 @@
 											variant="outline"
 											size="icon-sm"
 											disabled={index === data.queue.length - 1 || pending[lot.id]}
-											aria-label="Move {lot.player.name} down"
+											aria-label="Move {formatPlayerName(lot.player)} down"
 										>
 											↓
 										</Button>

@@ -75,8 +75,11 @@ export default {
       // client-visible validation (same reasoning as parseTournamentForm).
       const rowErrors: string[] = [];
       body.rows.forEach((row, index) => {
-        if (!row.name?.trim()) {
-          rowErrors.push(`Row ${index + 1}: name is required`);
+        if (!row.first_name?.trim()) {
+          rowErrors.push(`Row ${index + 1}: first name is required`);
+        }
+        if (!row.last_name?.trim()) {
+          rowErrors.push(`Row ${index + 1}: last name is required`);
         }
       });
       if (rowErrors.length > 0) {
@@ -96,7 +99,8 @@ export default {
       const insertRows = body.rows.flatMap((row) => {
         const base = {
           tournament_id: body.tournamentId!,
-          name: row.name!.trim(),
+          first_name: row.first_name!.trim(),
+          last_name: row.last_name!.trim(),
           contact_email: row.contact_email || null,
           contact_phone: row.contact_phone || null,
           // '' (not null) — players.flight is not-null-default-'' as of the
@@ -124,7 +128,7 @@ export default {
       const { data, error: insertError } = await ctx.supabaseAdmin
         .from("players")
         .insert(insertRows)
-        .select("id, slug, name");
+        .select("id, slug, first_name, last_name");
       if (insertError) {
         // Most likely cause: one of these rows' userId is already linked to
         // a different player in this tournament (unique per (tournamentId,
