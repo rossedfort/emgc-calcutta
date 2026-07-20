@@ -58,7 +58,12 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		return player ? [{ id: lot.id, queue_position: lot.queue_position, player }] : [];
 	});
 
-	return { tournament, queue };
+	return {
+		tournament,
+		queue,
+		title: `${tournament.name} · Live auction queue · EMGC Calcutta`,
+		description: `Manage the live auction lot order for ${tournament.name}.`
+	};
 };
 
 // Shared by the moveUp/moveDown actions below: finds the lot immediately

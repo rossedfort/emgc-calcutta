@@ -10,5 +10,9 @@ export const load: PageServerLoad = async ({ locals: { supabase } }) => {
 		.select('*')
 		.order('created_at', { ascending: false });
 
-	return { tournaments: (data as Tournament[] | null) ?? [] };
+	return {
+		tournaments: (data as Tournament[] | null) ?? [],
+		title: 'Tournaments · EMGC Calcutta',
+		description: 'Manage every EMGC Calcutta tournament.'
+	};
 };

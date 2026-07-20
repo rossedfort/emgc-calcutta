@@ -15,5 +15,12 @@ export const load: LayoutServerLoad = async ({ params, locals: { supabase } }) =
 		error(404, 'Tournament not found');
 	}
 
-	return { tournament: tournament as Tournament };
+	return {
+		tournament: tournament as Tournament,
+		// Fallback for the Settings tab (its own +page.server.ts has no load
+		// of its own) — every other tab under this layout overrides this
+		// with something more specific.
+		title: `${tournament.name} · Admin · EMGC Calcutta`,
+		description: `Manage the ${tournament.name} tournament.`
+	};
 };

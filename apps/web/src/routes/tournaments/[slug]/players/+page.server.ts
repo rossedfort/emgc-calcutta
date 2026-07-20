@@ -36,5 +36,10 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		error(500, playersError.message);
 	}
 
-	return { tournament, players: (players as PlayerRow[] | null) ?? [] };
+	return {
+		tournament,
+		players: (players as PlayerRow[] | null) ?? [],
+		title: `${tournament.name} · Players · EMGC Calcutta`,
+		description: `Browse every player in the ${tournament.name} field.`
+	};
 };

@@ -72,6 +72,8 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		tournament,
 		player: player as PlayerProfile,
 		linkedUserName,
-		isYou: player.user_id === session.user.id
+		isYou: player.user_id === session.user.id,
+		title: `${player.name} · ${tournament.name} · EMGC Calcutta`,
+		description: `Player profile and bidding status for ${player.name} in ${tournament.name}.`
 	};
 };

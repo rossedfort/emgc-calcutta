@@ -69,6 +69,8 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 
 	return {
 		players: (players as BookkeepingRow[] | null) ?? [],
-		payouts: (payouts as PayoutRow[] | null) ?? []
+		payouts: (payouts as PayoutRow[] | null) ?? [],
+		title: `${tournament.name} · Bookkeeping · EMGC Calcutta`,
+		description: `Track paid and unpaid winning bids and payouts for ${tournament.name}.`
 	};
 };

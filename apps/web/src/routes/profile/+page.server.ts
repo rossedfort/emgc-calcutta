@@ -17,5 +17,9 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 		error(500, queryError?.message ?? 'Failed to load profile');
 	}
 
-	return { profile: data as UserProfile };
+	return {
+		profile: data as UserProfile,
+		title: 'Profile · EMGC Calcutta',
+		description: 'Your EMGC Calcutta account details.'
+	};
 };

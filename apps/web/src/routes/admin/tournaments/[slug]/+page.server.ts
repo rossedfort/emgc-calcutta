@@ -1,6 +1,14 @@
 import { fail } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { parseTournamentForm } from '../shared';
+
+export const load: PageServerLoad = async ({ parent }) => {
+	const { tournament } = await parent();
+	return {
+		title: `${tournament.name} · Settings · EMGC Calcutta`,
+		description: `Configure auction timing, thresholds, and payout structure for ${tournament.name}.`
+	};
+};
 
 export const actions: Actions = {
 	// Named (not `default`) because it coexists with the `setStatus` action

@@ -10,5 +10,9 @@ export const load: PageServerLoad = async ({ locals: { supabase } }) => {
 		error(500, invokeError?.message ?? 'Failed to load users');
 	}
 
-	return { users: data.users };
+	return {
+		users: data.users,
+		title: 'Users · EMGC Calcutta',
+		description: 'Manage EMGC Calcutta participant and admin accounts.'
+	};
 };

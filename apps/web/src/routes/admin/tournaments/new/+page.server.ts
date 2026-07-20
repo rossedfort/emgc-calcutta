@@ -1,6 +1,13 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { parseTournamentForm } from '../shared';
+
+export const load: PageServerLoad = () => {
+	return {
+		title: 'New tournament · EMGC Calcutta',
+		description: 'Create a new EMGC Calcutta tournament.'
+	};
+};
 
 export const actions: Actions = {
 	default: async ({ request, locals: { supabase } }) => {

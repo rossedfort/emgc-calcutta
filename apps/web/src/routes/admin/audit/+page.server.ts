@@ -38,6 +38,8 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 
 	return {
 		events,
-		filters: filters satisfies AuditFilters
+		filters: filters satisfies AuditFilters,
+		title: 'Audit log · EMGC Calcutta',
+		description: 'Search and export the EMGC Calcutta admin audit trail.'
 	};
 };

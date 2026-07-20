@@ -14,6 +14,11 @@ declare global {
 		}
 		interface PageData {
 			session: Session | null;
+			// Set by every route's own `load` (falling back to the root
+			// layout's defaults) — see the manual <title>/meta description
+			// setup: https://svelte.dev/docs/kit/seo#Manual-setup
+			title: string;
+			description: string;
 		}
 		// interface PageState {}
 		// interface Platform {}

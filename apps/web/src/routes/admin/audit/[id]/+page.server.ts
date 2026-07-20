@@ -53,5 +53,9 @@ export const load: PageServerLoad = async ({ params, locals: { supabase } }) => 
 		player_name: (data.players as { name: string } | null)?.name ?? null
 	};
 
-	return { event };
+	return {
+		event,
+		title: 'Audit event · EMGC Calcutta',
+		description: `Detail for a ${event.action} audit event on ${event.entity_type}.`
+	};
 };
