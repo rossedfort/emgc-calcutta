@@ -1,6 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { navigating, page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
@@ -14,6 +16,13 @@
 	// current view, not just the 200 rows shown on screen (the export
 	// endpoint itself re-runs the same filtered query uncapped).
 	let exportHref = $derived(`${resolve('/admin/audit/export')}${page.url.search}`);
+
+	// The filter form is a plain GET, so re-querying is a real SvelteKit
+	// navigation (re-running this route's server `load`) rather than a
+	// fetch this component kicks off itself — `navigating` is the only
+	// signal available for it. Scoped to "navigating to this same route"
+	// so the indicator doesn't flash while leaving the page entirely.
+	let isQuerying = $derived(navigating.to?.route.id === page.route.id);
 
 	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
 		year: 'numeric',
@@ -43,18 +52,31 @@
 	>
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-muted-foreground">Actor</span>
-			<Input type="text" name="participant" value={data.filters.participant} placeholder="Email" />
+			<Input
+				type="text"
+				name="participant"
+				value={data.filters.participant}
+				placeholder="Email"
+				disabled={isQuerying}
+			/>
 		</label>
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-muted-foreground">Player</span>
-			<Input type="text" name="player" value={data.filters.player} placeholder="Name" />
+			<Input
+				type="text"
+				name="player"
+				value={data.filters.player}
+				placeholder="Name"
+				disabled={isQuerying}
+			/>
 		</label>
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-muted-foreground">Action</span>
 			<select
 				name="action"
 				value={data.filters.action}
-				class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+				disabled={isQuerying}
+				class="rounded-md border border-input bg-background px-2 py-1.5 text-sm disabled:opacity-50"
 			>
 				<option value="">All</option>
 				{#each AUDIT_ACTIONS as action (action)}
@@ -65,20 +87,31 @@
 		<div class="flex items-end gap-3">
 			<label class="flex flex-col gap-1 text-sm">
 				<span class="text-muted-foreground">From</span>
-				<Input type="datetime-local" name="start" value={data.filters.start} />
+				<Input
+					type="datetime-local"
+					name="start"
+					value={data.filters.start}
+					disabled={isQuerying}
+				/>
 			</label>
 			<label class="flex flex-col gap-1 text-sm">
 				<span class="text-muted-foreground">To</span>
-				<Input type="datetime-local" name="end" value={data.filters.end} />
+				<Input type="datetime-local" name="end" value={data.filters.end} disabled={isQuerying} />
 			</label>
 		</div>
-		<Button type="submit" variant="brass" size="sm">Apply filters</Button>
+		<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
+			{#if isQuerying}
+				<LoaderCircleIcon class="size-3.5 animate-spin" />
+			{/if}
+			{isQuerying ? 'Applying…' : 'Apply filters'}
+		</Button>
 		{#if data.filters.participant || data.filters.player || data.filters.action || data.filters.start || data.filters.end}
 			<Button
 				type="button"
 				variant="outline"
 				size="sm"
-				onclick={() => (window.location.href = resolve('/admin/audit'))}
+				disabled={isQuerying}
+				onclick={() => goto(resolve('/admin/audit'))}
 			>
 				Clear
 			</Button>
@@ -88,7 +121,7 @@
 	{#if data.events.length === 0}
 		<EmptyState title="No audit events match these filters" />
 	{:else}
-		<Table.Root>
+		<Table.Root class={isQuerying ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
 			<Table.Header>
 				<Table.Row>
 					<Table.Head class="bg-brass/10">Actor</Table.Head>

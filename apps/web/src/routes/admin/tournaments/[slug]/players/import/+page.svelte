@@ -2,6 +2,7 @@
 	import type { ImportCsvPreviewResponse } from '@emgc-calcutta/shared-types';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
@@ -208,6 +209,9 @@
 			>
 				<input type="hidden" name="rows" value={confirmRows} />
 				<Button type="submit" variant="brass" disabled={includedCount === 0 || confirmSubmitting}>
+					{#if confirmSubmitting}
+						<LoaderCircleIcon class="size-4 animate-spin" />
+					{/if}
 					{confirmSubmitting
 						? 'Importing…'
 						: entryCount === includedCount
@@ -249,6 +253,9 @@
 				/>
 			</div>
 			<Button type="submit" variant="brass" class="mt-4" disabled={previewSubmitting}>
+				{#if previewSubmitting}
+					<LoaderCircleIcon class="size-4 animate-spin" />
+				{/if}
 				{previewSubmitting ? 'Processing…' : 'Preview import'}
 			</Button>
 		</form>
