@@ -12,7 +12,7 @@
 	<PageHeader title={formatPlayerName(data.player)}>
 		{#snippet actions()}
 			<a
-				href={resolve('/tournaments/[slug]/players', { slug: data.tournament.slug })}
+				href={resolve('/tournaments/[slug]', { slug: data.tournament.slug })}
 				class="text-sm text-brass hover:underline">Back to players</a
 			>
 		{/snippet}

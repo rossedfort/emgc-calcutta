@@ -2,9 +2,17 @@ import { error, redirect } from '@sveltejs/kit';
 import type { Player } from '$lib/players';
 import type { PageServerLoad } from './$types';
 
-export type PlayerRow = Pick<
+export type FieldPlayerRow = Pick<
 	Player,
-	'id' | 'slug' | 'first_name' | 'last_name' | 'flight' | 'division' | 'handicap_index' | 'status'
+	| 'id'
+	| 'slug'
+	| 'first_name'
+	| 'last_name'
+	| 'flight'
+	| 'division'
+	| 'handicap_index'
+	| 'status'
+	| 'user_id'
 >;
 
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
@@ -29,7 +37,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	const { data: players, error: playersError } = await supabase
 		.from('players')
-		.select('id, slug, first_name, last_name, flight, division, handicap_index, status')
+		.select('id, slug, first_name, last_name, flight, division, handicap_index, status, user_id')
 		.eq('tournament_id', tournament.id)
 		.order('first_name')
 		.order('last_name');
@@ -39,8 +47,9 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	return {
 		tournament,
-		players: (players as PlayerRow[] | null) ?? [],
-		title: `${tournament.name} · Players · EMGC Calcutta`,
-		description: `Browse every player in the ${tournament.name} field.`
+		players: (players as FieldPlayerRow[] | null) ?? [],
+		currentUserId: session.user.id,
+		title: `${tournament.name} · EMGC Calcutta`,
+		description: `Browse every player in the ${tournament.name} field, with live status and current bids.`
 	};
 };
