@@ -8,6 +8,6 @@ export const load: PageServerLoad = async ({ locals: { session } }) => {
 
 	return {
 		title: 'Sign in · EMGC Calcutta',
-		description: 'Sign in to EMGC Calcutta with Google or Microsoft.'
+		description: 'Sign in to EMGC Calcutta with Google, Microsoft, or email.'
 	};
 };

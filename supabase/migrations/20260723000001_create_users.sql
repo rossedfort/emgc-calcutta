@@ -2,8 +2,10 @@
 
 create type user_role as enum ('unassigned', 'participant', 'admin', 'owner');
 
--- Only the three SSO providers spec section 4.1 calls for.
-create type auth_provider as enum ('google', 'azure', 'apple');
+-- Google and Microsoft SSO (spec section 4.1), plus 'email' for passwordless
+-- magic-link/OTP sign-in — a fourth, non-OAuth entry point for anyone
+-- without a Google or Microsoft account. Still no passwords either way.
+create type auth_provider as enum ('google', 'azure', 'email');
 
 -- Extends auth.users with the app-specific profile fields the spec's User
 -- model calls for (role, phone, avatar, etc).
@@ -84,7 +86,7 @@ begin
     case new.raw_app_meta_data ->> 'provider'
       when 'google' then 'google'::public.auth_provider
       when 'azure' then 'azure'::public.auth_provider
-      when 'apple' then 'apple'::public.auth_provider
+      when 'email' then 'email'::public.auth_provider
       else null
     end
   )

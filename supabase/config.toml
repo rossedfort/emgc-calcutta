@@ -238,20 +238,33 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Production needs a real SMTP server — local dev captures every email
+# (OAuth confirmations, magic links/OTP codes) in Inbucket instead. Reuses
+# the Resend account already set up for dispatch-notification (Phase 6)
+# rather than standing up a second email provider — generate SMTP
+# credentials for it from the Resend dashboard, then uncomment below.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
+# host = "smtp.resend.com"
+# port = 465
+# user = "resend"
+# pass = "env(RESEND_SMTP_PASS)"
 # admin_email = "admin@email.com"
-# sender_name = "Admin"
+# sender_name = "EMGC Calcutta"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+# Supabase's built-in magic-link template only renders the link itself, not
+# the 6-digit OTP `{{ .Token }}` — verified directly against a real local
+# send, which came through with no code visible anywhere in the email. The
+# /login code-entry fallback needs that code to actually be readable, so
+# this overrides the template to show both.
+[auth.email.template.magic_link]
+subject = "Your sign-in link"
+content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
@@ -324,20 +337,6 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
-[auth.external.apple]
-enabled = false
-client_id = ""
-# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
-secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
-# Overrides the default auth callback URL derived from auth.external_url.
-redirect_uri = ""
-# Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
-# or any other third-party OIDC providers.
-url = ""
-# If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
-skip_nonce_check = false
-# If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
-email_optional = false
 
 [auth.external.google]
 enabled = true
@@ -346,7 +345,7 @@ client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 redirect_uri = ""
 url = ""
-# Required for local sign-in with Google — see the comment on the Apple block above.
+# Required for local sign-in with Google (nonce mismatch otherwise against the local Kong proxy).
 skip_nonce_check = true
 
 [auth.external.azure]

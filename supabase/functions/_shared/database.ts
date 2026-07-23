@@ -538,7 +538,7 @@ export type Database = {
       };
     };
     Enums: {
-      auth_provider: "google" | "azure" | "apple";
+      auth_provider: "google" | "azure" | "email";
       bid_phase: "silent" | "live";
       player_status:
         | "open"
@@ -694,7 +694,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      auth_provider: ["google", "azure", "apple"],
+      auth_provider: ["google", "azure", "email"],
       bid_phase: ["silent", "live"],
       player_status: ["open", "reserved", "sold_silent", "sold_live", "no_bid"],
       user_role: ["unassigned", "participant", "admin", "owner"],
