@@ -25,7 +25,9 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	// 403, so this doesn't leak which slugs exist.
 	const { data: tournament, error: tournamentError } = await supabase
 		.from('tournaments')
-		.select('id, slug, name, flights')
+		.select(
+			'id, slug, name, flights, status, silent_auction_start, silent_auction_end, live_auction_started_at'
+		)
 		.eq('slug', params.slug)
 		.maybeSingle();
 	if (tournamentError) {
@@ -50,6 +52,6 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		players: (players as FieldPlayerRow[] | null) ?? [],
 		currentUserId: session.user.id,
 		title: `${tournament.name} · EMGC Calcutta`,
-		description: `Browse every player in the ${tournament.name} field, with live status and current bids.`
+		description: `Watch bids come in live on the ${tournament.name} field.`
 	};
 };
