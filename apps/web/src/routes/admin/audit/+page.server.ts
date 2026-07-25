@@ -1,18 +1,8 @@
 import { error } from '@sveltejs/kit';
+import type { AuditEventRow } from '$lib/auditActions';
 import { formatPlayerName } from '$lib/players';
 import type { PageServerLoad } from './$types';
 import { parseAuditFilters, queryAuditEvents, type AuditFilters } from './shared';
-
-export interface AuditEventRow {
-	id: string;
-	action: string;
-	entity_type: string;
-	entity_id: string | null;
-	actor_identity: string | null;
-	created_at: string;
-	tournament_name: string | null;
-	player_name: string | null;
-}
 
 // Server-side, URL-param-driven filtering (a plain GET form, not client-side
 // array filtering like the players list) — audit_events only ever grows, so

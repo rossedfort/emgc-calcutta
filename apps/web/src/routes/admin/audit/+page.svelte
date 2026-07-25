@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { navigating, page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -8,7 +9,10 @@
 	import * as Table from '$lib/components/ui/table';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { AUDIT_ACTIONS, auditActionLabel } from '$lib/auditActions';
+	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
+	import { AUDIT_ACTIONS, auditActionLabel, type AuditEventRow } from '$lib/auditActions';
+	import { createAuditRealtime, type AuditRealtime } from '$lib/stores/auditRealtime';
+	import type { RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data } = $props();
 
@@ -23,6 +27,73 @@
 	// signal available for it. Scoped to "navigating to this same route"
 	// so the indicator doesn't flash while leaving the page entirely.
 	let isQuerying = $derived(navigating.to?.route.id === page.route.id);
+
+	let filtersActive = $derived(
+		Boolean(
+			data.filters.participant ||
+			data.filters.player ||
+			data.filters.action ||
+			data.filters.start ||
+			data.filters.end
+		)
+	);
+
+	// Live mode only makes sense against the unfiltered view: postgres_changes
+	// can't apply this page's text-match/date-range filters server-side, and
+	// re-implementing them client-side against every new event would be real
+	// complexity for a live-tail convenience feature — so the toggle is
+	// simply unavailable while a filter is active, rather than risking an
+	// unfiltered event sneaking into a filtered view.
+	let rt: AuditRealtime | null = null;
+	let unsubEvents: (() => void) | null = null;
+	let unsubConnection: (() => void) | null = null;
+	let liveEnabled = $state(false);
+	let liveEvents = $state<AuditEventRow[]>([]);
+	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
+
+	function stopLive() {
+		unsubEvents?.();
+		unsubConnection?.();
+		rt?.destroy();
+		rt = null;
+		unsubEvents = null;
+		unsubConnection = null;
+		liveEnabled = false;
+		liveEvents = [];
+	}
+
+	function toggleLive() {
+		if (liveEnabled) {
+			stopLive();
+			return;
+		}
+
+		liveEnabled = true;
+		rt = createAuditRealtime(data.supabase);
+		unsubEvents = rt.events.subscribe((events) => (liveEvents = events));
+		unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
+	}
+
+	// Submitting the filter form is a real navigation, not a client-side
+	// state change this component controls — if live mode is on when that
+	// happens, turn it off rather than leaving a stale subscription running
+	// against what's now a filtered view.
+	$effect(() => {
+		if (filtersActive && liveEnabled) {
+			stopLive();
+		}
+	});
+
+	onDestroy(() => rt?.destroy());
+
+	// New live events are already most-recent-first (auditRealtime.ts
+	// prepends); data.events is the SSR snapshot, also most-recent-first.
+	// Deduping guards the vanishingly unlikely race where an event both
+	// landed in the initial query and arrived as a live INSERT.
+	let displayedEvents = $derived.by(() => {
+		const liveIds = new Set(liveEvents.map((e) => e.id));
+		return [...liveEvents, ...data.events.filter((e) => !liveIds.has(e.id))].slice(0, 200);
+	});
 
 	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
 		year: 'numeric',
@@ -42,9 +113,28 @@
 <div class="flex flex-col gap-4">
 	<PageHeader title="Audit log" eyebrow="Admin">
 		{#snippet actions()}
+			<Button
+				variant={liveEnabled ? 'brass' : 'outline'}
+				size="sm"
+				disabled={filtersActive}
+				title={filtersActive ? 'Clear filters to go live' : undefined}
+				onclick={toggleLive}
+			>
+				<span
+					class={[
+						'inline-block size-2 rounded-full',
+						liveEnabled ? 'animate-pulse bg-fairway' : 'bg-brass/60'
+					]}
+				></span>
+				{liveEnabled ? 'Live' : 'Go live'}
+			</Button>
 			<Button variant="outline" size="sm" href={exportHref}>Export CSV</Button>
 		{/snippet}
 	</PageHeader>
+
+	{#if liveEnabled}
+		<RealtimeStatusBanner status={connectionStatus} />
+	{/if}
 
 	<form
 		method="GET"
@@ -105,7 +195,7 @@
 			{/if}
 			{isQuerying ? 'Applying…' : 'Apply filters'}
 		</Button>
-		{#if data.filters.participant || data.filters.player || data.filters.action || data.filters.start || data.filters.end}
+		{#if filtersActive}
 			<Button
 				type="button"
 				variant="outline"
@@ -118,7 +208,7 @@
 		{/if}
 	</form>
 
-	{#if data.events.length === 0}
+	{#if displayedEvents.length === 0}
 		<EmptyState title="No audit events match these filters" />
 	{:else}
 		<Table.Root class={isQuerying ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
@@ -133,7 +223,7 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each data.events as event (event.id)}
+				{#each displayedEvents as event (event.id)}
 					<Table.Row>
 						<Table.Cell class="bg-brass/10 font-medium text-fairway">
 							{event.actor_identity ?? '—'}
@@ -154,7 +244,7 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
-		{#if data.events.length === 200}
+		{#if displayedEvents.length === 200}
 			<p class="text-xs text-muted-foreground">
 				Showing the 200 most recent matching events — narrow the filters to see older ones.
 			</p>

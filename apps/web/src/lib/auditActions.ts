@@ -30,3 +30,19 @@ export function auditActionLabel(action: string): string {
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1))
 		.join(' ');
 }
+
+// The shape both the SSR list query (admin/audit/+page.server.ts, joining
+// tournaments(name)/players(first_name,last_name) server-side) and the live
+// Realtime overlay (auditRealtime.ts, resolving the same two names itself
+// per event) ultimately produce — one shared shape so the list page can
+// merge and dedupe both sources without a translation step.
+export interface AuditEventRow {
+	id: string;
+	action: string;
+	entity_type: string;
+	entity_id: string | null;
+	actor_identity: string | null;
+	created_at: string;
+	tournament_name: string | null;
+	player_name: string | null;
+}
