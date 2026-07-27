@@ -108,12 +108,25 @@ export function parseTournamentForm(formData: FormData): {
 	const payoutRaw = String(formData.get('payout_structure') ?? '{}');
 	try {
 		const parsed = JSON.parse(payoutRaw || '{}');
+		let total = 0;
 		for (const [place, percent] of Object.entries(parsed)) {
 			if (!/^\d+$/.test(place) || typeof percent !== 'number' || percent <= 0 || percent > 1) {
 				throw new Error('invalid payout entry');
 			}
+			total += percent;
 		}
-		payout_structure = parsed;
+		// Each entry is already bounded to (0, 1] above; nothing previously
+		// checked the total across all places, so e.g. 1st=60%/2nd=60% (a
+		// nonsensical 120% payout) passed silently. Epsilon tolerance: percents
+		// are entered as whole numbers and divided by 100 client-side, so a
+		// legitimate 100% split (e.g. seven 7% places + one 9%) can float-drift
+		// to 1.0000000000000004 and would otherwise be rejected incorrectly.
+		if (total > 1 + 1e-9) {
+			errors.payout_structure =
+				'Payout percentages add up to more than 100% — reduce one or more places';
+		} else {
+			payout_structure = parsed;
+		}
 	} catch {
 		errors.payout_structure = 'Payout structure is invalid — each place must have a percentage';
 	}
