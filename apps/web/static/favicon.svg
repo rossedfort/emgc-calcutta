@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    :root {
+      --pole: #1a1815;
+      --ferrule: #b8925a;
+      --flag: #a63a2e;
+      --mound: #1b3a2b;
+      --mound-edge: rgba(184, 146, 90, 0.45);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --pole: #f3efe3;
+        --ferrule: #c9a165;
+        --flag: #c2483a;
+        --mound: #2f6b4a;
+        --mound-edge: rgba(243, 239, 227, 0.35);
+      }
+    }
+  </style>
+  <ellipse cx="16" cy="25.5" rx="9" ry="3" fill="var(--mound)" stroke="var(--mound-edge)" stroke-width="0.6" />
+  <line x1="14" y1="6" x2="14" y2="25.5" stroke="var(--pole)" stroke-width="2" stroke-linecap="round" />
+  <path d="M14,5 L24,8 L20.5,9.5 L24,11 L14,13.5 Z" fill="var(--flag)" />
+  <circle cx="14" cy="9.25" r="1.3" fill="var(--ferrule)" />
+</svg>
