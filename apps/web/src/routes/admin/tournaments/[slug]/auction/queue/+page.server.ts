@@ -61,7 +61,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	return {
 		tournament,
 		queue,
-		title: `${tournament.name} · Live auction queue · EMGC Calcutta`,
+		title: `${tournament.name} · Live auction queue · EMGC Bet`,
 		description: `Manage the live auction lot order for ${tournament.name}.`
 	};
 };

@@ -7,7 +7,7 @@ export const load: PageServerLoad = async ({ locals: { session } }) => {
 	}
 
 	return {
-		title: 'Sign in · EMGC Calcutta',
-		description: 'Sign in to EMGC Calcutta with Google, Microsoft, or email.'
+		title: 'Sign in · EMGC Bet',
+		description: 'Sign in to EMGC Bet with Google, Microsoft, or email.'
 	};
 };

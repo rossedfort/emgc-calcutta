@@ -30,7 +30,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 
 	return {
 		players: (players as PlayerRow[] | null) ?? [],
-		title: `${tournament.name} · Players · EMGC Calcutta`,
+		title: `${tournament.name} · Players · EMGC Bet`,
 		description: `Manage the ${tournament.name} player roster.`
 	};
 };

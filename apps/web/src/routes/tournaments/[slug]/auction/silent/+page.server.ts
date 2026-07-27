@@ -51,7 +51,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		tournament,
 		players: (players as AuctionPlayerRow[] | null) ?? [],
 		currentUserId: session.user.id,
-		title: `${tournament.name} · Silent auction · EMGC Calcutta`,
+		title: `${tournament.name} · Silent auction · EMGC Bet`,
 		description: `Place silent bids on ${tournament.name} players before the live auction begins.`
 	};
 };

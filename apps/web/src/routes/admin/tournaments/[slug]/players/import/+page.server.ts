@@ -26,7 +26,7 @@ async function extractFunctionError(error: unknown, fallback: string): Promise<s
 export const load: PageServerLoad = async ({ parent }) => {
 	const { tournament } = await parent();
 	return {
-		title: `Import players · ${tournament.name} · EMGC Calcutta`,
+		title: `Import players · ${tournament.name} · EMGC Bet`,
 		description: `Bulk-import players into ${tournament.name} from a CSV file.`
 	};
 };

@@ -6,7 +6,7 @@ import type { LayoutServerLoad } from './$types';
 // (see app.d.ts's PageData) — every real page overrides these, but this
 // still backstops the root +error.svelte boundary, which has no load of its
 // own and only ever sees whatever ancestor layouts already returned.
-const DEFAULT_TITLE = 'EMGC Calcutta';
+const DEFAULT_TITLE = 'EMGC Bet';
 const DEFAULT_DESCRIPTION =
 	"The EMGC golf league's Calcutta auction — browse players, bid, and follow results.";
 

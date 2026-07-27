@@ -67,9 +67,7 @@
 			>
 				<MenuIcon class="size-5" />
 			</button>
-			<span class="font-data text-xs tracking-widest text-brass uppercase"
-				>EMGC &middot; Calcutta</span
-			>
+			<span class="font-data text-xs tracking-widest text-brass uppercase">EMGC &middot; Bet</span>
 		</div>
 
 		<DropdownMenu.Root>

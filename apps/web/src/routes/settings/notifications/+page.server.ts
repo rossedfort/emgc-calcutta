@@ -55,8 +55,8 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 		// Drives the onboarding banner (see +page.svelte) — only shown the
 		// first time, before any explicit choice (a real row) exists yet.
 		isFirstVisit: data === null,
-		title: 'Notification settings · EMGC Calcutta',
-		description: 'Choose which EMGC Calcutta auction emails you receive.'
+		title: 'Notification settings · EMGC Bet',
+		description: 'Choose which EMGC Bet auction emails you receive.'
 	};
 };
 

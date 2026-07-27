@@ -99,7 +99,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	return {
 		payoutStructure: tournament.payout_structure as Record<string, number>,
 		results,
-		title: `${tournament.name} · Results · EMGC Calcutta`,
+		title: `${tournament.name} · Results · EMGC Bet`,
 		description: `Enter and review placements for ${tournament.name}.`
 	};
 };

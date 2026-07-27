@@ -51,7 +51,7 @@
 	{#each tournaments as tournament (tournament.id)}
 		{@const state = auctionState(tournament)}
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink shadow-sm">
-			<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Calcutta</p>
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Bet</p>
 
 			<div class="mt-2 flex items-baseline justify-between gap-4">
 				<h1 class="font-display text-4xl font-semibold text-ink">{tournament.name}</h1>
@@ -118,7 +118,7 @@
 		</div>
 	{:else}
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink shadow-sm">
-			<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Calcutta</p>
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Bet</p>
 			<h1 class="mt-2 font-display text-3xl font-semibold text-ink">
 				{isAdmin ? 'No tournament set up yet' : 'Nothing scheduled yet'}
 			</h1>
