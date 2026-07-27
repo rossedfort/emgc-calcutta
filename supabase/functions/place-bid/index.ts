@@ -250,6 +250,24 @@ export default {
         }, { status: 400 });
       }
 
+      // Silent bids are capped at the reservation threshold — nothing
+      // previously stopped an amount from jumping straight past it (e.g.
+      // current high $100, min increment $5, threshold $125: a $150 bid
+      // was accepted outright and became the player's reserved silent
+      // high bid instead of $125). A bid landing exactly at the threshold
+      // still crosses it and reserves the player, same as before this
+      // check — only an amount *exceeding* it is rejected. This keeps the
+      // value carried into the live auction as the lot's opening price
+      // always the threshold, never an arbitrary silent overbid; live
+      // bidding itself stays uncapped once the lot opens.
+      if (phase === "silent" && body.amount > tournament.threshold_amount) {
+        return Response.json({
+          error: `Silent bids cannot exceed the reservation threshold of $${
+            tournament.threshold_amount.toFixed(2)
+          }`,
+        }, { status: 400 });
+      }
+
       const { data: bid, error: insertError } = await ctx.supabaseAdmin
         .from("bids")
         .insert({
