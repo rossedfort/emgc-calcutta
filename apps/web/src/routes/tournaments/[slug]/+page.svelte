@@ -7,7 +7,7 @@
 	import { formatCountdown } from '$lib/time';
 	import { tournamentPhase } from '$lib/tournamentPhase';
 	import LiveAuctionBoard from './LiveAuctionBoard.svelte';
-	import SelfLinkPrompt from './SelfLinkPrompt.svelte';
+	import SelfLinkModal from './SelfLinkModal.svelte';
 	import SilentAuctionBoard from './SilentAuctionBoard.svelte';
 	import TournamentRoster from './TournamentRoster.svelte';
 
@@ -82,7 +82,7 @@
 	</div>
 
 	{#if !isLinkedToYou}
-		<SelfLinkPrompt {unlinkedPlayers} />
+		<SelfLinkModal {unlinkedPlayers} />
 	{/if}
 
 	{#if phase.phase === 'silent'}
