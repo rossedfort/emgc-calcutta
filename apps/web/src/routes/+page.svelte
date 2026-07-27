@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import { tournamentPhase } from '$lib/tournamentPhase';
+	import OnboardingModal from './OnboardingModal.svelte';
 
 	let { data } = $props();
 	let { tournaments } = $derived(data);
@@ -22,6 +23,13 @@
 		return `$${amount.toLocaleString('en-US')}`;
 	}
 </script>
+
+{#if data.profile}
+	<OnboardingModal
+		profile={data.profile}
+		notificationsSetupPending={data.notificationsSetupPending}
+	/>
+{/if}
 
 <div class="flex flex-col gap-6">
 	{#each tournaments as tournament (tournament.id)}
