@@ -93,6 +93,13 @@
 <div class="mx-auto flex max-w-2xl flex-col gap-4">
 	<PageHeader title="Notification settings" eyebrow="Settings" />
 
+	{#if data.isFirstVisit}
+		<p class="text-sm text-ink/70">
+			Notification emails are off by default — turn on the ones you'd like below, or save as-is to
+			stay opted out.
+		</p>
+	{/if}
+
 	<form
 		method="POST"
 		class="flex flex-col gap-6"

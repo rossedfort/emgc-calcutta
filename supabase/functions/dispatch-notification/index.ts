@@ -124,14 +124,19 @@ export default {
       const entityType = body.playerId ? "Player" : "Tournament";
       const entityId = body.playerId ?? body.tournamentId;
 
-      // Respect opt-out (spec 4.7) before doing any of the lookup/send
-      // work below. A Participant with no notification_prefs row yet
-      // (hasn't visited /settings/notifications) defaults to the same
-      // all-enabled state the migration's own column defaults establish
-      // — `?? true` on both checks, not `?? false`, so a missing row (or
-      // a trigger key some future migration hasn't backfilled onto older
-      // rows yet) never silently suppresses a notification nobody
-      // actually opted out of.
+      // Respect opt-in (spec 4.7: "opt-in ... not forced") before doing any
+      // of the lookup/send work below. A Participant with no
+      // notification_prefs row yet (hasn't visited /settings/notifications
+      // — the root layout's onboarding gate sends them there once their
+      // profile is complete, but this function can't assume that's already
+      // happened) has made no explicit choice at all, so `emailEnabled`
+      // defaults closed (`?? false`), matching the column's own default —
+      // silence, not a send nobody asked for. Once a row *does* exist (a
+      // real choice was made), an individual trigger key missing from its
+      // `triggers` jsonb (e.g. a future migration adds a new trigger type
+      // not yet backfilled onto older rows) still defaults open (`?? true`)
+      // — that's a different concern: the user already opted in generally,
+      // they just haven't seen this specific toggle yet.
       const { data: prefs, error: prefsError } = await ctx.supabaseAdmin
         .from("notification_prefs")
         .select("email_enabled, triggers")
@@ -141,7 +146,7 @@ export default {
         return Response.json({ error: prefsError.message }, { status: 500 });
       }
 
-      const emailEnabled = prefs?.email_enabled ?? true;
+      const emailEnabled = prefs?.email_enabled ?? false;
       const triggers = (prefs?.triggers as Record<string, boolean> | null) ??
         {};
       const triggerEnabled = triggers[body.trigger] ?? true;
