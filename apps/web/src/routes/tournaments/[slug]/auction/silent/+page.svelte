@@ -10,20 +10,29 @@
 	} from '@emgc-calcutta/shared-types';
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
-	import { PLAYER_STATUSES, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import {
+		PLAYER_STATUSES,
+		formatPlayerName,
+		playerStatusBadgeVariant,
+		playerStatusLabel
+	} from '$lib/players';
 	import { groupPlayersByFlight } from '$lib/flightGroups';
-	import { createTournamentRealtime } from '$lib/stores/realtime';
+	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data } = $props();
 
 	let liveBids = $state<RealtimeBid[]>([]);
 	let livePlayers = $state<RealtimePlayer[]>([]);
+	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
 	// Ticks every second so both auctionOpen and the countdown stay live —
 	// without this, auctionOpen would freeze at whatever it evaluated to on
 	// first render, since `new Date()` alone isn't a tracked reactive
@@ -34,10 +43,12 @@
 		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
 		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
+		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubPlayers();
+			unsubConnection();
 			rt.destroy();
 			clearInterval(tick);
 		};
@@ -75,14 +86,24 @@
 	}
 
 	let searchQuery = $state('');
-	let statusFilter = $state('all');
-	let flightFilter = $state('all');
+	let statusFilters = $state<string[]>([]);
+	let flightFilters = $state<string[]>([]);
+
+	let statusOptions = $derived(
+		PLAYER_STATUSES.map((status) => ({ value: status, label: playerStatusLabel(status) }))
+	);
+	let flightOptions = $derived(
+		data.tournament.flights.map((flight) => ({ value: flight, label: flight }))
+	);
 
 	let filteredPlayers = $derived(
 		players.filter((p) => {
-			if (statusFilter !== 'all' && p.status !== statusFilter) return false;
-			if (flightFilter !== 'all' && p.flight !== flightFilter) return false;
-			if (searchQuery.trim() && !p.name.toLowerCase().includes(searchQuery.trim().toLowerCase())) {
+			if (statusFilters.length > 0 && !statusFilters.includes(p.status)) return false;
+			if (flightFilters.length > 0 && !flightFilters.includes(p.flight)) return false;
+			if (
+				searchQuery.trim() &&
+				!formatPlayerName(p).toLowerCase().includes(searchQuery.trim().toLowerCase())
+			) {
 				return false;
 			}
 			return true;
@@ -142,6 +163,8 @@
 <div class="flex flex-col gap-4">
 	<PageHeader title="Silent auction" eyebrow={data.tournament.name} />
 
+	<RealtimeStatusBanner status={connectionStatus} />
+
 	<div class="flex items-center gap-2 text-sm">
 		<span class={['inline-block size-2 rounded-full', auctionOpen ? 'bg-fairway' : 'bg-brass/60']}
 		></span>
@@ -173,36 +196,14 @@
 
 	<div class="flex flex-wrap items-center gap-4 text-sm">
 		<Input type="search" placeholder="Search players…" bind:value={searchQuery} class="max-w-56" />
-		<label class="flex items-center gap-2">
-			<span class="text-muted-foreground">Status</span>
-			<select
-				bind:value={statusFilter}
-				class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-			>
-				<option value="all">All</option>
-				{#each PLAYER_STATUSES as status (status)}
-					<option value={status}>{playerStatusLabel(status)}</option>
-				{/each}
-			</select>
-		</label>
-		{#if data.tournament.flights.length > 0}
-			<label class="flex items-center gap-2">
-				<span class="text-muted-foreground">Flight</span>
-				<select
-					bind:value={flightFilter}
-					class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-				>
-					<option value="all">All</option>
-					{#each data.tournament.flights as flight (flight)}
-						<option value={flight}>{flight}</option>
-					{/each}
-				</select>
-			</label>
+		<MultiSelectFilter label="Status" options={statusOptions} bind:selected={statusFilters} />
+		{#if flightOptions.length > 0}
+			<MultiSelectFilter label="Flight" options={flightOptions} bind:selected={flightFilters} />
 		{/if}
 	</div>
 
 	{#if filteredPlayers.length === 0}
-		<p class="text-sm text-muted-foreground">No players match these filters.</p>
+		<EmptyState title="No players match these filters" />
 	{:else}
 		<Table.Root>
 			<Table.Header>
@@ -234,7 +235,7 @@
 										slug: data.tournament.slug,
 										playerSlug: player.slug
 									})}
-									class="hover:underline">{player.name}</a
+									class="hover:underline">{formatPlayerName(player)}</a
 								>
 								<DivisionBadge division={player.division} />
 								{#if isYou}

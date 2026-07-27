@@ -5,7 +5,8 @@
 // link choice) rather than the preview's matchedUserId/matchedUserEmail
 // pair.
 export interface ImportCsvConfirmRow {
-  name?: string;
+  first_name?: string;
+  last_name?: string;
   contact_email?: string | null;
   contact_phone?: string | null;
   flight?: string | null;
@@ -22,5 +23,10 @@ export interface ImportCsvConfirmRequest {
 
 export interface ImportCsvConfirmResponse {
   count: number;
-  players: { id: string; slug: string; name: string }[];
+  players: {
+    id: string;
+    slug: string;
+    first_name: string;
+    last_name: string;
+  }[];
 }

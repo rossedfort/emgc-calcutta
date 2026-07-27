@@ -8,6 +8,13 @@ export type Player = Tables<'players'>;
 
 export const PLAYER_STATUSES = Constants.public.Enums.player_status;
 
+// One place for "First Last" display formatting, reused across every
+// table/card/header that shows a player's name, instead of duplicating the
+// concatenation at each call site.
+export function formatPlayerName(player: Pick<Player, 'first_name' | 'last_name'>): string {
+	return `${player.first_name} ${player.last_name}`;
+}
+
 export function playerStatusBadgeVariant(status: Player['status']): BadgeVariant {
 	switch (status) {
 		case 'reserved':

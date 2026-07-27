@@ -1,6 +1,14 @@
 import { fail, redirect } from '@sveltejs/kit';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 import { parsePlayerForm } from '../shared';
+
+export const load: PageServerLoad = async ({ parent }) => {
+	const { tournament } = await parent();
+	return {
+		title: `New player · ${tournament.name} · EMGC Calcutta`,
+		description: `Add a new player to the ${tournament.name} roster.`
+	};
+};
 
 export const actions: Actions = {
 	default: async ({ request, params, locals: { supabase } }) => {

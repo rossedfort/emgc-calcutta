@@ -4,6 +4,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
+	import { formatUserName } from '$lib/profile';
 	import { roleBadgeVariant, type Role } from '$lib/roles';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import type { UserRow } from './types';
@@ -82,7 +83,7 @@
 			{#each users as user (user.id)}
 				<Table.Row>
 					<Table.Cell>{user.email}</Table.Cell>
-					<Table.Cell>{user.name ?? '—'}</Table.Cell>
+					<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
 					<Table.Cell>
 						<Badge variant={roleBadgeVariant(user.role)}>{user.role}</Badge>
 						{#if user.id === viewerId}

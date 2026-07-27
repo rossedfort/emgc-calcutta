@@ -47,7 +47,11 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 		won: triggers.won ?? DEFAULT_PREFS.won
 	};
 
-	return { prefs };
+	return {
+		prefs,
+		title: 'Notification settings · EMGC Calcutta',
+		description: 'Choose which EMGC Calcutta auction emails you receive.'
+	};
 };
 
 export const actions: Actions = {

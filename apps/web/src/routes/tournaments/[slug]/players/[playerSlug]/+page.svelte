@@ -3,16 +3,16 @@
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import { formatPlayerName, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
 
 	let { data } = $props();
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title={data.player.name}>
+	<PageHeader title={formatPlayerName(data.player)}>
 		{#snippet actions()}
 			<a
-				href={resolve('/tournaments/[slug]/players', { slug: data.tournament.slug })}
+				href={resolve('/tournaments/[slug]', { slug: data.tournament.slug })}
 				class="text-sm text-brass hover:underline">Back to players</a
 			>
 		{/snippet}

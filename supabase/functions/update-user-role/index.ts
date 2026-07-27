@@ -80,7 +80,7 @@ export default {
         .from("users")
         .update({ role })
         .eq("id", userId)
-        .select("id, name, email, role, created_at")
+        .select("id, first_name, last_name, email, role, created_at")
         .single();
 
       if (error) {

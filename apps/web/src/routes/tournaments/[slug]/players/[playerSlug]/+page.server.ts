@@ -1,12 +1,14 @@
 import { error, redirect } from '@sveltejs/kit';
-import type { Player } from '$lib/players';
+import { formatPlayerName, type Player } from '$lib/players';
+import { formatUserName } from '$lib/profile';
 import type { PageServerLoad } from './$types';
 
 export type PlayerProfile = Pick<
 	Player,
 	| 'id'
 	| 'slug'
-	| 'name'
+	| 'first_name'
+	| 'last_name'
 	| 'contact_email'
 	| 'contact_phone'
 	| 'preferences'
@@ -41,7 +43,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	const { data: player, error: playerError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, name, contact_email, contact_phone, preferences, photo_url, flight, division, handicap_index, status, user_id'
+			'id, slug, first_name, last_name, contact_email, contact_phone, preferences, photo_url, flight, division, handicap_index, status, user_id'
 		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
@@ -62,16 +64,18 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	if (player.user_id) {
 		const { data } = await supabase
 			.from('users')
-			.select('name, email')
+			.select('first_name, last_name, email')
 			.eq('id', player.user_id)
 			.maybeSingle();
-		linkedUserName = data ? (data.name ?? data.email) : null;
+		linkedUserName = data ? (formatUserName(data) ?? data.email) : null;
 	}
 
 	return {
 		tournament,
 		player: player as PlayerProfile,
 		linkedUserName,
-		isYou: player.user_id === session.user.id
+		isYou: player.user_id === session.user.id,
+		title: `${formatPlayerName(player)} · ${tournament.name} · EMGC Calcutta`,
+		description: `Player profile and bidding status for ${formatPlayerName(player)} in ${tournament.name}.`
 	};
 };

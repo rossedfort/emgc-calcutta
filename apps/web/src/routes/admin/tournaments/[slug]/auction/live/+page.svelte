@@ -3,11 +3,13 @@
 	import { enhance } from '$app/forms';
 	import type { RealtimeBid, RealtimeLiveLot, RealtimePlayer } from '@emgc-calcutta/shared-types';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { currentHighBid } from '$lib/bids';
-	import { playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
-	import { createTournamentRealtime } from '$lib/stores/realtime';
+	import { formatPlayerName, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data, form } = $props();
 
@@ -16,6 +18,7 @@
 	let liveBids = $state<RealtimeBid[]>([]);
 	let livePlayers = $state<RealtimePlayer[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
+	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
 	let now = $state(new Date());
 
 	onMount(() => {
@@ -23,11 +26,13 @@
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
 		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
+		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubPlayers();
 			unsubLots();
+			unsubConnection();
 			rt.destroy();
 			clearInterval(tick);
 		};
@@ -72,6 +77,8 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
+	<RealtimeStatusBanner status={connectionStatus} />
+
 	{#if errorMessage}
 		<p class="text-sm text-destructive">{errorMessage}</p>
 	{/if}
@@ -81,7 +88,7 @@
 			<div class="flex items-start justify-between gap-2">
 				<div class="flex flex-col gap-1">
 					<p class="flex items-center gap-2 font-display text-xl font-semibold text-ink">
-						{currentPlayer.name}
+						{formatPlayerName(currentPlayer)}
 						<DivisionBadge division={currentPlayer.division} />
 					</p>
 					{#if currentPlayer.flight || currentPlayer.handicap_index !== null}
@@ -147,7 +154,7 @@
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
 			<p class="font-data text-xs tracking-widest text-fairway uppercase">Up next</p>
 			<p class="mt-1 flex items-center gap-2 font-display text-xl font-semibold text-ink">
-				{nextQueuedPlayer.name}
+				{formatPlayerName(nextQueuedPlayer)}
 				<DivisionBadge division={nextQueuedPlayer.division} />
 			</p>
 			<form
@@ -164,16 +171,14 @@
 			>
 				<input type="hidden" name="lotId" value={nextQueuedLot.id} />
 				<Button type="submit" variant="brass" disabled={advanceSubmitting}>
-					{advanceSubmitting ? 'Opening…' : `Advance to ${nextQueuedPlayer.name}`}
+					{advanceSubmitting ? 'Opening…' : `Advance to ${formatPlayerName(nextQueuedPlayer)}`}
 				</Button>
 			</form>
 		</div>
 	{:else}
-		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-center text-ink">
-			<p class="font-display text-xl font-semibold text-ink">Queue is empty</p>
-			<p class="mt-2 text-sm text-ink/70">
-				Add reserved players to the queue before starting the live auction.
-			</p>
-		</div>
+		<EmptyState
+			title="Queue is empty"
+			description="Add reserved players to the queue before starting the live auction."
+		/>
 	{/if}
 </div>

@@ -201,7 +201,7 @@ export default {
       if (body.playerId) {
         const { data: player, error: playerError } = await ctx.supabaseAdmin
           .from("players")
-          .select("name")
+          .select("first_name, last_name")
           .eq("id", body.playerId)
           .maybeSingle();
         if (playerError) {
@@ -209,7 +209,7 @@ export default {
             status: 500,
           });
         }
-        playerName = player?.name ?? null;
+        playerName = player ? `${player.first_name} ${player.last_name}` : null;
       }
 
       const email = buildEmail(

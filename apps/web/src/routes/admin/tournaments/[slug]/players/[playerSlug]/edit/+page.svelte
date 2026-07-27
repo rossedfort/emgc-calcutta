@@ -3,6 +3,8 @@
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { formatPlayerName } from '$lib/players';
+	import { formatUserName } from '$lib/profile';
 	import PlayerForm from '../../PlayerForm.svelte';
 	import type { PlayerFormValues } from '../../shared';
 
@@ -11,7 +13,8 @@
 	let errorMessage = $derived(form && 'error' in form ? (form.error as string) : null);
 
 	let defaultValues = $derived<PlayerFormValues>({
-		name: data.player.name,
+		first_name: data.player.first_name,
+		last_name: data.player.last_name,
 		contact_email: data.player.contact_email ?? '',
 		contact_phone: data.player.contact_phone ?? '',
 		flight: data.player.flight,
@@ -26,7 +29,7 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
-	<PageHeader title={data.player.name}>
+	<PageHeader title={formatPlayerName(data.player)}>
 		{#snippet actions()}
 			<a
 				href={resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug })}
@@ -61,11 +64,11 @@
 			</p>
 
 			{#if data.linkedUser}
+				{@const linkedUserName = formatUserName(data.linkedUser)}
 				<div class="flex items-center gap-3">
 					<p class="text-sm">
-						{data.linkedUser.name ?? data.linkedUser.email}
-						{#if data.linkedUser.name}<span class="text-ink/60">({data.linkedUser.email})</span
-							>{/if}
+						{linkedUserName ?? data.linkedUser.email}
+						{#if linkedUserName}<span class="text-ink/60">({data.linkedUser.email})</span>{/if}
 					</p>
 					<form
 						method="POST"
@@ -107,8 +110,9 @@
 					>
 						<option value="" disabled selected>Choose a participant</option>
 						{#each data.users as user (user.id)}
+							{@const userName = formatUserName(user)}
 							<option value={user.id}
-								>{user.name ? `${user.name} (${user.email})` : user.email}</option
+								>{userName ? `${userName} (${user.email})` : user.email}</option
 							>
 						{/each}
 					</select>
@@ -127,7 +131,9 @@
 			</Button>
 		{:else}
 			<div class="flex items-center gap-2">
-				<p class="text-sm text-destructive">Remove {data.player.name}? This can't be undone.</p>
+				<p class="text-sm text-destructive">
+					Remove {formatPlayerName(data.player)}? This can't be undone.
+				</p>
 				<form
 					method="POST"
 					action="?/remove"

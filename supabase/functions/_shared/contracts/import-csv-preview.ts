@@ -9,7 +9,8 @@ export interface ImportCsvPreviewRequest {
 
 export interface ImportCsvPreviewRow {
   rowNumber: number;
-  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
   flight: string | null;

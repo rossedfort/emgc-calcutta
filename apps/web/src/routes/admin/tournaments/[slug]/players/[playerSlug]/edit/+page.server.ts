@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Tables } from '@emgc-calcutta/shared-types';
+import { formatPlayerName } from '$lib/players';
 import type { Actions, PageServerLoad } from './$types';
 import { parsePlayerForm } from '../../shared';
 
@@ -7,7 +8,8 @@ export type Player = Pick<
 	Tables<'players'>,
 	| 'id'
 	| 'slug'
-	| 'name'
+	| 'first_name'
+	| 'last_name'
 	| 'contact_email'
 	| 'contact_phone'
 	| 'preferences'
@@ -20,7 +22,8 @@ export type Player = Pick<
 export interface UserOption {
 	id: string;
 	email: string;
-	name: string | null;
+	first_name: string | null;
+	last_name: string | null;
 }
 
 export const load: PageServerLoad = async ({ params, parent, locals: { supabase } }) => {
@@ -29,7 +32,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 	const { data: player, error: playerError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, name, contact_email, contact_phone, preferences, flight, handicap_index, status, user_id'
+			'id, slug, first_name, last_name, contact_email, contact_phone, preferences, flight, handicap_index, status, user_id'
 		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
@@ -45,7 +48,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 	if (player.user_id) {
 		const { data } = await supabase
 			.from('users')
-			.select('id, email, name')
+			.select('id, email, first_name, last_name')
 			.eq('id', player.user_id)
 			.maybeSingle();
 		linkedUser = data;
@@ -64,13 +67,18 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 		.neq('id', player.id);
 	const takenUserIds = new Set((takenLinks ?? []).map((row) => row.user_id));
 
-	const { data: users } = await supabase.from('users').select('id, email, name').order('email');
+	const { data: users } = await supabase
+		.from('users')
+		.select('id, email, first_name, last_name')
+		.order('email');
 
 	return {
 		tournament,
 		player: player as Player,
 		linkedUser,
-		users: ((users as UserOption[] | null) ?? []).filter((user) => !takenUserIds.has(user.id))
+		users: ((users as UserOption[] | null) ?? []).filter((user) => !takenUserIds.has(user.id)),
+		title: `Edit ${formatPlayerName(player)} · ${tournament.name} · EMGC Calcutta`,
+		description: `Edit ${formatPlayerName(player)}'s roster entry in ${tournament.name}.`
 	};
 };
 

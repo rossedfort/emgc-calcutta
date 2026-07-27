@@ -5,7 +5,7 @@ import type { Actions, PageServerLoad } from './$types';
 
 export type QueuePlayer = Pick<
 	Tables<'players'>,
-	'id' | 'slug' | 'name' | 'flight' | 'division' | 'handicap_index'
+	'id' | 'slug' | 'first_name' | 'last_name' | 'flight' | 'division' | 'handicap_index'
 >;
 
 export interface QueueLot {
@@ -40,7 +40,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		lotPlayerIds.length > 0
 			? await supabase
 					.from('players')
-					.select('id, slug, name, flight, division, handicap_index')
+					.select('id, slug, first_name, last_name, flight, division, handicap_index')
 					.in('id', lotPlayerIds)
 			: { data: [] as QueuePlayer[], error: null };
 	if (lotPlayersError) {
@@ -58,7 +58,12 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		return player ? [{ id: lot.id, queue_position: lot.queue_position, player }] : [];
 	});
 
-	return { tournament, queue };
+	return {
+		tournament,
+		queue,
+		title: `${tournament.name} · Live auction queue · EMGC Calcutta`,
+		description: `Manage the live auction lot order for ${tournament.name}.`
+	};
 };
 
 // Shared by the moveUp/moveDown actions below: finds the lot immediately

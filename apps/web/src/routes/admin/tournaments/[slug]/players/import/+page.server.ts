@@ -7,7 +7,7 @@ import type {
 	ImportCsvPreviewRequest,
 	ImportCsvPreviewResponse
 } from '@emgc-calcutta/shared-types';
-import type { Actions } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 // supabase-js's invoke() wraps any non-2xx response in a FunctionsHttpError
 // whose own .message is just a generic "Edge Function returned a non-2xx
@@ -21,8 +21,16 @@ async function extractFunctionError(error: unknown, fallback: string): Promise<s
 	return error instanceof Error ? error.message : fallback;
 }
 
-// No own `load` — the tournament comes from the [slug] layout's load, merged
-// into this page's `data` automatically.
+// Otherwise no own `load` — the tournament comes from the [slug] layout's
+// load, merged into this page's `data` automatically.
+export const load: PageServerLoad = async ({ parent }) => {
+	const { tournament } = await parent();
+	return {
+		title: `Import players · ${tournament.name} · EMGC Calcutta`,
+		description: `Bulk-import players into ${tournament.name} from a CSV file.`
+	};
+};
+
 export const actions: Actions = {
 	preview: async ({ request, params, locals: { supabase } }) => {
 		const formData = await request.formData();

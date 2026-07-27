@@ -31,7 +31,7 @@ export default {
 
       const { data, error } = await ctx.supabaseAdmin
         .from("users")
-        .select("id, name, email, role, created_at")
+        .select("id, first_name, last_name, email, role, created_at")
         .order("created_at", { ascending: true });
 
       if (error) {

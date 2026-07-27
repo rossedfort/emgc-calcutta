@@ -329,10 +329,11 @@ export type Database = {
           contact_phone: string | null;
           created_at: string;
           division: string;
+          first_name: string;
           flight: string;
           handicap_index: number | null;
           id: string;
-          name: string;
+          last_name: string;
           photo_url: string | null;
           placement: number | null;
           preferences: string | null;
@@ -349,10 +350,11 @@ export type Database = {
           contact_phone?: string | null;
           created_at?: string;
           division?: string;
+          first_name: string;
           flight?: string;
           handicap_index?: number | null;
           id?: string;
-          name: string;
+          last_name: string;
           photo_url?: string | null;
           placement?: number | null;
           preferences?: string | null;
@@ -369,10 +371,11 @@ export type Database = {
           contact_phone?: string | null;
           created_at?: string;
           division?: string;
+          first_name?: string;
           flight?: string;
           handicap_index?: number | null;
           id?: string;
-          name?: string;
+          last_name?: string;
           photo_url?: string | null;
           placement?: number | null;
           preferences?: string | null;
@@ -472,8 +475,9 @@ export type Database = {
           avatar_url: string | null;
           created_at: string;
           email: string;
+          first_name: string | null;
           id: string;
-          name: string | null;
+          last_name: string | null;
           phone: string | null;
           role: Database["public"]["Enums"]["user_role"];
           sso_provider: Database["public"]["Enums"]["auth_provider"] | null;
@@ -482,8 +486,9 @@ export type Database = {
           avatar_url?: string | null;
           created_at?: string;
           email: string;
+          first_name?: string | null;
           id: string;
-          name?: string | null;
+          last_name?: string | null;
           phone?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
           sso_provider?: Database["public"]["Enums"]["auth_provider"] | null;
@@ -492,8 +497,9 @@ export type Database = {
           avatar_url?: string | null;
           created_at?: string;
           email?: string;
+          first_name?: string | null;
           id?: string;
-          name?: string | null;
+          last_name?: string | null;
           phone?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
           sso_provider?: Database["public"]["Enums"]["auth_provider"] | null;
@@ -535,7 +541,7 @@ export type Database = {
       };
     };
     Enums: {
-      auth_provider: "google" | "azure" | "apple";
+      auth_provider: "google" | "azure" | "email";
       bid_phase: "silent" | "live";
       player_status:
         | "open"
@@ -691,7 +697,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      auth_provider: ["google", "azure", "apple"],
+      auth_provider: ["google", "azure", "email"],
       bid_phase: ["silent", "live"],
       player_status: ["open", "reserved", "sold_silent", "sold_live", "no_bid"],
       user_role: ["unassigned", "participant", "admin", "owner"],

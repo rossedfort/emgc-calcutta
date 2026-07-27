@@ -23,7 +23,12 @@ import type {
 // Bid table exists. "handicap" maps to handicap_index — Phase 3.5 added
 // that column specifically to close this gap).
 const HEADER_ALIASES: Record<string, string> = {
-  "name": "name",
+  "first_name": "first_name",
+  "first name": "first_name",
+  "firstname": "first_name",
+  "last_name": "last_name",
+  "last name": "last_name",
+  "lastname": "last_name",
   "contact_email": "contact_email",
   "email": "contact_email",
   "contact_phone": "contact_phone",
@@ -155,9 +160,11 @@ export default {
         row: Record<string, string>,
         index: number,
       ) => {
-        const name = getField(row, "name");
+        const first_name = getField(row, "first_name");
+        const last_name = getField(row, "last_name");
         const errors: string[] = [];
-        if (!name) errors.push("Name is required");
+        if (!first_name) errors.push("First name is required");
+        if (!last_name) errors.push("Last name is required");
         const handicap_index = getHandicap(row, errors);
 
         const contact_email = getField(row, "contact_email");
@@ -167,7 +174,8 @@ export default {
 
         return {
           rowNumber: index + 2, // header row + 1-indexing
-          name,
+          first_name,
+          last_name,
           contact_email,
           contact_phone: getField(row, "contact_phone"),
           flight: getField(row, "flight"),

@@ -1,0 +1,57 @@
+import { error, redirect } from '@sveltejs/kit';
+import type { Player } from '$lib/players';
+import type { PageServerLoad } from './$types';
+
+export type FieldPlayerRow = Pick<
+	Player,
+	| 'id'
+	| 'slug'
+	| 'first_name'
+	| 'last_name'
+	| 'flight'
+	| 'division'
+	| 'handicap_index'
+	| 'status'
+	| 'user_id'
+>;
+
+export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
+	if (!session) {
+		redirect(303, '/login');
+	}
+
+	// RLS scopes both queries: a tournament a Participant can't see (a dry
+	// run) resolves to no rows here, same as a typo'd slug — a 404, not a
+	// 403, so this doesn't leak which slugs exist.
+	const { data: tournament, error: tournamentError } = await supabase
+		.from('tournaments')
+		.select(
+			'id, slug, name, flights, status, silent_auction_start, silent_auction_end, live_auction_started_at'
+		)
+		.eq('slug', params.slug)
+		.maybeSingle();
+	if (tournamentError) {
+		error(500, tournamentError.message);
+	}
+	if (!tournament) {
+		error(404, 'Tournament not found');
+	}
+
+	const { data: players, error: playersError } = await supabase
+		.from('players')
+		.select('id, slug, first_name, last_name, flight, division, handicap_index, status, user_id')
+		.eq('tournament_id', tournament.id)
+		.order('first_name')
+		.order('last_name');
+	if (playersError) {
+		error(500, playersError.message);
+	}
+
+	return {
+		tournament,
+		players: (players as FieldPlayerRow[] | null) ?? [],
+		currentUserId: session.user.id,
+		title: `${tournament.name} · EMGC Calcutta`,
+		description: `Watch bids come in live on the ${tournament.name} field.`
+	};
+};

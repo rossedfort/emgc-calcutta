@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import EnterResultsModal from '$lib/components/EnterResultsModal.svelte';
+	import { formatPlayerName } from '$lib/players';
+	import { formatUserName } from '$lib/profile';
 
 	let { data } = $props();
 	let { supabase, results, payoutStructure } = $derived(data);
@@ -53,7 +56,7 @@
 	</div>
 
 	{#if nonEmptyResults.length === 0}
-		<p class="text-sm text-muted-foreground">No sold players yet.</p>
+		<EmptyState title="No sold players yet" />
 	{:else}
 		<div class="flex flex-col gap-6">
 			{#each nonEmptyResults as { group, players } (`${group.flight}::${group.division}`)}
@@ -76,12 +79,12 @@
 								<Table.Row>
 									<Table.Cell class="font-data">{player.placement ?? '—'}</Table.Cell>
 									<Table.Cell class="font-medium text-ink">
-										{player.name}
+										{formatPlayerName(player)}
 										<DivisionBadge division={player.division} />
 									</Table.Cell>
 									<Table.Cell>
 										{#if player.winning_bid?.bidder}
-											{player.winning_bid.bidder.name ?? player.winning_bid.bidder.email}
+											{formatUserName(player.winning_bid.bidder) ?? player.winning_bid.bidder.email}
 										{:else}
 											<span class="text-muted-foreground">—</span>
 										{/if}
