@@ -19,8 +19,8 @@ export function formatRelativeTime(date: Date, now: Date): string {
 }
 
 // "1d 02h 03m" once a full day out, "02:03:04" once inside the final day —
-// same format the /auction/silent countdown already uses, generalized here
-// so this dashboard's own phase countdown doesn't duplicate it.
+// shared by the phase banner's countdown and the live board's anti-snipe
+// countdown so neither duplicates the format.
 export function formatCountdown(target: Date, now: Date): string | null {
 	const totalSeconds = Math.floor((target.getTime() - now.getTime()) / 1000);
 	if (totalSeconds <= 0) return null;

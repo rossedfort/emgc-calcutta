@@ -22,11 +22,14 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	// RLS scopes both queries: a tournament a Participant can't see (a dry
 	// run) resolves to no rows here, same as a typo'd slug — a 404, not a
-	// 403, so this doesn't leak which slugs exist.
+	// 403, so this doesn't leak which slugs exist. Selects the union of what
+	// every phase's rendered UI needs (silent board's threshold/increment,
+	// live board's increment, the roster view's flights) since this one page
+	// now covers all of them.
 	const { data: tournament, error: tournamentError } = await supabase
 		.from('tournaments')
 		.select(
-			'id, slug, name, flights, status, silent_auction_start, silent_auction_end, live_auction_started_at'
+			'id, slug, name, flights, status, silent_auction_start, silent_auction_end, live_auction_started_at, threshold_amount, min_increment'
 		)
 		.eq('slug', params.slug)
 		.maybeSingle();
@@ -52,6 +55,6 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		players: (players as FieldPlayerRow[] | null) ?? [],
 		currentUserId: session.user.id,
 		title: `${tournament.name} · EMGC Bet`,
-		description: `Watch bids come in live on the ${tournament.name} field.`
+		description: `Browse the field and bid in the ${tournament.name} auction.`
 	};
 };
