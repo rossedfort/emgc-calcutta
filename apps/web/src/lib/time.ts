@@ -35,3 +35,27 @@ export function formatCountdown(target: Date, now: Date): string | null {
 		? `${days}d ${pad(hours)}h ${pad(minutes)}m`
 		: `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
+
+// Converts a <input type="datetime-local"> value ("YYYY-MM-DDTHH:mm", no
+// timezone of its own) into the true UTC instant its browser's user
+// actually entered. Never do this via `new Date(value)` on the server:
+// per the ECMA-262 date-time string grammar, a date-time with no offset
+// is parsed using the *executing runtime's* own local timezone — correct
+// only when server and browser happen to share one (true for most local
+// dev, which is why this class of bug goes uncaught there), wrong
+// wherever they don't (e.g. a UTC-timezone production server and a
+// browser anywhere else — confirmed as the actual cause of a real report:
+// entering 07/14 12:00 AM in MDT silently stored as 07/14 00:00 UTC
+// instead of 07/14 06:00 UTC, six hours/one calendar day off).
+// tzOffsetMinutes must come from the browser itself
+// (`new Date().getTimezoneOffset()`, submitted alongside the raw value —
+// the server has no other way to know it) and follows that method's own
+// sign convention (positive when local is behind UTC). Returns null for a
+// malformed or empty value.
+export function localDateTimeToUtcIso(value: string, tzOffsetMinutes: number): string | null {
+	const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(value);
+	if (!match) return null;
+	const [year, month, day, hour, minute] = match.slice(1).map(Number);
+	const utcMs = Date.UTC(year, month - 1, day, hour, minute) + tzOffsetMinutes * 60000;
+	return new Date(utcMs).toISOString();
+}

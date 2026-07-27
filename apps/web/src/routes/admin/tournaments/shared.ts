@@ -1,4 +1,5 @@
 import type { BadgeVariant } from '$lib/components/ui/badge';
+import { localDateTimeToUtcIso } from '$lib/time';
 
 // No generated Supabase types in this project yet (see spec 6.8) — this is
 // just enough of the shape of public.tournaments for this feature.
@@ -78,8 +79,21 @@ export function parseTournamentForm(formData: FormData): {
 	const kindRaw = String(formData.get('kind') ?? 'production');
 	const kind: 'production' | 'dry_run' = kindRaw === 'dry_run' ? 'dry_run' : 'production';
 
-	const start = String(formData.get('silent_auction_start') ?? '');
-	const end = String(formData.get('silent_auction_end') ?? '');
+	// The raw <input type="datetime-local"> value has no timezone of its
+	// own — only the browser that rendered it knows what offset applies, so
+	// the browser submits its own `Date.prototype.getTimezoneOffset()`
+	// alongside the raw value (TournamentForm.svelte) rather than this
+	// server ever guessing. Falls back to 0 (UTC) if missing/malformed
+	// (e.g. JS disabled) — same "hidden field required for correctness, no
+	// graceful no-JS path" trade-off already made for payout_structure/
+	// flights below.
+	const tzOffsetRaw = Number(formData.get('tz_offset_minutes'));
+	const tzOffsetMinutes = Number.isFinite(tzOffsetRaw) ? tzOffsetRaw : 0;
+
+	const startRaw = String(formData.get('silent_auction_start') ?? '');
+	const endRaw = String(formData.get('silent_auction_end') ?? '');
+	const start = startRaw ? localDateTimeToUtcIso(startRaw, tzOffsetMinutes) : null;
+	const end = endRaw ? localDateTimeToUtcIso(endRaw, tzOffsetMinutes) : null;
 	if (!start) errors.silent_auction_start = 'Start is required';
 	if (!end) errors.silent_auction_end = 'End is required';
 	if (start && end && new Date(end) <= new Date(start)) {
@@ -170,8 +184,8 @@ export function parseTournamentForm(formData: FormData): {
 		data: {
 			name,
 			kind,
-			silent_auction_start: new Date(start).toISOString(),
-			silent_auction_end: new Date(end).toISOString(),
+			silent_auction_start: start!,
+			silent_auction_end: end!,
 			threshold_amount,
 			min_increment,
 			anti_snipe_seconds,

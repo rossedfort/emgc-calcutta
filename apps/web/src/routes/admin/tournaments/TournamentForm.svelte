@@ -21,6 +21,16 @@
 		submitLabel
 	}: Props = $props();
 
+	// The datetime-local inputs below submit a raw "YYYY-MM-DDTHH:mm" string
+	// with no timezone of its own — the server (parseTournamentForm) has no
+	// way to know what offset that's relative to on its own, so this
+	// browser's own offset rides along as a hidden field. Computed once at
+	// component init, not reactively: the browser's own timezone doesn't
+	// change mid-session, and by the time a user could actually submit the
+	// form, hydration has already replaced any (irrelevant) SSR-computed
+	// value with this real client-side one.
+	const tzOffsetMinutes = new Date().getTimezoneOffset();
+
 	// Seeds local, independently-editable row state from the prop once — not
 	// a live mirror of it, since the user adds/removes/edits rows from here.
 	let rows = $state<PayoutRow[]>(
@@ -144,7 +154,12 @@
 					{errors.silent_auction_end}
 				</p>{/if}
 		</div>
+		<p class="col-span-2 text-xs text-muted-foreground">
+			Times are entered in your browser's local timezone.
+		</p>
 	</div>
+
+	<input type="hidden" name="tz_offset_minutes" value={tzOffsetMinutes} />
 
 	<div class="grid grid-cols-2 gap-4">
 		<div class="flex flex-col gap-1.5">
