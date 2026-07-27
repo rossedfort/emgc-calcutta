@@ -7,6 +7,7 @@
 	import { formatCountdown } from '$lib/time';
 	import { tournamentPhase } from '$lib/tournamentPhase';
 	import LiveAuctionBoard from './LiveAuctionBoard.svelte';
+	import SelfLinkPrompt from './SelfLinkPrompt.svelte';
 	import SilentAuctionBoard from './SilentAuctionBoard.svelte';
 	import TournamentRoster from './TournamentRoster.svelte';
 
@@ -50,6 +51,9 @@
 
 	let phase = $derived(tournamentPhase(data.tournament, now));
 	let countdownText = $derived(phase.countdownTo ? formatCountdown(phase.countdownTo, now) : null);
+
+	let isLinkedToYou = $derived(players.some((p) => p.user_id === data.currentUserId));
+	let unlinkedPlayers = $derived(players.filter((p) => p.user_id === null));
 </script>
 
 <div class="flex flex-col gap-4">
@@ -76,6 +80,10 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if !isLinkedToYou}
+		<SelfLinkPrompt {unlinkedPlayers} />
+	{/if}
 
 	{#if phase.phase === 'silent'}
 		<SilentAuctionBoard

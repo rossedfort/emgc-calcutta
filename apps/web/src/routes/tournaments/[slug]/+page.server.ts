@@ -1,6 +1,6 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error, fail, redirect } from '@sveltejs/kit';
 import type { Player } from '$lib/players';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
 export type FieldPlayerRow = Pick<
 	Player,
@@ -57,4 +57,26 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		title: `${tournament.name} · EMGC Bet`,
 		description: `Browse the field and bid in the ${tournament.name} auction.`
 	};
+};
+
+export const actions: Actions = {
+	// Self-service linking (spec 4.9, Phase 10) — link_self_to_player is
+	// SECURITY DEFINER (see its migration) since an ordinary Participant has
+	// no RLS UPDATE grant on players at all, unlike open_live_lot/
+	// close_live_lot's SECURITY INVOKER, which only ever run as an
+	// Admin/Owner who already has that grant directly.
+	linkSelf: async ({ request, locals: { supabase } }) => {
+		const formData = await request.formData();
+		const playerId = String(formData.get('playerId') ?? '');
+		if (!playerId) {
+			return fail(400, { error: 'Choose a player' });
+		}
+
+		const { error: linkError } = await supabase.rpc('link_self_to_player', {
+			p_player_id: playerId
+		});
+		if (linkError) {
+			return fail(400, { error: linkError.message });
+		}
+	}
 };

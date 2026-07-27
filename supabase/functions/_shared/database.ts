@@ -525,6 +525,10 @@ export type Database = {
         Args: { p_player_id: string; p_tournament_id: string };
         Returns: undefined;
       };
+      link_self_to_player: {
+        Args: { p_player_id: string };
+        Returns: undefined;
+      };
       log_audit_event: {
         Args: {
           p_action: string;
