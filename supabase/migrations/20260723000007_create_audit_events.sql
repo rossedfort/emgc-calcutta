@@ -70,6 +70,15 @@ alter table public.audit_events enable row level security;
 grant select on public.audit_events to authenticated;
 grant select, insert on public.audit_events to service_role;
 
+-- Powers /admin/audit's live-tail toggle. A table needs to be explicitly
+-- added to this publication before Realtime broadcasts anything for it at
+-- all, regardless of how correct a subscribing client's code is — same
+-- pattern as players/bids/live_lots above. The SELECT policy below applies
+-- to Realtime subscribers the same way it applies to a plain REST read: a
+-- non-Admin/Owner subscriber's channel receives nothing for this table,
+-- not an error.
+alter publication supabase_realtime add table public.audit_events;
+
 -- Admin/Owner only, matching spec's `/admin/audit` route access — no
 -- Participant visibility at all, unlike most other tables in this app.
 -- This is the *only* policy audit_events will ever have: still zero
