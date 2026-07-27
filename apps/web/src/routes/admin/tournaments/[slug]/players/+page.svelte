@@ -38,15 +38,15 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
-	<div class="flex items-center justify-between">
-		<div class="flex items-center gap-4 text-sm">
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<div class="flex flex-wrap items-center gap-4 text-sm">
 			<MultiSelectFilter label="Status" options={statusOptions} bind:selected={statusFilters} />
 			{#if flightOptions.length > 0}
 				<MultiSelectFilter label="Flight" options={flightOptions} bind:selected={flightFilters} />
 			{/if}
 		</div>
 
-		<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
 			<Button
 				href={resolve('/admin/tournaments/[slug]/players/new', { slug: data.tournament.slug })}
 				variant="brass"
