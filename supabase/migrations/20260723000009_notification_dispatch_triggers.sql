@@ -72,6 +72,21 @@ $$;
 -- directly — a real hole, not a reasonable trade. `search_path` is pinned
 -- per Postgres's own SECURITY DEFINER guidance, even though every
 -- reference here is already schema-qualified.
+-- The whole body is wrapped in a nested BEGIN/EXCEPTION block: a failure
+-- here (a bad Vault secret, net.http_post itself erroring) must never
+-- propagate to the caller — spec 4.7 requires "failed sends are logged,
+-- not retried indefinitely, and don't block ... state", and this function
+-- is called synchronously from inside triggers that fire as part of a
+-- larger UPDATE (e.g. close_silent_auctions()/close_live_lot() marking a
+-- player sold). An uncaught exception here would roll back that entire
+-- UPDATE, not just skip the notification — verified directly: with a
+-- Vault secret still in its placeholder "unset" state, an unguarded
+-- version of this function left players.status completely unchanged.
+-- RAISE WARNING (visible in the Postgres logs) rather than a new
+-- audit_events row: this is a setup/connectivity-level failure happening
+-- *before* the actual dispatch-notification function ever runs, a
+-- different layer than a real send failure once it does (which that
+-- function already logs to audit_events itself, e.g. notification_failed).
 create function public.call_dispatch_notification(payload jsonb)
 returns void
 language plpgsql
@@ -82,26 +97,30 @@ declare
   v_function_url text;
   v_service_key text;
 begin
-  select decrypted_secret into v_function_url
-  from vault.decrypted_secrets where name = 'dispatch_notification_url';
+  begin
+    select decrypted_secret into v_function_url
+    from vault.decrypted_secrets where name = 'dispatch_notification_url';
 
-  select decrypted_secret into v_service_key
-  from vault.decrypted_secrets where name = 'service_role_key';
+    select decrypted_secret into v_service_key
+    from vault.decrypted_secrets where name = 'service_role_key';
 
-  perform net.http_post(
-    url := v_function_url,
-    body := payload,
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      -- Both the `apikey` header (Kong's own API-key check, gating whether
-      -- a request reaches an Edge Function at all) and the `Authorization`
-      -- header (dispatch-notification's own `auth: "secret"` check, once
-      -- Kong lets the request through) are required, and are two separate
-      -- checks.
-      'Authorization', 'Bearer ' || v_service_key,
-      'apikey', v_service_key
-    )
-  );
+    perform net.http_post(
+      url := v_function_url,
+      body := payload,
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        -- Both the `apikey` header (Kong's own API-key check, gating
+        -- whether a request reaches an Edge Function at all) and the
+        -- `Authorization` header (dispatch-notification's own
+        -- `auth: "secret"` check, once Kong lets the request through) are
+        -- required, and are two separate checks.
+        'Authorization', 'Bearer ' || v_service_key,
+        'apikey', v_service_key
+      )
+    );
+  exception when others then
+    raise warning 'call_dispatch_notification failed (payload %): %', payload, sqlerrm;
+  end;
 end;
 $$;
 
@@ -277,8 +296,27 @@ begin
 end;
 $$;
 
+-- Also fires when winning_bid_id itself changes while status stays sold,
+-- not just on a status transition — void-bid's confirmed auto-fall-through
+-- recompute (voiding a closed live lot's winning bid) updates
+-- winning_bid_id to the new highest surviving bidder but leaves status
+-- untouched (already sold_live, stays sold_live), so a plain transition-
+-- only WHEN clause would silently skip notifying the new winner.
+-- notify_on_player_sold() itself needs no special-casing for this: it
+-- already recomputes the current non-voided high bidder fresh from
+-- public.bids rather than trusting NEW.winning_bid_id. Confirmed the only
+-- writers of players.winning_bid_id are close_silent_auctions(),
+-- close_live_lot(), and void-bid's recompute — the first two already
+-- transition status on every write (so this OR is a no-op for them, not a
+-- double-fire risk); void-bid's recompute is the only case this
+-- additional clause newly reaches. The no-surviving-bid recompute outcome
+-- (no_bid) is unaffected either way, since no_bid was never in the
+-- NEW.status IN (...) list to begin with.
 create trigger players_notify_sold
 after update on public.players
 for each row
-when (NEW.status in ('sold_silent', 'sold_live') and OLD.status is distinct from NEW.status)
+when (
+  NEW.status in ('sold_silent', 'sold_live')
+  and (OLD.status is distinct from NEW.status or OLD.winning_bid_id is distinct from NEW.winning_bid_id)
+)
 execute function public.notify_on_player_sold();

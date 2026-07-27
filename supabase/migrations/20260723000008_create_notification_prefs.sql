@@ -7,7 +7,10 @@
 create table public.notification_prefs (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references public.users (id) on delete cascade,
-  email_enabled boolean not null default true,
+  -- Defaults closed (spec 4.7: "opt-in ... not forced") — a user who's
+  -- never visited /settings/notifications has made no explicit choice, so
+  -- this should read as opted-out, not opted-in by omission.
+  email_enabled boolean not null default false,
   -- Five keys for the five distinct triggers spec 4.7 defines: outbid,
   -- bid-on-you, player-reserved, live-auction-starting, lot-won.
   triggers jsonb not null default '{

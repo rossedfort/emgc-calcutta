@@ -211,13 +211,58 @@ $$;
 
 grant execute on function public.enqueue_player_for_live_auction(uuid, uuid) to service_role;
 
+-- Writes an AuditEvent from inside a SECURITY INVOKER function that
+-- otherwise couldn't — audit_events has zero client-writable policies, not
+-- even for Admin/Owner, so open_live_lot/close_live_lot below (both plain
+-- SECURITY INVOKER) hit the same wall a direct client INSERT would.
+-- Deliberately narrow: actor_id/actor_identity always come from the
+-- calling session (auth.uid()/auth.email()), never a caller-supplied
+-- parameter, so nothing invoking this can forge an event attributed to
+-- someone else — the only elevated capability granted is "write an audit
+-- row," not a broader RLS bypass. No p_ip/p_user_agent (a Postgres
+-- function has no HTTP request to read those from, unlike an Edge
+-- Function — audit_events already treats both as nullable for this). No
+-- p_reason (a bid-void concept, not needed by either caller below).
+create function public.log_audit_event(
+  p_tournament_id uuid,
+  p_player_id uuid,
+  p_action text,
+  p_entity_type text,
+  p_entity_id uuid,
+  p_before jsonb,
+  p_after jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.audit_events (
+    tournament_id, player_id, actor_id, actor_identity,
+    action, entity_type, entity_id, before, after
+  )
+  values (
+    p_tournament_id, p_player_id, auth.uid(), auth.email(),
+    p_action, p_entity_type, p_entity_id, p_before, p_after
+  );
+end;
+$$;
+
+-- Only granted to the two functions below, not authenticated at large —
+-- nothing else can write an audit row just because it can call a SQL
+-- function.
+grant execute on function public.log_audit_event(uuid, uuid, text, text, uuid, jsonb, jsonb) to authenticated;
+
 -- Open/close a live lot (spec 4.4). Both are read-then-write (need the
 -- tournament's anti_snipe_seconds/live_auction_started_at to open, need the
 -- current high bid to close), same shape as swap_queue_position and for the
 -- same reason: a plain PostgREST client can't do a read followed by a
 -- dependent write as one atomic call, and this genuinely needs to be atomic
 -- (no client-visible half-state where a lot is "opened" without its
--- countdown, or "closed" without a resolved winner).
+-- countdown, or "closed" without a resolved winner). Both also log an
+-- AuditEvent ("lot opened"/"lot sold", spec 4.6) via log_audit_event above
+-- once their own write succeeds.
 --
 -- Both are plain SECURITY INVOKER (the default) — the existing
 -- live_lots_write_admin_owner and players_update_admin_owner RLS policies
@@ -231,11 +276,13 @@ language plpgsql
 as $$
 declare
   target_tournament_id uuid;
+  target_player_id uuid;
   snipe_seconds integer;
   already_open_count integer;
   started timestamptz;
+  opened_ts timestamptz := now();
 begin
-  select tournament_id into target_tournament_id
+  select tournament_id, player_id into target_tournament_id, target_player_id
   from public.live_lots
   where id = lot_id;
 
@@ -273,12 +320,12 @@ begin
 
   update public.live_lots
   set
-    opened_at = now(),
+    opened_at = opened_ts,
     -- anti_snipe_seconds <= 0 means anti-snipe is disabled for this
     -- tournament — closes_at is left null rather than set to a
     -- meaningless "now".
     closes_at = case
-      when snipe_seconds > 0 then now() + (snipe_seconds || ' seconds')::interval
+      when snipe_seconds > 0 then opened_ts + (snipe_seconds || ' seconds')::interval
       else null
     end
   where id = lot_id;
@@ -289,6 +336,11 @@ begin
   if not found then
     raise exception 'Not permitted to open this lot';
   end if;
+
+  perform public.log_audit_event(
+    target_tournament_id, target_player_id, 'lot_opened', 'LiveLot', lot_id,
+    null, jsonb_build_object('opened_at', opened_ts)
+  );
 end;
 $$;
 
@@ -299,17 +351,23 @@ returns void
 language plpgsql
 as $$
 declare
+  target_tournament_id uuid;
   target_player_id uuid;
+  before_status public.player_status;
   high_bid_id uuid;
   new_status public.player_status;
 begin
-  select player_id into target_player_id
+  select tournament_id, player_id into target_tournament_id, target_player_id
   from public.live_lots
   where id = lot_id and opened_at is not null and closed_at is null;
 
   if target_player_id is null then
     raise exception 'Lot not found or not currently open';
   end if;
+
+  select status into before_status
+  from public.players
+  where id = target_player_id;
 
   -- Same "current non-voided high bid" lookup place-bid itself uses — this
   -- is what makes the outcome auto-computed rather than a manual Admin
@@ -338,6 +396,12 @@ begin
   if not found then
     raise exception 'Not permitted to update this player';
   end if;
+
+  perform public.log_audit_event(
+    target_tournament_id, target_player_id, 'lot_sold', 'LiveLot', lot_id,
+    jsonb_build_object('status', before_status),
+    jsonb_build_object('status', new_status, 'winning_bid_id', high_bid_id)
+  );
 end;
 $$;
 
