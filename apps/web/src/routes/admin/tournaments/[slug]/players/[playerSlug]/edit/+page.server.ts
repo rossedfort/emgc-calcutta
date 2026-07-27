@@ -22,7 +22,8 @@ export type Player = Pick<
 export interface UserOption {
 	id: string;
 	email: string;
-	name: string | null;
+	first_name: string | null;
+	last_name: string | null;
 }
 
 export const load: PageServerLoad = async ({ params, parent, locals: { supabase } }) => {
@@ -47,7 +48,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 	if (player.user_id) {
 		const { data } = await supabase
 			.from('users')
-			.select('id, email, name')
+			.select('id, email, first_name, last_name')
 			.eq('id', player.user_id)
 			.maybeSingle();
 		linkedUser = data;
@@ -66,7 +67,10 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 		.neq('id', player.id);
 	const takenUserIds = new Set((takenLinks ?? []).map((row) => row.user_id));
 
-	const { data: users } = await supabase.from('users').select('id, email, name').order('email');
+	const { data: users } = await supabase
+		.from('users')
+		.select('id, email, first_name, last_name')
+		.order('email');
 
 	return {
 		tournament,

@@ -4,6 +4,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { formatPlayerName } from '$lib/players';
+	import { formatUserName } from '$lib/profile';
 	import PlayerForm from '../../PlayerForm.svelte';
 	import type { PlayerFormValues } from '../../shared';
 
@@ -63,11 +64,11 @@
 			</p>
 
 			{#if data.linkedUser}
+				{@const linkedUserName = formatUserName(data.linkedUser)}
 				<div class="flex items-center gap-3">
 					<p class="text-sm">
-						{data.linkedUser.name ?? data.linkedUser.email}
-						{#if data.linkedUser.name}<span class="text-ink/60">({data.linkedUser.email})</span
-							>{/if}
+						{linkedUserName ?? data.linkedUser.email}
+						{#if linkedUserName}<span class="text-ink/60">({data.linkedUser.email})</span>{/if}
 					</p>
 					<form
 						method="POST"
@@ -109,8 +110,9 @@
 					>
 						<option value="" disabled selected>Choose a participant</option>
 						{#each data.users as user (user.id)}
+							{@const userName = formatUserName(user)}
 							<option value={user.id}
-								>{user.name ? `${user.name} (${user.email})` : user.email}</option
+								>{userName ? `${userName} (${user.email})` : user.email}</option
 							>
 						{/each}
 					</select>

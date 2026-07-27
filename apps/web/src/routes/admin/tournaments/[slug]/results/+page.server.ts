@@ -12,7 +12,12 @@ export interface ResultsRow {
 	placement: number | null;
 	winning_bid: {
 		amount: number;
-		bidder: { id: string; name: string | null; email: string } | null;
+		bidder: {
+			id: string;
+			first_name: string | null;
+			last_name: string | null;
+			email: string;
+		} | null;
 	} | null;
 	payout: { pot_share: number; amount: number } | null;
 }
@@ -56,7 +61,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: players, error: playersError } = await supabase
 		.from('players')
 		.select(
-			'id, first_name, last_name, flight, division, status, placement, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, name, email))'
+			'id, first_name, last_name, flight, division, status, placement, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live'])

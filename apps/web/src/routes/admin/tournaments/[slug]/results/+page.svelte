@@ -7,6 +7,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import EnterResultsModal from '$lib/components/EnterResultsModal.svelte';
 	import { formatPlayerName } from '$lib/players';
+	import { formatUserName } from '$lib/profile';
 
 	let { data } = $props();
 	let { supabase, results, payoutStructure } = $derived(data);
@@ -83,7 +84,7 @@
 									</Table.Cell>
 									<Table.Cell>
 										{#if player.winning_bid?.bidder}
-											{player.winning_bid.bidder.name ?? player.winning_bid.bidder.email}
+											{formatUserName(player.winning_bid.bidder) ?? player.winning_bid.bidder.email}
 										{:else}
 											<span class="text-muted-foreground">—</span>
 										{/if}

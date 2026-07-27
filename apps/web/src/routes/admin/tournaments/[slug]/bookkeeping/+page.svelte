@@ -7,6 +7,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import { formatPlayerName } from '$lib/players';
+	import { formatUserName } from '$lib/profile';
 
 	let { data } = $props();
 	let { supabase, players, payouts } = $derived(data);
@@ -91,7 +92,7 @@
 							</Table.Cell>
 							<Table.Cell>
 								{#if player.winning_bid?.bidder}
-									{player.winning_bid.bidder.name ?? player.winning_bid.bidder.email}
+									{formatUserName(player.winning_bid.bidder) ?? player.winning_bid.bidder.email}
 								{:else}
 									<span class="text-muted-foreground">—</span>
 								{/if}
@@ -153,7 +154,7 @@
 							</Table.Cell>
 							<Table.Cell>
 								{#if payout.bidder}
-									{payout.bidder.name ?? payout.bidder.email}
+									{formatUserName(payout.bidder) ?? payout.bidder.email}
 								{:else}
 									<span class="text-muted-foreground">—</span>
 								{/if}

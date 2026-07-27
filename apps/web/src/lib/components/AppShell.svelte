@@ -8,7 +8,7 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { initials } from '$lib/initials';
-	import type { UserProfile } from '$lib/profile';
+	import { formatUserName, type UserProfile } from '$lib/profile';
 
 	interface Props {
 		profile: UserProfile | null;
@@ -75,9 +75,12 @@
 		<DropdownMenu.Root>
 			<DropdownMenu.Trigger>
 				<Avatar.Root size="sm" class="ring-2 ring-brass/40">
-					<Avatar.Image src={profile?.avatar_url} alt={profile?.name ?? profile?.email} />
+					<Avatar.Image
+						src={profile?.avatar_url}
+						alt={(profile && formatUserName(profile)) ?? profile?.email}
+					/>
 					<Avatar.Fallback class="bg-scorecard font-data text-fairway">
-						{profile ? initials(profile.name ?? profile.email) : '?'}
+						{profile ? initials(formatUserName(profile) ?? profile.email) : '?'}
 					</Avatar.Fallback>
 				</Avatar.Root>
 			</DropdownMenu.Trigger>

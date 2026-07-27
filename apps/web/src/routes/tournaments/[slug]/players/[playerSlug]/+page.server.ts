@@ -1,5 +1,6 @@
 import { error, redirect } from '@sveltejs/kit';
 import { formatPlayerName, type Player } from '$lib/players';
+import { formatUserName } from '$lib/profile';
 import type { PageServerLoad } from './$types';
 
 export type PlayerProfile = Pick<
@@ -63,10 +64,10 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	if (player.user_id) {
 		const { data } = await supabase
 			.from('users')
-			.select('name, email')
+			.select('first_name, last_name, email')
 			.eq('id', player.user_id)
 			.maybeSingle();
-		linkedUserName = data ? (data.name ?? data.email) : null;
+		linkedUserName = data ? (formatUserName(data) ?? data.email) : null;
 	}
 
 	return {

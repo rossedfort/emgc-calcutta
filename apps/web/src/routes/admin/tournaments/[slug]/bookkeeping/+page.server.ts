@@ -11,7 +11,12 @@ export interface BookkeepingRow {
 	buyer_marked_paid_at: string | null;
 	winning_bid: {
 		amount: number;
-		bidder: { id: string; name: string | null; email: string } | null;
+		bidder: {
+			id: string;
+			first_name: string | null;
+			last_name: string | null;
+			email: string;
+		} | null;
 	} | null;
 }
 
@@ -22,7 +27,7 @@ export interface PayoutRow {
 	amount: number;
 	marked_paid_at: string | null;
 	player: { first_name: string; last_name: string; division: string } | null;
-	bidder: { id: string; name: string | null; email: string } | null;
+	bidder: { id: string; first_name: string | null; last_name: string | null; email: string } | null;
 }
 
 // Only sold players have a winning bid to mark paid — open/reserved/no_bid
@@ -48,7 +53,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: players, error: playersError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, first_name, last_name, division, status, buyer_marked_paid_at, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, name, email))'
+			'id, slug, first_name, last_name, division, status, buyer_marked_paid_at, winning_bid:bids!players_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live'])
@@ -61,7 +66,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: payouts, error: payoutsError } = await supabase
 		.from('payouts')
 		.select(
-			'id, placement, pot_share, amount, marked_paid_at, player:players(first_name, last_name, division), bidder:users!payouts_bidder_id_fkey(id, name, email)'
+			'id, placement, pot_share, amount, marked_paid_at, player:players(first_name, last_name, division), bidder:users!payouts_bidder_id_fkey(id, first_name, last_name, email)'
 		)
 		.eq('tournament_id', tournament.id)
 		.order('placement');
