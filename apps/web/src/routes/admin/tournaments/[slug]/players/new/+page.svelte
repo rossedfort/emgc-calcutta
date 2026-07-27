@@ -10,8 +10,6 @@
 	const emptyValues: PlayerFormValues = {
 		first_name: '',
 		last_name: '',
-		contact_email: '',
-		contact_phone: '',
 		flight: '',
 		handicap_index: '',
 		preferences: ''

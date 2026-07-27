@@ -15,10 +15,8 @@
 	let importedCount = $state(0);
 
 	// Per-row checkbox state, seeded whenever a new preview payload arrives —
-	// error rows start unchecked (can't be imported until the CSV is fixed),
-	// matched rows start with their auto-match kept.
+	// error rows start unchecked (can't be imported until the CSV is fixed).
 	let included = $state<Record<number, boolean>>({});
-	let keepLink = $state<Record<number, boolean>>({});
 
 	$effect(() => {
 		if (form && 'step' in form) {
@@ -29,14 +27,11 @@
 				// write, causing an infinite loop (effect_update_depth_exceeded).
 				const nextPreview = form.preview as ImportCsvPreviewResponse;
 				const nextIncluded: Record<number, boolean> = {};
-				const nextKeepLink: Record<number, boolean> = {};
 				for (const row of nextPreview.rows) {
 					nextIncluded[row.rowNumber] = row.errors.length === 0;
-					nextKeepLink[row.rowNumber] = true;
 				}
 				previewData = nextPreview;
 				included = nextIncluded;
-				keepLink = nextKeepLink;
 				step = 'preview';
 			} else if (form.step === 'done' && 'imported' in form) {
 				importedCount = (form.imported as { count: number }).count;
@@ -65,13 +60,10 @@
 				.map((row) => ({
 					first_name: row.first_name,
 					last_name: row.last_name,
-					contact_email: row.contact_email,
-					contact_phone: row.contact_phone,
 					flight: row.flight,
 					handicap_index: row.handicap_index,
 					preferences: row.preferences,
-					photo_url: row.photo_url,
-					userId: keepLink[row.rowNumber] ? row.matchedUserId : null
+					photo_url: row.photo_url
 				}))
 		)
 	);
@@ -140,10 +132,8 @@
 					<Table.Head>Include</Table.Head>
 					<Table.Head>First name</Table.Head>
 					<Table.Head>Last name</Table.Head>
-					<Table.Head>Contact</Table.Head>
 					<Table.Head>Flight</Table.Head>
 					<Table.Head>Handicap</Table.Head>
-					<Table.Head>Match</Table.Head>
 					<Table.Head>Notes</Table.Head>
 				</Table.Row>
 			</Table.Header>
@@ -163,12 +153,6 @@
 						</Table.Cell>
 						<Table.Cell class="font-medium text-ink">{row.first_name ?? '—'}</Table.Cell>
 						<Table.Cell class="font-medium text-ink">{row.last_name ?? '—'}</Table.Cell>
-						<Table.Cell class="text-sm">
-							{row.contact_email ?? '—'}
-							{#if row.contact_phone}
-								<br /><span class="text-muted-foreground">{row.contact_phone}</span>
-							{/if}
-						</Table.Cell>
 						<Table.Cell>
 							{row.flight || '—'}
 							{#if isChampionshipRow(row.flight)}
@@ -176,21 +160,6 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell class="font-data">{row.handicap_index ?? '—'}</Table.Cell>
-						<Table.Cell>
-							{#if row.matchedUserId}
-								<label class="flex items-center gap-2 text-sm">
-									<input
-										type="checkbox"
-										class="accent-brass"
-										checked={keepLink[row.rowNumber] ?? true}
-										onchange={(e) => (keepLink[row.rowNumber] = e.currentTarget.checked)}
-									/>
-									<Badge variant="fairway">Linked · {row.matchedUserEmail}</Badge>
-								</label>
-							{:else}
-								<Badge variant="sand">No match</Badge>
-							{/if}
-						</Table.Cell>
 						<Table.Cell class="text-sm text-flag">
 							{row.errors.join(', ')}
 						</Table.Cell>
@@ -245,8 +214,8 @@
 			>
 				<p class="font-data text-xs tracking-widest text-fairway uppercase">Player roster</p>
 				<p class="text-sm text-ink/70">
-					Choose a CSV file with First Name and Last Name columns for each competitor, plus contact
-					info and flight.
+					Choose a CSV file with First Name and Last Name columns for each competitor, plus flight
+					and handicap.
 				</p>
 				<input
 					type="file"

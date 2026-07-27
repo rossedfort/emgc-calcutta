@@ -42,10 +42,6 @@
 			<dd>{data.player.flight || '—'}</dd>
 			<dt class="text-ink/60">Handicap</dt>
 			<dd class="font-data">{data.player.handicap_index ?? '—'}</dd>
-			<dt class="text-ink/60">Contact email</dt>
-			<dd>{data.player.contact_email ?? '—'}</dd>
-			<dt class="text-ink/60">Contact phone</dt>
-			<dd>{data.player.contact_phone ?? '—'}</dd>
 			<dt class="text-ink/60">Preferences</dt>
 			<dd>{data.player.preferences ?? '—'}</dd>
 		</dl>

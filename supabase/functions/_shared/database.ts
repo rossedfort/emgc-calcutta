@@ -325,8 +325,6 @@ export type Database = {
         Row: {
           buyer_marked_paid_at: string | null;
           buyer_marked_paid_by: string | null;
-          contact_email: string | null;
-          contact_phone: string | null;
           created_at: string;
           division: string;
           first_name: string;
@@ -346,8 +344,6 @@ export type Database = {
         Insert: {
           buyer_marked_paid_at?: string | null;
           buyer_marked_paid_by?: string | null;
-          contact_email?: string | null;
-          contact_phone?: string | null;
           created_at?: string;
           division?: string;
           first_name: string;
@@ -367,8 +363,6 @@ export type Database = {
         Update: {
           buyer_marked_paid_at?: string | null;
           buyer_marked_paid_by?: string | null;
-          contact_email?: string | null;
-          contact_phone?: string | null;
           created_at?: string;
           division?: string;
           first_name?: string;

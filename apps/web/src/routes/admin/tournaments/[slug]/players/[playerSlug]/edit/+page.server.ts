@@ -10,8 +10,6 @@ export type Player = Pick<
 	| 'slug'
 	| 'first_name'
 	| 'last_name'
-	| 'contact_email'
-	| 'contact_phone'
 	| 'preferences'
 	| 'flight'
 	| 'handicap_index'
@@ -31,9 +29,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 
 	const { data: player, error: playerError } = await supabase
 		.from('players')
-		.select(
-			'id, slug, first_name, last_name, contact_email, contact_phone, preferences, flight, handicap_index, status, user_id'
-		)
+		.select('id, slug, first_name, last_name, preferences, flight, handicap_index, status, user_id')
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
 		.maybeSingle();

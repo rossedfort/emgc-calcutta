@@ -1,7 +1,8 @@
 // Writes the rows an Admin has reviewed and confirmed from the
-// import-csv-preview payload — this is the commit step (spec 4.2); the
-// Admin may have overridden or cleared the auto-matched userId per row
-// before calling this. All rows are written in a single multi-row insert,
+// import-csv-preview payload — this is the commit step (spec 4.2). Every
+// row is written unlinked (no user_id) — self-service linking (Phase 10)
+// is the only way a Player gets connected to a User. All rows are written
+// in a single multi-row insert,
 // which Postgres executes as one atomic statement — if any row violates a
 // constraint, the whole batch rolls back, matching "transactionally" in the
 // backlog without needing an explicit BEGIN/COMMIT.
@@ -91,18 +92,12 @@ export default {
       // A roster row whose flight is the tournament's Championship flight
       // becomes *two* players rows — one per division — since that flight's
       // golfers are auctioned separately for Gross and Net (Phase 7.5).
-      // Every other row stays a single 'overall' row, unchanged. A linked
-      // userId is carried onto both Championship rows (confirmed decision):
-      // the relaxed (tournament_id, user_id, division) uniqueness (see this
-      // task's own migration) is exactly what makes that possible without
-      // colliding with the Gross/Net counterpart.
+      // Every other row stays a single 'overall' row, unchanged.
       const insertRows = body.rows.flatMap((row) => {
         const base = {
           tournament_id: body.tournamentId!,
           first_name: row.first_name!.trim(),
           last_name: row.last_name!.trim(),
-          contact_email: row.contact_email || null,
-          contact_phone: row.contact_phone || null,
           // '' (not null) — players.flight is not-null-default-'' as of the
           // flighting schema task; a raw `|| null` here would violate that
           // constraint for any row with no flight in the CSV.
@@ -110,7 +105,6 @@ export default {
           handicap_index: row.handicap_index ?? null,
           preferences: row.preferences || null,
           photo_url: row.photo_url || null,
-          user_id: row.userId || null,
         };
 
         if (
@@ -130,16 +124,7 @@ export default {
         .insert(insertRows)
         .select("id, slug, first_name, last_name");
       if (insertError) {
-        // Most likely cause: one of these rows' userId is already linked to
-        // a different player in this tournament (unique per (tournamentId,
-        // userId) — see the players migration) — e.g. re-importing a CSV
-        // where a row auto-matched to someone already linked from an
-        // earlier import. Translate rather than surfacing Postgres's raw
-        // constraint-name error.
-        const message = insertError.code === "23505"
-          ? "One of these rows is linked to a participant who's already linked to another player in this tournament. Uncheck that row's link (or exclude the row) and try again."
-          : insertError.message;
-        return Response.json({ error: message }, {
+        return Response.json({ error: insertError.message }, {
           status: 400,
         });
       }
