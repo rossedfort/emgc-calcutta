@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import { invalidateAll } from '$app/navigation';
+	import EmptyState from '$lib/components/EmptyState.svelte';
+	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
 	import { formatUserName } from '$lib/profile';
-	import { roleBadgeVariant, type Role } from '$lib/roles';
+	import { ROLES, roleBadgeVariant, roleLabel, type Role } from '$lib/roles';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import type { UserRow } from './types';
 
@@ -15,6 +18,25 @@
 
 	let pendingId: string | null = $state(null);
 	let errorMessage = $state('');
+
+	let searchQuery = $state('');
+	let roleFilters = $state<string[]>([]);
+	let roleOptions = $derived(ROLES.map((role) => ({ value: role, label: roleLabel(role) })));
+
+	let filteredUsers = $derived(
+		users.filter((user) => {
+			if (roleFilters.length > 0 && !roleFilters.includes(user.role)) return false;
+			const query = searchQuery.trim().toLowerCase();
+			if (
+				query &&
+				!(formatUserName(user) ?? '').toLowerCase().includes(query) &&
+				!user.email.toLowerCase().includes(query)
+			) {
+				return false;
+			}
+			return true;
+		})
+	);
 
 	// Mirrors the authorization rules enforced server-side in the
 	// update-user-role Edge Function — this only controls which buttons are
@@ -70,42 +92,56 @@
 		<p class="text-sm text-destructive">{errorMessage}</p>
 	{/if}
 
-	<Table.Root>
-		<Table.Header>
-			<Table.Row>
-				<Table.Head>Email</Table.Head>
-				<Table.Head>Name</Table.Head>
-				<Table.Head>Role</Table.Head>
-				<Table.Head>Actions</Table.Head>
-			</Table.Row>
-		</Table.Header>
-		<Table.Body>
-			{#each users as user (user.id)}
+	<div class="flex items-center gap-4 text-sm">
+		<Input
+			type="search"
+			placeholder="Search name or email…"
+			bind:value={searchQuery}
+			class="max-w-56"
+		/>
+		<MultiSelectFilter label="Role" options={roleOptions} bind:selected={roleFilters} />
+	</div>
+
+	{#if filteredUsers.length === 0}
+		<EmptyState title="No users match these filters" />
+	{:else}
+		<Table.Root>
+			<Table.Header>
 				<Table.Row>
-					<Table.Cell>{user.email}</Table.Cell>
-					<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
-					<Table.Cell>
-						<Badge variant={roleBadgeVariant(user.role)}>{user.role}</Badge>
-						{#if user.id === viewerId}
-							<span class="text-xs text-muted-foreground">(you)</span>
-						{/if}
-					</Table.Cell>
-					<Table.Cell>
-						<div class="flex gap-2">
-							{#each actionsFor(user) as action (action.label)}
-								<Button
-									variant="brass"
-									size="sm"
-									disabled={pendingId === user.id}
-									onclick={() => setRole(user.id, action.role)}
-								>
-									{action.label}
-								</Button>
-							{/each}
-						</div>
-					</Table.Cell>
+					<Table.Head>Email</Table.Head>
+					<Table.Head>Name</Table.Head>
+					<Table.Head>Role</Table.Head>
+					<Table.Head>Actions</Table.Head>
 				</Table.Row>
-			{/each}
-		</Table.Body>
-	</Table.Root>
+			</Table.Header>
+			<Table.Body>
+				{#each filteredUsers as user (user.id)}
+					<Table.Row>
+						<Table.Cell>{user.email}</Table.Cell>
+						<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
+						<Table.Cell>
+							<Badge variant={roleBadgeVariant(user.role)}>{user.role}</Badge>
+							{#if user.id === viewerId}
+								<span class="text-xs text-muted-foreground">(you)</span>
+							{/if}
+						</Table.Cell>
+						<Table.Cell>
+							<div class="flex gap-2">
+								{#each actionsFor(user) as action (action.label)}
+									<Button
+										variant="brass"
+										size="sm"
+										disabled={pendingId === user.id}
+										onclick={() => setRole(user.id, action.role)}
+									>
+										{action.label}
+									</Button>
+								{/each}
+							</div>
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
+	{/if}
 </div>

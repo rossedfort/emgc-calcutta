@@ -5,7 +5,7 @@ import { parseTournamentForm } from '../shared';
 export const load: PageServerLoad = async ({ parent }) => {
 	const { tournament } = await parent();
 	return {
-		title: `${tournament.name} · Settings · EMGC Calcutta`,
+		title: `${tournament.name} · Settings · EMGC Bet`,
 		description: `Configure auction timing, thresholds, and payout structure for ${tournament.name}.`
 	};
 };

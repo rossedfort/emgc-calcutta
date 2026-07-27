@@ -10,13 +10,27 @@
 -- project, no explicit grant to service_role is needed for this to work.
 create extension if not exists pg_cron;
 
+-- A player with zero silent bids gets no_bid, not sold_silent — mirrors
+-- close_live_lot()'s own "a surviving bid means sold, none means no_bid"
+-- rule for the live phase. The status CASE and winning_bid_id below both
+-- run the same correlated scalar subquery rather than a LATERAL join in
+-- FROM: Postgres rejects a FROM-clause LATERAL referencing the UPDATE's
+-- own target table. Running the lookup twice per row is a non-issue for a
+-- per-minute cron sweep over one tournament's player count.
 create function public.close_silent_auctions()
 returns void
 language sql
 as $$
   update public.players p
   set
-    status = 'sold_silent',
+    status = case
+      when (
+        select b.id from public.bids b
+        where b.player_id = p.id and b.voided_at is null
+        order by b.amount desc limit 1
+      ) is not null then 'sold_silent'::public.player_status
+      else 'no_bid'::public.player_status
+    end,
     winning_bid_id = (
       select b.id
       from public.bids b

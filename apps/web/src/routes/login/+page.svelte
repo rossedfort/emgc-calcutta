@@ -78,7 +78,7 @@
 	<div
 		class="w-full max-w-sm rounded-lg border border-brass/30 bg-scorecard p-8 text-ink shadow-sm"
 	>
-		<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Calcutta</p>
+		<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Bet</p>
 		<h1 class="mt-2 font-display text-3xl font-semibold text-ink">Sign in</h1>
 		<p class="mt-2 text-sm text-ink/70">
 			Sign in to browse players and bid in the league's Calcutta auction.

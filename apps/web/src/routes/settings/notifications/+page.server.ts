@@ -11,11 +11,14 @@ export interface NotificationPrefsForm {
 }
 
 // Mirrors the notification_prefs migration's own column defaults — a
-// Participant who's never visited this page yet (no row exists) sees
-// every toggle on, matching what dispatch-notification's "no row yet"
-// fallback will treat them as once the opt-out-respecting task lands.
+// Participant who's never visited this page yet (no row exists) sees the
+// master toggle off (spec 4.7: "opt-in ... not forced"), matching
+// dispatch-notification's own `?? false` fallback for the same "no row"
+// case. The five per-trigger toggles still default on: if/when a user does
+// turn email on, they get every trigger by default rather than needing to
+// individually enable each one on top of the master switch.
 const DEFAULT_PREFS: NotificationPrefsForm = {
-	email_enabled: true,
+	email_enabled: false,
 	outbid: true,
 	bid_on_you: true,
 	reserved: true,
@@ -49,8 +52,11 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 
 	return {
 		prefs,
-		title: 'Notification settings · EMGC Calcutta',
-		description: 'Choose which EMGC Calcutta auction emails you receive.'
+		// Drives the onboarding banner (see +page.svelte) — only shown the
+		// first time, before any explicit choice (a real row) exists yet.
+		isFirstVisit: data === null,
+		title: 'Notification settings · EMGC Bet',
+		description: 'Choose which EMGC Bet auction emails you receive.'
 	};
 };
 

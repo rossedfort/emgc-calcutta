@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ locals: { supabase } }) => {
 
 	return {
 		tournaments: (data as Tournament[] | null) ?? [],
-		title: 'Tournaments · EMGC Calcutta',
-		description: 'Manage every EMGC Calcutta tournament.'
+		title: 'Tournaments · EMGC Bet',
+		description: 'Manage every EMGC Bet tournament.'
 	};
 };

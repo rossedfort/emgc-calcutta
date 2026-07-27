@@ -1,4 +1,5 @@
 import type { BadgeVariant } from '$lib/components/ui/badge';
+import { localDateTimeToUtcIso } from '$lib/time';
 
 // No generated Supabase types in this project yet (see spec 6.8) — this is
 // just enough of the shape of public.tournaments for this feature.
@@ -78,8 +79,21 @@ export function parseTournamentForm(formData: FormData): {
 	const kindRaw = String(formData.get('kind') ?? 'production');
 	const kind: 'production' | 'dry_run' = kindRaw === 'dry_run' ? 'dry_run' : 'production';
 
-	const start = String(formData.get('silent_auction_start') ?? '');
-	const end = String(formData.get('silent_auction_end') ?? '');
+	// The raw <input type="datetime-local"> value has no timezone of its
+	// own — only the browser that rendered it knows what offset applies, so
+	// the browser submits its own `Date.prototype.getTimezoneOffset()`
+	// alongside the raw value (TournamentForm.svelte) rather than this
+	// server ever guessing. Falls back to 0 (UTC) if missing/malformed
+	// (e.g. JS disabled) — same "hidden field required for correctness, no
+	// graceful no-JS path" trade-off already made for payout_structure/
+	// flights below.
+	const tzOffsetRaw = Number(formData.get('tz_offset_minutes'));
+	const tzOffsetMinutes = Number.isFinite(tzOffsetRaw) ? tzOffsetRaw : 0;
+
+	const startRaw = String(formData.get('silent_auction_start') ?? '');
+	const endRaw = String(formData.get('silent_auction_end') ?? '');
+	const start = startRaw ? localDateTimeToUtcIso(startRaw, tzOffsetMinutes) : null;
+	const end = endRaw ? localDateTimeToUtcIso(endRaw, tzOffsetMinutes) : null;
 	if (!start) errors.silent_auction_start = 'Start is required';
 	if (!end) errors.silent_auction_end = 'End is required';
 	if (start && end && new Date(end) <= new Date(start)) {
@@ -108,12 +122,25 @@ export function parseTournamentForm(formData: FormData): {
 	const payoutRaw = String(formData.get('payout_structure') ?? '{}');
 	try {
 		const parsed = JSON.parse(payoutRaw || '{}');
+		let total = 0;
 		for (const [place, percent] of Object.entries(parsed)) {
 			if (!/^\d+$/.test(place) || typeof percent !== 'number' || percent <= 0 || percent > 1) {
 				throw new Error('invalid payout entry');
 			}
+			total += percent;
 		}
-		payout_structure = parsed;
+		// Each entry is already bounded to (0, 1] above; nothing previously
+		// checked the total across all places, so e.g. 1st=60%/2nd=60% (a
+		// nonsensical 120% payout) passed silently. Epsilon tolerance: percents
+		// are entered as whole numbers and divided by 100 client-side, so a
+		// legitimate 100% split (e.g. seven 7% places + one 9%) can float-drift
+		// to 1.0000000000000004 and would otherwise be rejected incorrectly.
+		if (total > 1 + 1e-9) {
+			errors.payout_structure =
+				'Payout percentages add up to more than 100% — reduce one or more places';
+		} else {
+			payout_structure = parsed;
+		}
 	} catch {
 		errors.payout_structure = 'Payout structure is invalid — each place must have a percentage';
 	}
@@ -157,8 +184,8 @@ export function parseTournamentForm(formData: FormData): {
 		data: {
 			name,
 			kind,
-			silent_auction_start: new Date(start).toISOString(),
-			silent_auction_end: new Date(end).toISOString(),
+			silent_auction_start: start!,
+			silent_auction_end: end!,
 			threshold_amount,
 			min_increment,
 			anti_snipe_seconds,

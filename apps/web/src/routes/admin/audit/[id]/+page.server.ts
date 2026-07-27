@@ -58,7 +58,7 @@ export const load: PageServerLoad = async ({ params, locals: { supabase } }) => 
 
 	return {
 		event,
-		title: 'Audit event · EMGC Calcutta',
+		title: 'Audit event · EMGC Bet',
 		description: `Detail for a ${event.action} audit event on ${event.entity_type}.`
 	};
 };

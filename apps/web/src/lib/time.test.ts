@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCountdown, formatRelativeTime } from './time';
+import { formatCountdown, formatRelativeTime, localDateTimeToUtcIso } from './time';
 
 describe('formatRelativeTime', () => {
 	const now = new Date('2026-01-01T12:00:00Z');
@@ -37,5 +37,31 @@ describe('formatCountdown', () => {
 
 	it('formats "Nd HHh MMm" once more than a day out', () => {
 		expect(formatCountdown(new Date('2026-01-03T14:30:00Z'), now)).toBe('2d 02h 30m');
+	});
+});
+
+describe('localDateTimeToUtcIso', () => {
+	it('applies a positive offset (behind UTC, e.g. MDT) — the actual reported bug', () => {
+		// 07/14 12:00 AM MDT must land on 07/14 06:00 UTC, not silently stored
+		// as 07/14 00:00 UTC (which reads back as 07/13 6:00 PM MDT).
+		expect(localDateTimeToUtcIso('2026-07-14T00:00', 360)).toBe('2026-07-14T06:00:00.000Z');
+	});
+
+	it('applies a negative offset (ahead of UTC)', () => {
+		expect(localDateTimeToUtcIso('2026-07-14T10:00', -330)).toBe('2026-07-14T04:30:00.000Z');
+	});
+
+	it('passes through unchanged for a zero offset (UTC)', () => {
+		expect(localDateTimeToUtcIso('2026-07-14T10:00', 0)).toBe('2026-07-14T10:00:00.000Z');
+	});
+
+	it('rolls over the calendar day/month/year when the offset crosses midnight', () => {
+		expect(localDateTimeToUtcIso('2026-12-31T23:00', 120)).toBe('2027-01-01T01:00:00.000Z');
+		expect(localDateTimeToUtcIso('2026-01-01T01:00', -120)).toBe('2025-12-31T23:00:00.000Z');
+	});
+
+	it('returns null for malformed or empty input', () => {
+		expect(localDateTimeToUtcIso('', 360)).toBeNull();
+		expect(localDateTimeToUtcIso('not-a-date', 360)).toBeNull();
 	});
 });

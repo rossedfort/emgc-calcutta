@@ -5,7 +5,7 @@ import { parsePlayerForm } from '../shared';
 export const load: PageServerLoad = async ({ parent }) => {
 	const { tournament } = await parent();
 	return {
-		title: `New player · ${tournament.name} · EMGC Calcutta`,
+		title: `New player · ${tournament.name} · EMGC Bet`,
 		description: `Add a new player to the ${tournament.name} roster.`
 	};
 };

@@ -4,8 +4,8 @@ import { parseTournamentForm } from '../shared';
 
 export const load: PageServerLoad = () => {
 	return {
-		title: 'New tournament · EMGC Calcutta',
-		description: 'Create a new EMGC Calcutta tournament.'
+		title: 'New tournament · EMGC Bet',
+		description: 'Create a new EMGC Bet tournament.'
 	};
 };
 

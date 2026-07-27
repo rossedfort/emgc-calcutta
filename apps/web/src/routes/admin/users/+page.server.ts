@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ locals: { supabase } }) => {
 
 	return {
 		users: data.users,
-		title: 'Users · EMGC Calcutta',
-		description: 'Manage EMGC Calcutta participant and admin accounts.'
+		title: 'Users · EMGC Bet',
+		description: 'Manage EMGC Bet participant and admin accounts.'
 	};
 };

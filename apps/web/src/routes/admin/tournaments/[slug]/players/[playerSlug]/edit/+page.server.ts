@@ -77,7 +77,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 		player: player as Player,
 		linkedUser,
 		users: ((users as UserOption[] | null) ?? []).filter((user) => !takenUserIds.has(user.id)),
-		title: `Edit ${formatPlayerName(player)} · ${tournament.name} · EMGC Calcutta`,
+		title: `Edit ${formatPlayerName(player)} · ${tournament.name} · EMGC Bet`,
 		description: `Edit ${formatPlayerName(player)}'s roster entry in ${tournament.name}.`
 	};
 };

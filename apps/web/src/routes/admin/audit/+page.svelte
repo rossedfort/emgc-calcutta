@@ -16,6 +16,13 @@
 
 	let { data } = $props();
 
+	// The From/To datetime-local inputs below submit a raw "YYYY-MM-DDTHH:mm"
+	// string with no timezone of its own — parseAuditFilters/queryAuditEvents
+	// need this browser's own offset to convert it to the correct UTC
+	// instant (see $lib/time.ts's localDateTimeToUtcIso). Computed once, not
+	// reactively: the browser's own timezone doesn't change mid-session.
+	const tzOffsetMinutes = new Date().getTimezoneOffset();
+
 	// Carries whatever filters are currently applied — export reflects the
 	// current view, not just the 200 rows shown on screen (the export
 	// endpoint itself re-runs the same filtered query uncapped).
@@ -174,21 +181,27 @@
 				{/each}
 			</select>
 		</label>
-		<div class="flex items-end gap-3">
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-muted-foreground">From</span>
-				<Input
-					type="datetime-local"
-					name="start"
-					value={data.filters.start}
-					disabled={isQuerying}
-				/>
-			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-muted-foreground">To</span>
-				<Input type="datetime-local" name="end" value={data.filters.end} disabled={isQuerying} />
-			</label>
+		<div class="flex flex-col gap-1">
+			<div class="flex items-end gap-3">
+				<label class="flex flex-col gap-1 text-sm">
+					<span class="text-muted-foreground">From</span>
+					<Input
+						type="datetime-local"
+						name="start"
+						value={data.filters.start}
+						disabled={isQuerying}
+					/>
+				</label>
+				<label class="flex flex-col gap-1 text-sm">
+					<span class="text-muted-foreground">To</span>
+					<Input type="datetime-local" name="end" value={data.filters.end} disabled={isQuerying} />
+				</label>
+			</div>
+			<p class="text-xs text-muted-foreground">
+				Times are entered in your browser's local timezone.
+			</p>
 		</div>
+		<input type="hidden" name="tz_offset_minutes" value={tzOffsetMinutes} />
 		<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
 			{#if isQuerying}
 				<LoaderCircleIcon class="size-3.5 animate-spin" />

@@ -72,7 +72,7 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 	return {
 		owed: (owed as OwedRow[] | null) ?? [],
 		won: (won as WonRow[] | null) ?? [],
-		title: 'My balance · EMGC Calcutta',
-		description: "What you owe and what you've won across every EMGC Calcutta tournament."
+		title: 'My balance · EMGC Bet',
+		description: "What you owe and what you've won across every EMGC Bet tournament."
 	};
 };

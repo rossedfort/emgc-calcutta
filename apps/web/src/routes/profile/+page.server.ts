@@ -19,8 +19,8 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 
 	return {
 		profile: data as UserProfile,
-		title: 'Profile · EMGC Calcutta',
-		description: 'Your EMGC Calcutta account details.'
+		title: 'Profile · EMGC Bet',
+		description: 'Your EMGC Bet account details.'
 	};
 };
 

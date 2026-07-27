@@ -250,7 +250,7 @@ otp_expiry = 3600
 # user = "resend"
 # pass = "env(RESEND_SMTP_PASS)"
 # admin_email = "admin@email.com"
-# sender_name = "EMGC Calcutta"
+# sender_name = "EMGC Bet"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

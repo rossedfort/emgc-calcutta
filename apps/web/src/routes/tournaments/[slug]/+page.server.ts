@@ -51,7 +51,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		tournament,
 		players: (players as FieldPlayerRow[] | null) ?? [],
 		currentUserId: session.user.id,
-		title: `${tournament.name} · EMGC Calcutta`,
+		title: `${tournament.name} · EMGC Bet`,
 		description: `Watch bids come in live on the ${tournament.name} field.`
 	};
 };

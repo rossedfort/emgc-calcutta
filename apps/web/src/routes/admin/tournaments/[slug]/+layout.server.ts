@@ -20,7 +20,7 @@ export const load: LayoutServerLoad = async ({ params, locals: { supabase } }) =
 		// Fallback for the Settings tab (its own +page.server.ts has no load
 		// of its own) — every other tab under this layout overrides this
 		// with something more specific.
-		title: `${tournament.name} · Admin · EMGC Calcutta`,
+		title: `${tournament.name} · Admin · EMGC Bet`,
 		description: `Manage the ${tournament.name} tournament.`
 	};
 };

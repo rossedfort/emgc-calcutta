@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@emgc-calcutta/shared-types';
+import { localDateTimeToUtcIso } from '$lib/time';
 
 export interface AuditFilters {
 	participant: string;
@@ -7,15 +8,22 @@ export interface AuditFilters {
 	action: string;
 	start: string;
 	end: string;
+	// The browser's own Date.prototype.getTimezoneOffset(), submitted
+	// alongside the raw start/end datetime-local values (which have no
+	// timezone of their own) so queryAuditEvents can convert them to the
+	// correct UTC instant — see $lib/time.ts's localDateTimeToUtcIso.
+	tzOffsetMinutes: number;
 }
 
 export function parseAuditFilters(url: URL): AuditFilters {
+	const tzOffsetRaw = Number(url.searchParams.get('tz_offset_minutes'));
 	return {
 		participant: url.searchParams.get('participant')?.trim() ?? '',
 		player: url.searchParams.get('player')?.trim() ?? '',
 		action: url.searchParams.get('action')?.trim() ?? '',
 		start: url.searchParams.get('start') ?? '',
-		end: url.searchParams.get('end') ?? ''
+		end: url.searchParams.get('end') ?? '',
+		tzOffsetMinutes: Number.isFinite(tzOffsetRaw) ? tzOffsetRaw : 0
 	};
 }
 
@@ -51,11 +59,15 @@ export async function queryAuditEvents(
 		// Exact match — action is a dropdown of known values, not free text.
 		query = query.eq('action', filters.action);
 	}
-	if (filters.start) {
-		query = query.gte('created_at', new Date(filters.start).toISOString());
+	const startIso = filters.start
+		? localDateTimeToUtcIso(filters.start, filters.tzOffsetMinutes)
+		: null;
+	const endIso = filters.end ? localDateTimeToUtcIso(filters.end, filters.tzOffsetMinutes) : null;
+	if (startIso) {
+		query = query.gte('created_at', startIso);
 	}
-	if (filters.end) {
-		query = query.lte('created_at', new Date(filters.end).toISOString());
+	if (endIso) {
+		query = query.lte('created_at', endIso);
 	}
 
 	if (filters.player) {
