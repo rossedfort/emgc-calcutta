@@ -67,7 +67,7 @@
 				<Dialog.Footer>
 					<Button href={resolve('/')} variant="outline">Back</Button>
 					<Button type="submit" variant="brass" disabled={submitting}>
-						{submitting ? 'Linking…' : 'This is me'}
+						{submitting ? 'Joining...' : 'Join'}
 					</Button>
 				</Dialog.Footer>
 			</form>
