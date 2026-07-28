@@ -6,6 +6,7 @@
 	import { page } from '$app/state';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import * as Avatar from '$lib/components/ui/avatar';
+	import { Badge } from '$lib/components/ui/badge';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { initials } from '$lib/initials';
 	import { formatUserName, type UserProfile } from '$lib/profile';
@@ -13,10 +14,11 @@
 	interface Props {
 		profile: UserProfile | null;
 		supabase: SupabaseClient;
+		pendingUserCount: number | null;
 		children: Snippet;
 	}
 
-	let { profile, supabase, children }: Props = $props();
+	let { profile, supabase, pendingUserCount, children }: Props = $props();
 
 	let isAdmin = $derived(profile?.role === 'admin' || profile?.role === 'owner');
 
@@ -130,6 +132,9 @@
 				<a href={resolve('/admin/users')} class={navLinkClass('/admin/users')}>
 					{@render navDot('/admin/users')}
 					<span>Users</span>
+					{#if pendingUserCount}
+						<Badge variant="flag" class="ml-auto">{pendingUserCount}</Badge>
+					{/if}
 				</a>
 				<a href={resolve('/admin/audit')} class={navLinkClass('/admin/audit')}>
 					{@render navDot('/admin/audit')}

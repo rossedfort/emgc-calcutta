@@ -6,7 +6,7 @@
 	import AppShell from '$lib/components/AppShell.svelte';
 
 	let { data, children } = $props();
-	let { session, supabase, profile } = $derived(data);
+	let { session, supabase, profile, pendingUserCount } = $derived(data);
 
 	onMount(() => {
 		const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
@@ -25,7 +25,7 @@
 </svelte:head>
 
 {#if session}
-	<AppShell {profile} {supabase}>
+	<AppShell {profile} {supabase} {pendingUserCount}>
 		{@render children()}
 	</AppShell>
 {:else}
