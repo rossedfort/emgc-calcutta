@@ -7,6 +7,7 @@
 	let { data } = $props();
 	let { tournaments } = $derived(data);
 	let isAdmin = $derived(data.profile?.role === 'admin' || data.profile?.role === 'owner');
+	let isUnassigned = $derived(data.profile?.role === 'unassigned');
 
 	function formatWindow(startIso: string, endIso: string): string {
 		const start = new Date(startIso);
@@ -99,12 +100,23 @@
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink shadow-sm">
 			<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Bet</p>
 			<h1 class="mt-2 font-display text-3xl font-semibold text-ink">
-				{isAdmin ? 'No tournament set up yet' : 'Nothing scheduled yet'}
+				{#if isAdmin}
+					No tournament set up yet
+				{:else if isUnassigned}
+					Almost there
+				{:else}
+					Nothing scheduled yet
+				{/if}
 			</h1>
 			<p class="mt-2 text-sm text-ink/70">
-				{isAdmin
-					? "Create this year's tournament to open it up for the league."
-					: 'Check back once an Admin sets up this year’s tournament.'}
+				{#if isAdmin}
+					Create this year's tournament to open it up for the league.
+				{:else if isUnassigned}
+					An Admin needs to approve your account before you can view or bid. Check back once that
+					happens.
+				{:else}
+					Check back once an Admin sets up this year’s tournament.
+				{/if}
 			</p>
 
 			{#if isAdmin}

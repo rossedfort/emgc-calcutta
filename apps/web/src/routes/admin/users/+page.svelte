@@ -38,6 +38,12 @@
 		})
 	);
 
+	// Split rather than just sorted to the top, so an Admin working the list
+	// sees "someone's waiting" as its own labeled section instead of having
+	// to notice an unassigned badge mixed into the rest of the table.
+	let pendingUsers = $derived(filteredUsers.filter((user) => user.role === 'unassigned'));
+	let otherUsers = $derived(filteredUsers.filter((user) => user.role !== 'unassigned'));
+
 	// Mirrors the authorization rules enforced server-side in the
 	// update-user-role Edge Function — this only controls which buttons are
 	// shown, the function is the actual source of truth.
@@ -102,9 +108,7 @@
 		<MultiSelectFilter label="Role" options={roleOptions} bind:selected={roleFilters} />
 	</div>
 
-	{#if filteredUsers.length === 0}
-		<EmptyState title="No users match these filters" />
-	{:else}
+	{#snippet usersTable(rows: UserRow[])}
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
@@ -115,7 +119,7 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each filteredUsers as user (user.id)}
+				{#each rows as user (user.id)}
 					<Table.Row>
 						<Table.Cell>{user.email}</Table.Cell>
 						<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
@@ -143,5 +147,29 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
+	{/snippet}
+
+	{#if filteredUsers.length === 0}
+		<EmptyState title="No users match these filters" />
+	{:else}
+		<div class="flex flex-col gap-8">
+			{#if pendingUsers.length > 0}
+				<div class="flex flex-col gap-2">
+					<div class="flex items-center gap-2">
+						<h2 class="font-display text-lg font-semibold text-ink">Pending approval</h2>
+						<Badge variant="sand">{pendingUsers.length}</Badge>
+					</div>
+					{@render usersTable(pendingUsers)}
+				</div>
+			{/if}
+			{#if otherUsers.length > 0}
+				<div class="flex flex-col gap-2">
+					{#if pendingUsers.length > 0}
+						<h2 class="font-display text-lg font-semibold text-ink">All users</h2>
+					{/if}
+					{@render usersTable(otherUsers)}
+				</div>
+			{/if}
+		</div>
 	{/if}
 </div>

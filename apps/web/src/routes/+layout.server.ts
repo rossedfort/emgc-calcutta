@@ -23,6 +23,7 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase }, co
 	// stale value here just affects what's displayed, not authorization.
 	let profile: UserProfile | null = null;
 	let notificationsSetupPending = false;
+	let pendingUserCount: number | null = null;
 	if (session) {
 		const { data } = await supabase
 			.from('users')
@@ -30,6 +31,20 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase }, co
 			.eq('id', session.user.id)
 			.single();
 		profile = (data as UserProfile) ?? null;
+
+		// Nav badge count (AppShell) for the "someone's waiting" signal Phase
+		// 12 adds — Admin/Owner only, mirroring how profile/isAdmin already
+		// gate other admin-only bits computed here. Relies on the same RLS
+		// policy /admin/users' own read already depends on ("admin/owner can
+		// read every users row"), just narrowed to a count.
+		const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
+		if (isAdmin) {
+			const { count } = await supabase
+				.from('users')
+				.select('*', { count: 'exact', head: true })
+				.eq('role', 'unassigned');
+			pendingUserCount = count ?? 0;
+		}
 
 		// Notification-prefs completeness (spec 4.7's opt-in step): no
 		// notification_prefs row exists at all yet (that route's own load/
@@ -67,6 +82,7 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase }, co
 		cookies: cookies.getAll(),
 		profile,
 		notificationsSetupPending,
+		pendingUserCount,
 		title: DEFAULT_TITLE,
 		description: DEFAULT_DESCRIPTION
 	};
