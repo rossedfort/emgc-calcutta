@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
+	import { onMount } from 'svelte';
 	import type {
 		Database,
 		ErrorResponse,
@@ -49,6 +50,17 @@
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
+
+	// Stays false through this component's first render, then flips once and
+	// for all — used so a player's reels only spin in from zero when their
+	// first-ever bid arrives live (a real "no bid" -> "has a bid" transition
+	// witnessed on an already-open board), not when the page simply loads on
+	// a player who already had a bid (that should snap straight to the
+	// current value, no animation).
+	let pastInitialLoad = $state(false);
+	onMount(() => {
+		pastInitialLoad = true;
+	});
 
 	let searchQuery = $state('');
 	let statusFilters = $state<string[]>([]);
@@ -202,14 +214,17 @@
 								<span class="inline-flex">
 									{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}
 										{#if isDigit}
-											<SlotMachineDigit digit={char} delayMs={key * 60} />
+											<SlotMachineDigit digit={char} delayMs={key * 60} spinIn={pastInitialLoad} />
 										{:else}
-											<span class="inline-block">{char}</span>
+											<span
+												class="inline-block text-center align-bottom"
+												style="height: 1.2em; width: 0.62em; line-height: 1.2em;">{char}</span
+											>
 										{/if}
 									{/each}
 								</span>
 							{:else}
-								No bids yet
+								-
 							{/if}
 						</Table.Cell>
 						<Table.Cell>
