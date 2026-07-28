@@ -4,6 +4,15 @@
 -- 4.9). This link is not just a display indicator: per tournament, it's the
 -- entire definition of who's allowed to bid (spec 4.9), enforced by
 -- place-bid, not by this migration.
+--
+-- Squashed (Phase 10.7): originally also had contact_email/contact_phone
+-- columns, dropped in a later migration once self-service linking (Phase
+-- 10) gave every Player a way to get connected to a User without them —
+-- folded back into this original migration rather than left as a
+-- create-then-drop pair, matching this codebase's established squash
+-- precedent. contact_email's only functional use was CSV import's
+-- email-match auto-link, itself removed the same phase; contact_phone was
+-- never read anywhere outside of storage/display.
 create type player_status as enum ('open', 'reserved', 'sold_silent', 'sold_live', 'no_bid');
 
 create table public.players (
@@ -14,8 +23,6 @@ create table public.players (
   slug text not null default '',
   first_name text not null,
   last_name text not null,
-  contact_email text,
-  contact_phone text,
   preferences text,
   photo_url text,
   -- '' means "no flight assigned" — not null, since the per-flight
