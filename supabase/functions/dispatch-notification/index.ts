@@ -34,6 +34,7 @@ import { Resend } from "resend";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import { logAuditEvent } from "../_shared/audit.ts";
+import { sendNotificationEmail } from "../_shared/notify.ts";
 import type { Database } from "../_shared/database.ts";
 import type {
   DispatchNotificationRequest,
@@ -224,48 +225,20 @@ export default {
         body.amount,
       );
 
-      const { error: sendError } = await resend.emails.send({
-        from: Deno.env.get("RESEND_FROM_EMAIL")!,
+      const result = await sendNotificationEmail(resend, ctx.supabaseAdmin, {
         to: recipient.email,
         subject: email.subject,
         text: email.text,
-      });
-
-      if (sendError) {
-        await logAuditEvent(ctx.supabaseAdmin, {
+        audit: {
           tournament_id: body.tournamentId,
           player_id: body.playerId ?? null,
-          action: "notification_failed",
           entity_type: entityType,
           entity_id: entityId,
-          reason: sendError.message,
-          after: {
-            trigger: body.trigger,
-            subject: email.subject,
-            recipient: recipient.email,
-          },
-        });
-        return Response.json(
-          { sent: false } satisfies DispatchNotificationResponse,
-        );
-      }
-
-      await logAuditEvent(ctx.supabaseAdmin, {
-        tournament_id: body.tournamentId,
-        player_id: body.playerId ?? null,
-        action: "notification_sent",
-        entity_type: entityType,
-        entity_id: entityId,
-        after: {
-          trigger: body.trigger,
-          subject: email.subject,
-          recipient: recipient.email,
+          after: { trigger: body.trigger },
         },
       });
 
-      return Response.json(
-        { sent: true } satisfies DispatchNotificationResponse,
-      );
+      return Response.json(result satisfies DispatchNotificationResponse);
     },
   ),
 };
