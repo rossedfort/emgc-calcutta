@@ -6,5 +6,6 @@ export interface UserRow {
 	last_name: string | null;
 	email: string;
 	role: Role;
+	rejected_at: string | null;
 	created_at: string;
 }

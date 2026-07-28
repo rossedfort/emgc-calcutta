@@ -41,23 +41,38 @@
 	// Split rather than just sorted to the top, so an Admin working the list
 	// sees "someone's waiting" as its own labeled section instead of having
 	// to notice an unassigned badge mixed into the rest of the table.
-	let pendingUsers = $derived(filteredUsers.filter((user) => user.role === 'unassigned'));
+	// Rejected users are unassigned too but split into their own section —
+	// they've already been dealt with, so they'd be dead weight cluttering
+	// the actionable Pending approval list otherwise.
+	let pendingUsers = $derived(
+		filteredUsers.filter((user) => user.role === 'unassigned' && !user.rejected_at)
+	);
+	let rejectedUsers = $derived(
+		filteredUsers.filter((user) => user.role === 'unassigned' && !!user.rejected_at)
+	);
 	let otherUsers = $derived(filteredUsers.filter((user) => user.role !== 'unassigned'));
+
+	type UserAction =
+		{ label: string; role: Role } | { label: string; action: 'reject' | 'unreject' };
 
 	// Mirrors the authorization rules enforced server-side in the
 	// update-user-role Edge Function — this only controls which buttons are
 	// shown, the function is the actual source of truth.
-	function actionsFor(row: UserRow): { label: string; role: Role }[] {
+	function actionsFor(row: UserRow): UserAction[] {
 		if (row.id === viewerId || row.role === 'owner') {
 			return [];
 		}
 		if (row.role === 'unassigned') {
-			return [{ label: 'Make participant', role: 'participant' }];
+			if (row.rejected_at) {
+				return [{ label: 'Un-reject', action: 'unreject' }];
+			}
+			return [
+				{ label: 'Make participant', role: 'participant' },
+				{ label: 'Reject', action: 'reject' }
+			];
 		}
 		if (row.role === 'participant') {
-			const actions: { label: string; role: Role }[] = [
-				{ label: 'Remove participant', role: 'unassigned' }
-			];
+			const actions: UserAction[] = [{ label: 'Remove participant', role: 'unassigned' }];
 			if (viewerRole === 'owner') {
 				actions.push({ label: 'Make admin', role: 'admin' });
 			}
@@ -69,16 +84,16 @@
 		return [];
 	}
 
-	async function setRole(userId: string, role: Role) {
+	async function runAction(userId: string, action: UserAction) {
 		pendingId = userId;
 		errorMessage = '';
 
-		const { error } = await supabase.functions.invoke('update-user-role', {
-			body: { userId, role }
-		});
+		const body =
+			'role' in action ? { userId, role: action.role } : { userId, action: action.action };
+		const { error } = await supabase.functions.invoke('update-user-role', { body });
 
 		if (error) {
-			errorMessage = 'Failed to update role';
+			errorMessage = 'Failed to update user';
 			if (error instanceof FunctionsHttpError) {
 				const body = await error.context.json().catch(() => null);
 				if (body?.error) errorMessage = body.error;
@@ -124,7 +139,11 @@
 						<Table.Cell>{user.email}</Table.Cell>
 						<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
 						<Table.Cell>
-							<Badge variant={roleBadgeVariant(user.role)}>{user.role}</Badge>
+							{#if user.role === 'unassigned' && user.rejected_at}
+								<Badge variant="destructive">Rejected</Badge>
+							{:else}
+								<Badge variant={roleBadgeVariant(user.role)}>{user.role}</Badge>
+							{/if}
 							{#if user.id === viewerId}
 								<span class="text-xs text-muted-foreground">(you)</span>
 							{/if}
@@ -136,7 +155,7 @@
 										variant="brass"
 										size="sm"
 										disabled={pendingId === user.id}
-										onclick={() => setRole(user.id, action.role)}
+										onclick={() => runAction(user.id, action)}
 									>
 										{action.label}
 									</Button>
@@ -162,9 +181,18 @@
 					{@render usersTable(pendingUsers)}
 				</div>
 			{/if}
+			{#if rejectedUsers.length > 0}
+				<div class="flex flex-col gap-2">
+					<div class="flex items-center gap-2">
+						<h2 class="font-display text-lg font-semibold text-ink">Rejected</h2>
+						<Badge variant="outline">{rejectedUsers.length}</Badge>
+					</div>
+					{@render usersTable(rejectedUsers)}
+				</div>
+			{/if}
 			{#if otherUsers.length > 0}
 				<div class="flex flex-col gap-2">
-					{#if pendingUsers.length > 0}
+					{#if pendingUsers.length > 0 || rejectedUsers.length > 0}
 						<h2 class="font-display text-lg font-semibold text-ink">All users</h2>
 					{/if}
 					{@render usersTable(otherUsers)}
