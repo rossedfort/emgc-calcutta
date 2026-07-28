@@ -18,6 +18,14 @@ export type PlayerProfile = Pick<
 	| 'user_id'
 >;
 
+export interface BidHistoryRow {
+	id: string;
+	amount: number;
+	phase: 'silent' | 'live';
+	placed_at: string;
+	voided_at: string | null;
+}
+
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
 	if (!session) {
 		redirect(303, '/login');
@@ -68,10 +76,23 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		linkedUserName = data ? (formatUserName(data) ?? data.email) : null;
 	}
 
+	// Deliberately no bidder identity here (confirmed with the user) — the
+	// same anonymity the silent/live auction boards already apply to other
+	// participants applies to this history too, amount and timing only.
+	const { data: bids, error: bidsError } = await supabase
+		.from('bids')
+		.select('id, amount, phase, placed_at, voided_at')
+		.eq('player_id', player.id)
+		.order('placed_at', { ascending: false });
+	if (bidsError) {
+		error(500, bidsError.message);
+	}
+
 	return {
 		tournament,
 		player: player as PlayerProfile,
 		linkedUserName,
+		bids: (bids as BidHistoryRow[] | null) ?? [],
 		isYou: player.user_id === session.user.id,
 		title: `${formatPlayerName(player)} · ${tournament.name} · EMGC Bet`,
 		description: `Player profile and bidding status for ${formatPlayerName(player)} in ${tournament.name}.`
