@@ -7,8 +7,12 @@
 // server-side call — vacate A's spot, then assign B — rather than
 // requiring the caller to sequence two separate requests around a
 // transient uniqueness conflict.
+// entryId (Phase 11, renamed from playerId): a player_entries.id — a
+// placement/payout belongs to one specific division's sellable unit, not
+// the golfer's identity row directly (the same distinction place-bid's
+// entryId makes).
 export interface SetPlacementEntry {
-  playerId: string;
+  entryId: string;
   placement: number;
 }
 
@@ -18,7 +22,7 @@ export interface SetPlacementRequest {
 }
 
 export interface SetPlacementResultEntry {
-  playerId: string;
+  entryId: string;
   placement: number;
   payout: {
     id: string;
@@ -30,8 +34,8 @@ export interface SetPlacementResultEntry {
 
 export interface SetPlacementResponse {
   results: SetPlacementResultEntry[];
-  // playerIds whose placement was cleared because their old spot isn't
+  // entryIds whose placement was cleared because their old spot isn't
   // held by them in this submission (either vacated entirely or handed
-  // to a different player).
+  // to a different entry).
   cleared: string[];
 }

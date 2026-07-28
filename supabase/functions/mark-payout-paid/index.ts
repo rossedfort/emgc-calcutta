@@ -5,8 +5,8 @@
 // recording only, never touches money, never calls a payment API (spec
 // 2, Non-Goals).
 //
-// Payout-scoped (keyed by payoutId, not playerId): unlike
-// buyerMarkedPaidAt/By (which live on Player), markedPaidAt/By live
+// Payout-scoped (keyed by payoutId, not entryId): unlike
+// buyerMarkedPaidAt/By (which live on PlayerEntry), markedPaidAt/By live
 // directly on Payout per spec 5's data model — there's no analogous
 // "wrong table" trap here since Payout is the only place this field
 // exists.
@@ -51,10 +51,15 @@ export default {
         });
       }
 
+      // player_entries(player_id) resolves the golfer's own identity row
+      // for the audit event below (Phase 11) — payouts.entry_id points at
+      // the sellable unit, not the golfer, and audit_events.player_id is
+      // meant to always resolve to the golfer regardless of which entry
+      // an event concerns.
       const { data: payout, error: payoutError } = await ctx.supabaseAdmin
         .from("payouts")
         .select(
-          "id, tournament_id, player_id, bidder_id, placement, amount, marked_paid_at",
+          "id, tournament_id, entry_id, bidder_id, placement, amount, marked_paid_at, player_entries(player_id)",
         )
         .eq("id", body.payoutId)
         .maybeSingle();
@@ -93,7 +98,8 @@ export default {
       const { ip, user_agent } = requestMetadata(req);
       await logAuditEvent(ctx.supabaseAdmin, {
         tournament_id: payout.tournament_id,
-        player_id: payout.player_id,
+        player_id: payout.player_entries?.player_id ?? null,
+        entry_id: payout.entry_id,
         actor_id: ctx.userClaims!.id,
         actor_identity: ctx.userClaims?.email ?? null,
         action: "payout_marked_paid",
