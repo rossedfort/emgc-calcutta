@@ -132,12 +132,29 @@ function buildEmail(
         }),
       };
     }
-    case "reserved":
+    case "reserved": {
+      const subject = `${playerName} has been reserved for the live auction`;
+      const text =
+        `${playerName}'s silent-auction bidding crossed the reserve threshold in ${tournamentName} — they'll go to the live auction instead of closing silently.`;
       return {
-        subject: `${playerName} has been reserved for the live auction`,
-        text:
-          `${playerName}'s silent-auction bidding crossed the reserve threshold in ${tournamentName} — they'll go to the live auction instead of closing silently.`,
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            playerSlug
+              ? emailButton(
+                "View the auction",
+                playerUrl(tournamentSlug, playerSlug),
+              )
+              : "",
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
       };
+    }
     case "live_starting":
       return {
         subject: `The live auction for ${tournamentName} is starting`,
