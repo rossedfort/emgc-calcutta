@@ -2,10 +2,26 @@
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { formatPlayerName, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
 
 	let { data } = $props();
+
+	function formatCurrency(amount: number): string {
+		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+	}
+
+	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+		month: 'short',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit'
+	});
+
+	function formatDateTime(iso: string): string {
+		return dateTimeFormatter.format(new Date(iso));
+	}
 </script>
 
 <div class="flex flex-col gap-4">
@@ -48,9 +64,34 @@
 
 		<div class="mt-4 border-t border-brass/40"></div>
 
-		<div class="mt-4 flex flex-col gap-1">
+		<div class="mt-4 flex flex-col gap-2">
 			<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Bid history</p>
-			<p class="text-sm text-ink/70">No bids placed yet.</p>
+			{#if data.bids.length === 0}
+				<p class="text-sm text-ink/70">No bids placed yet.</p>
+			{:else}
+				<Table.Root>
+					<Table.Header>
+						<Table.Row>
+							<Table.Head>Amount</Table.Head>
+							<Table.Head>Placed</Table.Head>
+							<Table.Head>Status</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each data.bids as bid (bid.id)}
+							<Table.Row>
+								<Table.Cell class="font-data">{formatCurrency(bid.amount)}</Table.Cell>
+								<Table.Cell class="font-data">{formatDateTime(bid.placed_at)}</Table.Cell>
+								<Table.Cell>
+									{#if bid.voided_at}
+										<Badge variant="flag">Voided</Badge>
+									{/if}
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			{/if}
 		</div>
 	</div>
 </div>
