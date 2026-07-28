@@ -20,12 +20,12 @@
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
 
-	async function markBidPaid(playerId: string) {
-		pendingBidId = playerId;
+	async function markBidPaid(entryId: string) {
+		pendingBidId = entryId;
 		errorMessage = '';
 
 		const { error } = await supabase.functions.invoke('mark-bid-paid', {
-			body: { playerId }
+			body: { entryId }
 		});
 
 		if (error) {
