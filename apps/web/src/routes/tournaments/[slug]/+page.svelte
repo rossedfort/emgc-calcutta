@@ -57,21 +57,6 @@
 	let countdownText = $derived(phase.countdownTo ? formatCountdown(phase.countdownTo, now) : null);
 
 	let isLinkedToYou = $derived(players.some((p) => p.user_id === data.currentUserId));
-	// A Championship-flight golfer is two independent Player rows (Gross and
-	// Net) — deduped here to one dropdown entry per golfer, keeping whichever
-	// row comes first, since link_self_to_player already links the sibling
-	// row automatically once either one is picked (see its migration).
-	let unlinkedPlayers = $derived(
-		players
-			.filter((p) => p.user_id === null)
-			.filter(
-				(p, i, all) =>
-					all.findIndex(
-						(q) =>
-							q.flight === p.flight && q.first_name === p.first_name && q.last_name === p.last_name
-					) === i
-			)
-	);
 </script>
 
 <div class="flex flex-col gap-4">
@@ -100,7 +85,7 @@
 	</div>
 
 	{#if !isLinkedToYou}
-		<SelfLinkModal {unlinkedPlayers} />
+		<SelfLinkModal unlinkedPlayers={data.unlinkedPlayers} />
 	{/if}
 
 	{#if phase.phase === 'silent'}

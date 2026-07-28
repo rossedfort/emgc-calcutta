@@ -1,17 +1,26 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import type { Enums } from '@emgc-calcutta/shared-types';
+import type { Enums, Tables } from '@emgc-calcutta/shared-types';
 import type { Actions, PageServerLoad } from './$types';
+
+// One row per unlinked golfer (Phase 11) — queried directly off `players`
+// rather than derived from the entry-scoped FieldPlayerRow list below, so a
+// Championship golfer naturally appears once, not twice: no dedup step
+// needed at all now that identity and entries are separate tables (unlike
+// the sibling-dedup-by-name filter this replaces, back when a Championship
+// golfer was two independent `players` rows).
+export type UnlinkedPlayer = Pick<
+	Tables<'players'>,
+	'id' | 'first_name' | 'last_name' | 'handicap_index'
+>;
 
 // One row per player_entries row (Phase 11) — a Championship golfer
 // appears twice, once per division, since bidding/auction UI is inherently
 // per-sellable-unit. `id` is the entry's own id (player_entries.id) — what
 // place-bid targets and what the Svelte `#each` keys on, since a golfer's
-// two entries must never collide. `playerId` (players.id, the golfer's own
-// identity row) is carried separately for SelfLinkModal, which links a
-// whole golfer, not one specific entry.
+// two entries must never collide. Self-linking targets the golfer's own
+// identity row instead, sourced separately via UnlinkedPlayer above.
 export type FieldPlayerRow = {
 	id: string;
-	playerId: string;
 	slug: string;
 	first_name: string;
 	last_name: string;
@@ -66,7 +75,6 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 				? [
 						{
 							id: entry.id,
-							playerId: entry.players.id,
 							slug: entry.players.slug,
 							first_name: entry.players.first_name,
 							last_name: entry.players.last_name,
@@ -83,9 +91,21 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 			(a, b) => a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name)
 		);
 
+	const { data: unlinkedPlayers, error: unlinkedPlayersError } = await supabase
+		.from('players')
+		.select('id, first_name, last_name, handicap_index')
+		.eq('tournament_id', tournament.id)
+		.is('user_id', null)
+		.order('first_name')
+		.order('last_name');
+	if (unlinkedPlayersError) {
+		error(500, unlinkedPlayersError.message);
+	}
+
 	return {
 		tournament,
 		players,
+		unlinkedPlayers: unlinkedPlayers ?? [],
 		currentUserId: session.user.id,
 		title: `${tournament.name} · EMGC Bet`,
 		description: `Browse the field and bid in the ${tournament.name} auction.`

@@ -1,5 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import type { Tables } from '@emgc-calcutta/shared-types';
+import type { Enums, Tables } from '@emgc-calcutta/shared-types';
 import { formatPlayerName } from '$lib/players';
 import type { Actions, PageServerLoad } from './$types';
 import { parsePlayerForm } from '../../shared';
@@ -13,9 +13,18 @@ export type Player = Pick<
 	| 'preferences'
 	| 'flight'
 	| 'handicap_index'
-	| 'status'
 	| 'user_id'
 >;
+
+// A golfer has one or two entries (Phase 11) — the single "Status" line
+// this page used to show (back when a Player row was itself the sellable
+// entry) becomes one line per entry instead, so a Championship golfer's
+// independent Gross/Net statuses ("Gross: Open", "Net: Reserved") both
+// display correctly rather than picking just one arbitrarily.
+export interface PlayerEntryStatus {
+	division: string;
+	status: Enums<'player_status'>;
+}
 
 export interface UserOption {
 	id: string;
@@ -29,7 +38,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 
 	const { data: player, error: playerError } = await supabase
 		.from('players')
-		.select('id, slug, first_name, last_name, preferences, flight, handicap_index, status, user_id')
+		.select('id, slug, first_name, last_name, preferences, flight, handicap_index, user_id')
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
 		.maybeSingle();
@@ -38,6 +47,15 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 	}
 	if (!player) {
 		error(404, 'Player not found');
+	}
+
+	const { data: entries, error: entriesError } = await supabase
+		.from('player_entries')
+		.select('division, status')
+		.eq('player_id', player.id)
+		.order('division');
+	if (entriesError) {
+		error(500, entriesError.message);
 	}
 
 	let linkedUser: UserOption | null = null;
@@ -71,6 +89,7 @@ export const load: PageServerLoad = async ({ params, parent, locals: { supabase 
 	return {
 		tournament,
 		player: player as Player,
+		entries: (entries as PlayerEntryStatus[] | null) ?? [],
 		linkedUser,
 		users: ((users as UserOption[] | null) ?? []).filter((user) => !takenUserIds.has(user.id)),
 		title: `Edit ${formatPlayerName(player)} · ${tournament.name} · EMGC Bet`,
@@ -97,7 +116,7 @@ export const actions: Actions = {
 
 		const { data: player } = await supabase
 			.from('players')
-			.select('id, flight, division, first_name, last_name')
+			.select('id')
 			.eq('tournament_id', tournament.id)
 			.eq('slug', params.playerSlug)
 			.maybeSingle();
@@ -105,6 +124,9 @@ export const actions: Actions = {
 			return fail(404, { error: 'Player not found' });
 		}
 
+		// A golfer is one players row now (Phase 11) — no sibling row to link
+		// in step, unlike before the split when a Championship golfer was two
+		// independent rows with no shared identity to join on.
 		const { error: updateError } = await supabase
 			.from('players')
 			.update({ user_id: userId })
@@ -118,27 +140,6 @@ export const actions: Actions = {
 					? 'That participant is already linked to another player in this tournament.'
 					: updateError.message;
 			return fail(400, { error: message });
-		}
-
-		// A Championship-flight golfer is two independent rows (Gross/Net,
-		// same tournament/flight/first_name/last_name, different division —
-		// there's no shared "golfer id" to join on). Link the sibling too,
-		// matching how CSV import used to link both at once before
-		// self-service linking replaced that email-match auto-link (see
-		// link_self_to_player's own migration for the same reasoning).
-		// Filtered to a still-unlinked sibling so this never steals a link
-		// from someone else; a no-match here is a silent no-op, not an
-		// error, since the primary link above already succeeded.
-		if (player.division === 'gross' || player.division === 'net') {
-			await supabase
-				.from('players')
-				.update({ user_id: userId })
-				.eq('tournament_id', tournament.id)
-				.eq('flight', player.flight)
-				.eq('first_name', player.first_name)
-				.eq('last_name', player.last_name)
-				.eq('division', player.division === 'gross' ? 'net' : 'gross')
-				.is('user_id', null);
 		}
 	},
 
@@ -154,7 +155,7 @@ export const actions: Actions = {
 
 		const { data: player } = await supabase
 			.from('players')
-			.select('id, flight, division, first_name, last_name, user_id')
+			.select('id')
 			.eq('tournament_id', tournament.id)
 			.eq('slug', params.playerSlug)
 			.maybeSingle();
@@ -162,29 +163,14 @@ export const actions: Actions = {
 			return fail(404, { error: 'Player not found' });
 		}
 
+		// A golfer is one players row now (Phase 11) — no sibling row to
+		// unlink in step, unlike before the split.
 		const { error: updateError } = await supabase
 			.from('players')
 			.update({ user_id: null })
 			.eq('id', player.id);
 		if (updateError) {
 			return fail(400, { error: updateError.message });
-		}
-
-		// Symmetric with the link action above: leaving the sibling still
-		// linked would recreate the same one-golfer-two-owners
-		// inconsistency. Only touches the sibling if it's linked to the
-		// *same* user that was just unlinked here — never unlinks someone
-		// else's link just because it shares a name/flight.
-		if ((player.division === 'gross' || player.division === 'net') && player.user_id) {
-			await supabase
-				.from('players')
-				.update({ user_id: null })
-				.eq('tournament_id', tournament.id)
-				.eq('flight', player.flight)
-				.eq('first_name', player.first_name)
-				.eq('last_name', player.last_name)
-				.eq('division', player.division === 'gross' ? 'net' : 'gross')
-				.eq('user_id', player.user_id);
 		}
 	},
 

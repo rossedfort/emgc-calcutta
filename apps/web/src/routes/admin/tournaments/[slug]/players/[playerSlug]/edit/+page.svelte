@@ -2,8 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { formatPlayerName } from '$lib/players';
+	import { formatPlayerName, playerStatusLabel } from '$lib/players';
 	import { formatUserName } from '$lib/profile';
 	import PlayerForm from '../../PlayerForm.svelte';
 	import type { PlayerFormValues } from '../../shared';
@@ -52,7 +53,16 @@
 
 	<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
 		<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Status</p>
-		<p class="font-data mt-1 text-sm">{data.player.status}</p>
+		<!-- One line per entry (Phase 11) — a Championship golfer has two
+		     independent entries (Gross/Net), each with its own status. -->
+		<div class="mt-1 flex flex-col gap-1">
+			{#each data.entries as entry (entry.division)}
+				<p class="font-data flex items-center gap-2 text-sm">
+					{#if entry.division !== 'overall'}<DivisionBadge division={entry.division} />{/if}
+					{playerStatusLabel(entry.status)}
+				</p>
+			{/each}
+		</div>
 
 		<div class="mt-4 border-t border-brass/40"></div>
 

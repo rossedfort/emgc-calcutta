@@ -4,9 +4,9 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
-	import type { FieldPlayerRow } from './+page.server';
+	import type { UnlinkedPlayer } from './+page.server';
 
-	let { unlinkedPlayers }: { unlinkedPlayers: FieldPlayerRow[] } = $props();
+	let { unlinkedPlayers }: { unlinkedPlayers: UnlinkedPlayer[] } = $props();
 
 	let submitting = $state(false);
 	let errorMessage = $state('');
@@ -61,7 +61,7 @@
 				>
 					<option value="" disabled selected>Choose your name</option>
 					{#each unlinkedPlayers as player (player.id)}
-						<option value={player.playerId}
+						<option value={player.id}
 							>{formatPlayerName(player)} - {formatHandicapIndex(player.handicap_index)}</option
 						>
 					{/each}
