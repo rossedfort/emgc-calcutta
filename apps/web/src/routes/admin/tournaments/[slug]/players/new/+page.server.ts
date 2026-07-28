@@ -20,7 +20,7 @@ export const actions: Actions = {
 
 		const { data: tournament } = await supabase
 			.from('tournaments')
-			.select('id')
+			.select('id, championship_flight')
 			.eq('slug', params.slug)
 			.maybeSingle();
 		if (!tournament) {
@@ -30,9 +30,19 @@ export const actions: Actions = {
 			});
 		}
 
-		const { error: insertError } = await supabase
-			.from('players')
-			.insert({ tournament_id: tournament.id, ...data });
+		// A Championship-flight player is auctioned twice (Gross + Net) — same
+		// rule CSV import applies in import-csv-confirm's flatMap. Division
+		// isn't a form field; it's always derived from flight vs. the
+		// tournament's configured championship_flight.
+		const insertRows =
+			tournament.championship_flight && data.flight === tournament.championship_flight
+				? [
+						{ tournament_id: tournament.id, ...data, division: 'gross' },
+						{ tournament_id: tournament.id, ...data, division: 'net' }
+					]
+				: [{ tournament_id: tournament.id, ...data, division: 'overall' }];
+
+		const { error: insertError } = await supabase.from('players').insert(insertRows);
 		if (insertError) {
 			return fail(400, {
 				errors: { form: insertError.message },
