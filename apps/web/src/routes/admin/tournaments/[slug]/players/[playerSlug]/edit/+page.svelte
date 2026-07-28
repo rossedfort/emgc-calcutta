@@ -15,8 +15,6 @@
 	let defaultValues = $derived<PlayerFormValues>({
 		first_name: data.player.first_name,
 		last_name: data.player.last_name,
-		contact_email: data.player.contact_email ?? '',
-		contact_phone: data.player.contact_phone ?? '',
 		flight: data.player.flight,
 		handicap_index: data.player.handicap_index !== null ? String(data.player.handicap_index) : '',
 		preferences: data.player.preferences ?? ''

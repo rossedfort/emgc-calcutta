@@ -325,8 +325,6 @@ export type Database = {
         Row: {
           buyer_marked_paid_at: string | null;
           buyer_marked_paid_by: string | null;
-          contact_email: string | null;
-          contact_phone: string | null;
           created_at: string;
           division: string;
           first_name: string;
@@ -346,8 +344,6 @@ export type Database = {
         Insert: {
           buyer_marked_paid_at?: string | null;
           buyer_marked_paid_by?: string | null;
-          contact_email?: string | null;
-          contact_phone?: string | null;
           created_at?: string;
           division?: string;
           first_name: string;
@@ -367,8 +363,6 @@ export type Database = {
         Update: {
           buyer_marked_paid_at?: string | null;
           buyer_marked_paid_by?: string | null;
-          contact_email?: string | null;
-          contact_phone?: string | null;
           created_at?: string;
           division?: string;
           first_name?: string;
@@ -525,6 +519,10 @@ export type Database = {
         Args: { p_player_id: string; p_tournament_id: string };
         Returns: undefined;
       };
+      link_self_to_player: {
+        Args: { p_player_id: string };
+        Returns: undefined;
+      };
       log_audit_event: {
         Args: {
           p_action: string;
@@ -549,6 +547,10 @@ export type Database = {
       };
       swap_queue_position: {
         Args: { lot_a: string; lot_b: string };
+        Returns: undefined;
+      };
+      unlink_self_from_player: {
+        Args: { p_player_id: string };
         Returns: undefined;
       };
     };

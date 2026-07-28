@@ -33,17 +33,6 @@
 
 	<div class="grid grid-cols-2 gap-4">
 		<div class="flex flex-col gap-1.5">
-			<Label for="contact_email">Contact email</Label>
-			<Input id="contact_email" name="contact_email" type="email" value={values.contact_email} />
-		</div>
-		<div class="flex flex-col gap-1.5">
-			<Label for="contact_phone">Contact phone</Label>
-			<Input id="contact_phone" name="contact_phone" value={values.contact_phone} />
-		</div>
-	</div>
-
-	<div class="grid grid-cols-2 gap-4">
-		<div class="flex flex-col gap-1.5">
 			<Label for="flight">Flight</Label>
 			<Input id="flight" name="flight" class="max-w-40" value={values.flight} />
 		</div>

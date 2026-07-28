@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Button } from '$lib/components/ui/button';
+	import { tournamentPhase } from '$lib/tournamentPhase';
+	import OnboardingModal from './OnboardingModal.svelte';
 
 	let { data } = $props();
 	let { tournaments } = $derived(data);
@@ -20,36 +22,19 @@
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US')}`;
 	}
-
-	type AuctionState = { label: string; live: boolean };
-
-	function auctionState(t: (typeof tournaments)[number]): AuctionState {
-		const now = new Date();
-		const start = new Date(t.silent_auction_start);
-		const end = new Date(t.silent_auction_end);
-
-		if (t.status === 'complete') {
-			return { label: 'Complete', live: false };
-		}
-		if (now < start) {
-			return {
-				label: `Silent auction opens ${new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' }).format(start)}`,
-				live: false
-			};
-		}
-		if (now <= end) {
-			return {
-				label: `Silent auction open — closes ${new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' }).format(end)}`,
-				live: true
-			};
-		}
-		return { label: 'Silent auction closed — awaiting live auction', live: false };
-	}
 </script>
+
+{#if data.profile}
+	<OnboardingModal
+		profile={data.profile}
+		notificationsSetupPending={data.notificationsSetupPending}
+	/>
+{/if}
 
 <div class="flex flex-col gap-6">
 	{#each tournaments as tournament (tournament.id)}
-		{@const state = auctionState(tournament)}
+		{@const phase = tournamentPhase(tournament, new Date())}
+		{@const isActive = phase.phase === 'silent' || phase.phase === 'live'}
 		<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink shadow-sm">
 			<p class="font-data text-xs tracking-widest text-fairway uppercase">EMGC &middot; Bet</p>
 
@@ -65,10 +50,9 @@
 			<div class="mt-4 border-t border-brass/40"></div>
 
 			<div class="mt-4 flex items-center gap-2 text-sm">
-				<span
-					class={['inline-block size-2 rounded-full', state.live ? 'bg-fairway' : 'bg-brass/60']}
+				<span class={['inline-block size-2 rounded-full', isActive ? 'bg-fairway' : 'bg-brass/60']}
 				></span>
-				<span>{state.label}</span>
+				<span>{phase.label}</span>
 			</div>
 
 			<div
@@ -98,16 +82,11 @@
 
 			<div class="mt-6 flex items-center gap-2">
 				<Button
-					href={resolve('/tournaments/[slug]/auction/silent', { slug: tournament.slug })}
-					variant="fairway">Silent auction</Button
+					href={resolve('/tournaments/[slug]', { slug: tournament.slug })}
+					variant={isActive ? 'fairway' : 'brass'}
 				>
-				<Button
-					href={resolve('/tournaments/[slug]/auction/live', { slug: tournament.slug })}
-					variant="brass">Live auction</Button
-				>
-				<Button href={resolve('/tournaments/[slug]', { slug: tournament.slug })} variant="brass"
-					>View the field</Button
-				>
+					{isActive ? 'Join Auction' : 'View the field'}
+				</Button>
 				{#if isAdmin}
 					<Button
 						href={resolve('/admin/tournaments/[slug]', { slug: tournament.slug })}

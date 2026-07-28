@@ -1,7 +1,9 @@
-// Parses an Admin-uploaded player CSV for a specific tournament, validates
-// each row, and auto-matches contact_email against public.users.email —
-// this is the preview step (spec 4.2): nothing is written here, that's
-// import-csv-confirm's job once the Admin reviews and confirms this payload.
+// Parses an Admin-uploaded player CSV for a specific tournament and
+// validates each row — this is the preview step (spec 4.2): nothing is
+// written here, that's import-csv-confirm's job once the Admin reviews and
+// confirms this payload. No longer auto-matches against public.users —
+// self-service linking (Phase 10) is now the only way a Player gets
+// connected to a User; a CSV-imported player always starts unlinked.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import Papa from "papaparse";
@@ -31,12 +33,6 @@ const HEADER_ALIASES: Record<string, string> = {
   "last name": "last_name",
   "lastname": "last_name",
   "Last Name": "last_name",
-  "contact_email": "contact_email",
-  "email": "contact_email",
-  "contact_phone": "contact_phone",
-  "phone": "contact_phone",
-  "phone number": "contact_phone",
-  "Phone Number": "contact_phone",
   "flight": "flight",
   "handicap": "handicap_index",
   "handicap_index": "handicap_index",
@@ -141,26 +137,6 @@ export default {
         return value;
       };
 
-      const emails = parsed.data
-        .map((row: Record<string, string>) =>
-          getField(row, "contact_email")?.toLowerCase()
-        )
-        .filter((email: string | undefined): email is string => !!email);
-
-      const { data: matchingUsers, error: usersError } = emails.length > 0
-        ? await ctx.supabaseAdmin.from("users").select("id, email").in(
-          "email",
-          emails,
-        )
-        : { data: [] as { id: string; email: string }[], error: null };
-      if (usersError) {
-        return Response.json({ error: usersError.message }, { status: 500 });
-      }
-
-      const usersByEmail = new Map(
-        (matchingUsers ?? []).map((u) => [u.email.toLowerCase(), u]),
-      );
-
       const rows: ImportCsvPreviewRow[] = parsed.data.map((
         row: Record<string, string>,
         index: number,
@@ -172,24 +148,15 @@ export default {
         if (!last_name) errors.push("Last name is required");
         const handicap_index = getHandicap(row, errors);
 
-        const contact_email = getField(row, "contact_email");
-        const matchedUser = contact_email
-          ? usersByEmail.get(contact_email.toLowerCase())
-          : undefined;
-
         return {
           rowNumber: index + 2, // header row + 1-indexing
           first_name,
           last_name,
-          contact_email,
-          contact_phone: getField(row, "contact_phone"),
           flight: getField(row, "flight"),
           handicap_index,
           preferences: getField(row, "preferences"),
           photo_url: getField(row, "photo_url"),
           errors,
-          matchedUserId: matchedUser?.id ?? null,
-          matchedUserEmail: matchedUser?.email ?? null,
         };
       });
 

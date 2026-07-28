@@ -15,8 +15,8 @@
 			? page.url.pathname === href
 			: page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
 		return current
-			? 'border-b-2 border-brass px-1 pb-2 text-sm font-medium text-ink'
-			: 'border-b-2 border-transparent px-1 pb-2 text-sm text-muted-foreground hover:text-ink';
+			? 'shrink-0 whitespace-nowrap border-b-2 border-brass px-1 pb-2 text-sm font-medium text-ink'
+			: 'shrink-0 whitespace-nowrap border-b-2 border-transparent px-1 pb-2 text-sm text-muted-foreground hover:text-ink';
 	}
 </script>
 
@@ -42,7 +42,7 @@
 		onSuccess={() => invalidateAll()}
 	/>
 
-	<nav class="flex gap-4 border-b border-brass/30">
+	<nav class="flex gap-4 overflow-x-auto border-b border-brass/30">
 		<a
 			href={resolve('/admin/tournaments/[slug]', { slug: data.tournament.slug })}
 			class={tabClass(resolve('/admin/tournaments/[slug]', { slug: data.tournament.slug }), true)}

@@ -1,81 +1,60 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import type {
+		Database,
 		ErrorResponse,
 		PlaceBidRequest,
 		PlaceBidResponse,
 		RealtimeBid,
-		RealtimeLiveLot,
-		RealtimePlayer
+		RealtimeLiveLot
 	} from '@emgc-calcutta/shared-types';
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
 	import { formatPlayerName } from '$lib/players';
-	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
+	import type { FieldPlayerRow } from './+page.server';
 
-	let { data } = $props();
-
-	let liveBids = $state<RealtimeBid[]>([]);
-	let livePlayers = $state<RealtimePlayer[]>([]);
-	let liveLots = $state<RealtimeLiveLot[]>([]);
-	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
-	// Ticks every second so the anti-snipe countdown stays live — same
-	// reasoning as the silent auction board's own ticking clock.
-	let now = $state(new Date());
-
-	onMount(() => {
-		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
-		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
-		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
-		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
-		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
-		const tick = setInterval(() => (now = new Date()), 1000);
-		return () => {
-			unsubBids();
-			unsubPlayers();
-			unsubLots();
-			unsubConnection();
-			rt.destroy();
-			clearInterval(tick);
-		};
-	});
-
-	// The Realtime store only carries id+status (see $lib/stores/realtime.ts)
-	// — it's meant to overlay onto the fuller SSR snapshot, not replace it.
-	let players = $derived(
-		data.players.map((player) => {
-			const live = livePlayers.find((p) => p.id === player.id);
-			return live ? { ...player, status: live.status as typeof player.status } : player;
-		})
-	);
+	let {
+		tournament,
+		players,
+		liveBids,
+		liveLots,
+		currentUserId,
+		supabase,
+		now
+	}: {
+		tournament: { slug: string; min_increment: number };
+		players: FieldPlayerRow[];
+		liveBids: RealtimeBid[];
+		liveLots: RealtimeLiveLot[];
+		currentUserId: string;
+		supabase: SupabaseClient<Database>;
+		now: Date;
+	} = $props();
 
 	// At most one lot should ever be opened-but-not-closed at a time — an
-	// application-level invariant the Admin's open/close controls (a later
-	// task) are responsible for maintaining, not something enforced here.
+	// application-level invariant the Admin's open/close controls are
+	// responsible for maintaining, not something enforced here.
 	let currentLot = $derived(
 		liveLots.find((lot) => lot.opened_at !== null && lot.closed_at === null) ?? null
 	);
 	let currentPlayer = $derived(
 		currentLot ? (players.find((p) => p.id === currentLot!.player_id) ?? null) : null
 	);
-	let isYou = $derived(currentPlayer?.user_id === data.currentUserId);
-	let high = $derived(currentLot ? currentHighBid(liveBids, currentLot.player_id) : null);
+	let isCurrentPlayerYou = $derived(currentPlayer?.user_id === currentUserId);
+	let currentLotHigh = $derived(currentLot ? currentHighBid(liveBids, currentLot.player_id) : null);
 
-	// The carousel strip below the current lot — every not-yet-opened lot,
-	// in queue order, so participants can see what's coming while the
-	// current player is being bid on. Skips a lot whose player can't be
-	// found the same way the queue admin screen does (can't happen today,
-	// player_id has no ON DELETE cascade — cheap insurance against a future
-	// inconsistency, not a real case).
-	let upcoming = $derived(
+	// The carousel strip below the current lot — every not-yet-opened lot, in
+	// queue order, so participants can see what's coming while the current
+	// player is being bid on. Skips a lot whose player can't be found the
+	// same way the queue admin screen does (can't happen today, player_id has
+	// no ON DELETE cascade — cheap insurance against a future inconsistency).
+	let upcomingLots = $derived(
 		liveLots
 			.filter((lot) => lot.opened_at === null)
 			.sort((a, b) => a.queue_position - b.queue_position)
@@ -96,12 +75,13 @@
 	}
 
 	function suggestedBid(): number {
-		return high ? high.amount + data.tournament.min_increment : data.tournament.min_increment;
+		return currentLotHigh
+			? currentLotHigh.amount + tournament.min_increment
+			: tournament.min_increment;
 	}
 
 	// The underlying <input type="number"> binds its value as a number (or
-	// '' when empty), not a string — see the silent auction board for the
-	// same note.
+	// '' when empty), not a string — see the silent board for the same note.
 	let bidAmount = $state<string | number>('');
 	let bidPending = $state(false);
 	let bidError = $state('');
@@ -118,10 +98,9 @@
 		bidPending = true;
 		bidError = '';
 
-		const { error: invokeError } = await data.supabase.functions.invoke<PlaceBidResponse>(
-			'place-bid',
-			{ body: { playerId: currentPlayer.id, amount } satisfies PlaceBidRequest }
-		);
+		const { error: invokeError } = await supabase.functions.invoke<PlaceBidResponse>('place-bid', {
+			body: { playerId: currentPlayer.id, amount } satisfies PlaceBidRequest
+		});
 
 		bidPending = false;
 
@@ -139,11 +118,7 @@
 	}
 </script>
 
-<div class="mx-auto flex max-w-3xl flex-col gap-4">
-	<PageHeader title="Live auction" eyebrow={data.tournament.name} />
-
-	<RealtimeStatusBanner status={connectionStatus} />
-
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-4">
 	{#if !currentLot || !currentPlayer}
 		<EmptyState
 			title="Waiting for the next lot"
@@ -156,7 +131,7 @@
 					<span class="flex items-center gap-2">
 						<a
 							href={resolve('/tournaments/[slug]/players/[playerSlug]', {
-								slug: data.tournament.slug,
+								slug: tournament.slug,
 								playerSlug: currentPlayer.slug
 							})}
 							class="font-display text-3xl font-semibold text-ink hover:underline"
@@ -176,7 +151,7 @@
 						</span>
 					{/if}
 				</div>
-				{#if isYou}
+				{#if isCurrentPlayerYou}
 					<Badge variant="brass">This is you</Badge>
 				{/if}
 			</div>
@@ -189,7 +164,7 @@
 						Current high
 					</span>
 					<span class="font-data text-lg text-ink sm:text-2xl">
-						{high ? formatCurrency(high.amount) : 'No bids yet'}
+						{currentLotHigh ? formatCurrency(currentLotHigh.amount) : 'No bids yet'}
 					</span>
 				</div>
 				<div class="flex flex-col gap-1 bg-scorecard p-3 sm:p-4">
@@ -234,7 +209,7 @@
 		</div>
 	{/if}
 
-	{#if upcoming.length > 0}
+	{#if upcomingLots.length > 0}
 		<div class="flex flex-col gap-2">
 			<p class="font-data text-xs tracking-widest text-fairway uppercase">Up next</p>
 			<!-- Bounded and scrollable rather than growing the page to fit the
@@ -243,13 +218,13 @@
 			     at once. -->
 			<div class="max-h-[32rem] overflow-y-auto">
 				<div class="flex flex-col gap-4">
-					{#each upcoming as { lot, player } (lot.id)}
+					{#each upcomingLots as { lot, player } (lot.id)}
 						<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-ink sm:p-8">
 							<div class="flex items-start justify-between gap-2">
 								<div class="flex flex-col gap-1">
 									<a
 										href={resolve('/tournaments/[slug]/players/[playerSlug]', {
-											slug: data.tournament.slug,
+											slug: tournament.slug,
 											playerSlug: player.slug
 										})}
 										class="font-display text-3xl font-semibold text-ink hover:underline"
@@ -267,7 +242,7 @@
 										</span>
 									{/if}
 								</div>
-								{#if player.user_id === data.currentUserId}
+								{#if player.user_id === currentUserId}
 									<Badge variant="brass">This is you</Badge>
 								{/if}
 							</div>

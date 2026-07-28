@@ -1,8 +1,6 @@
 export interface PlayerFormValues {
 	first_name: string;
 	last_name: string;
-	contact_email: string;
-	contact_phone: string;
 	flight: string;
 	handicap_index: string;
 	preferences: string;
@@ -11,8 +9,6 @@ export interface PlayerFormValues {
 export interface ParsedPlayer {
 	first_name: string;
 	last_name: string;
-	contact_email: string | null;
-	contact_phone: string | null;
 	flight: string;
 	handicap_index: number | null;
 	preferences: string | null;
@@ -54,8 +50,6 @@ export function parsePlayerForm(formData: FormData): {
 		data: {
 			first_name,
 			last_name,
-			contact_email: String(formData.get('contact_email') ?? '').trim() || null,
-			contact_phone: String(formData.get('contact_phone') ?? '').trim() || null,
 			flight: String(formData.get('flight') ?? '').trim(),
 			handicap_index,
 			preferences: String(formData.get('preferences') ?? '').trim() || null

@@ -1,43 +1,39 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { RealtimeBid, RealtimePlayer } from '@emgc-calcutta/shared-types';
-	import { resolve } from '$app/paths';
-	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
-	import EmptyState from '$lib/components/EmptyState.svelte';
-	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import type { RealtimeBid, RealtimeLiveLot, RealtimePlayer } from '@emgc-calcutta/shared-types';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
-	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { currentHighBid } from '$lib/bids';
-	import { PLAYER_STATUSES, formatPlayerName, playerStatusLabel } from '$lib/players';
-	import { groupPlayersByFlight } from '$lib/flightGroups';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
-	import { formatCountdown, formatRelativeTime } from '$lib/time';
+	import { formatCountdown } from '$lib/time';
 	import { tournamentPhase } from '$lib/tournamentPhase';
+	import LiveAuctionBoard from './LiveAuctionBoard.svelte';
+	import SelfLinkModal from './SelfLinkModal.svelte';
+	import SilentAuctionBoard from './SilentAuctionBoard.svelte';
+	import TournamentRoster from './TournamentRoster.svelte';
 
 	let { data } = $props();
 
 	let liveBids = $state<RealtimeBid[]>([]);
 	let livePlayers = $state<RealtimePlayer[]>([]);
+	let liveLots = $state<RealtimeLiveLot[]>([]);
 	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
-	// Ticks every second so the phase banner, its countdown, and every row's
-	// "time since last bid" all stay live — none of those are otherwise a
-	// tracked reactive dependency, same reasoning as /auction/silent's own
-	// ticking clock.
+	// Ticks every second so the phase banner/countdown and whichever child
+	// board is active (the silent board's bid forms, the live board's
+	// anti-snipe countdown, the roster's "time since last bid") all stay
+	// live — none of those are otherwise a tracked reactive dependency.
 	let now = $state(new Date());
 
 	onMount(() => {
 		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
 		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
+		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
 		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubPlayers();
+			unsubLots();
 			unsubConnection();
 			rt.destroy();
 			clearInterval(tick);
@@ -45,8 +41,7 @@
 	});
 
 	// The Realtime store only carries id+status (see $lib/stores/realtime.ts)
-	// — it's meant to overlay onto the fuller SSR snapshot, not replace it,
-	// same pattern as /auction/silent.
+	// — it's meant to overlay onto the fuller SSR snapshot, not replace it.
 	let players = $derived(
 		data.players.map((player) => {
 			const live = livePlayers.find((p) => p.id === player.id);
@@ -57,45 +52,12 @@
 	let phase = $derived(tournamentPhase(data.tournament, now));
 	let countdownText = $derived(phase.countdownTo ? formatCountdown(phase.countdownTo, now) : null);
 
-	function formatCurrency(amount: number): string {
-		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-	}
-
-	let searchQuery = $state('');
-	let statusFilters = $state<string[]>([]);
-	let flightFilters = $state<string[]>([]);
-
-	let statusOptions = $derived(
-		PLAYER_STATUSES.map((status) => ({ value: status, label: playerStatusLabel(status) }))
-	);
-	let flightOptions = $derived(
-		data.tournament.flights.map((flight) => ({ value: flight, label: flight }))
-	);
-
-	let filteredPlayers = $derived(
-		players.filter((p) => {
-			if (statusFilters.length > 0 && !statusFilters.includes(p.status)) return false;
-			if (flightFilters.length > 0 && !flightFilters.includes(p.flight)) return false;
-			if (
-				searchQuery.trim() &&
-				!formatPlayerName(p).toLowerCase().includes(searchQuery.trim().toLowerCase())
-			) {
-				return false;
-			}
-			return true;
-		})
-	);
-
-	// currentHighBid is already phase-agnostic (highest non-voided Bid, full
-	// stop) — silent and live bids write to the same table through the same
-	// place-bid function, so this shows the right "current bid" (and, since
-	// bids only ever increase, the same bid's placed_at as "last bid")
-	// regardless of which phase the tournament is actually in.
-	let groupedPlayers = $derived(groupPlayersByFlight(filteredPlayers, data.tournament.flights));
+	let isLinkedToYou = $derived(players.some((p) => p.user_id === data.currentUserId));
+	let unlinkedPlayers = $derived(players.filter((p) => p.user_id === null));
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="Players" eyebrow={data.tournament.name} />
+	<PageHeader title={data.tournament.name} eyebrow={phase.label} />
 
 	<RealtimeStatusBanner status={connectionStatus} />
 
@@ -117,82 +79,37 @@
 				</span>
 			{/if}
 		</div>
-
-		{#if phase.phase === 'silent'}
-			<Button
-				href={resolve('/tournaments/[slug]/auction/silent', { slug: data.tournament.slug })}
-				variant="fairway"
-				size="sm">Go bid →</Button
-			>
-		{:else if phase.phase === 'live'}
-			<Button
-				href={resolve('/tournaments/[slug]/auction/live', { slug: data.tournament.slug })}
-				variant="brass"
-				size="sm">Go bid →</Button
-			>
-		{/if}
 	</div>
 
-	<div class="flex flex-wrap items-center gap-4 text-sm">
-		<Input type="search" placeholder="Search players…" bind:value={searchQuery} class="max-w-56" />
-		<MultiSelectFilter label="Status" options={statusOptions} bind:selected={statusFilters} />
-		{#if flightOptions.length > 0}
-			<MultiSelectFilter label="Flight" options={flightOptions} bind:selected={flightFilters} />
-		{/if}
-	</div>
+	{#if !isLinkedToYou}
+		<SelfLinkModal {unlinkedPlayers} />
+	{/if}
 
-	{#if filteredPlayers.length === 0}
-		<EmptyState title="No players match these filters" />
+	{#if phase.phase === 'silent'}
+		<SilentAuctionBoard
+			tournament={data.tournament}
+			{players}
+			{liveBids}
+			currentUserId={data.currentUserId}
+			supabase={data.supabase}
+		/>
+	{:else if phase.phase === 'live'}
+		<LiveAuctionBoard
+			tournament={data.tournament}
+			{players}
+			{liveBids}
+			{liveLots}
+			currentUserId={data.currentUserId}
+			supabase={data.supabase}
+			{now}
+		/>
 	{:else}
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.Head>Name</Table.Head>
-					<Table.Head>Flight</Table.Head>
-					<Table.Head>Handicap</Table.Head>
-					<Table.Head>Current bid</Table.Head>
-					<Table.Head>Last bid</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
-				{#each groupedPlayers as { group, players } (group.flight)}
-					<Table.Row class="bg-sand/20 hover:bg-sand/20">
-						<Table.Cell
-							colspan={5}
-							class="font-data text-xs tracking-widest text-fairway uppercase"
-						>
-							{group.label}
-						</Table.Cell>
-					</Table.Row>
-					{#each players as player (player.id)}
-						{@const high = currentHighBid(liveBids, player.id)}
-						{@const isYou = player.user_id === data.currentUserId}
-						<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
-							<Table.Cell class="font-medium text-ink">
-								<a
-									href={resolve('/tournaments/[slug]/players/[playerSlug]', {
-										slug: data.tournament.slug,
-										playerSlug: player.slug
-									})}
-									class="hover:underline">{formatPlayerName(player)}</a
-								>
-								<DivisionBadge division={player.division} />
-								{#if isYou}
-									<Badge variant="brass">This is you</Badge>
-								{/if}
-							</Table.Cell>
-							<Table.Cell>{player.flight || '—'}</Table.Cell>
-							<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
-							<Table.Cell class="font-data">
-								{high ? formatCurrency(high.amount) : 'No bids yet'}
-							</Table.Cell>
-							<Table.Cell class="text-ink/70">
-								{high ? formatRelativeTime(new Date(high.placed_at), now) : '—'}
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				{/each}
-			</Table.Body>
-		</Table.Root>
+		<TournamentRoster
+			tournament={data.tournament}
+			{players}
+			{liveBids}
+			currentUserId={data.currentUserId}
+			{now}
+		/>
 	{/if}
 </div>
