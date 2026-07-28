@@ -199,9 +199,14 @@
 											placeholder={suggestedBid(player.id).toFixed(2)}
 											bind:value={bidAmounts[player.id]}
 											disabled={bidPending[player.id]}
-											class="w-32"
+											class="w-32 shrink-0"
 										/>
-										<Button type="submit" variant="brass" disabled={bidPending[player.id]}>
+										<Button
+											type="submit"
+											variant="brass"
+											disabled={bidPending[player.id]}
+											class="shrink-0"
+										>
 											{bidPending[player.id] ? 'Bidding…' : 'Bid'}
 										</Button>
 									</div>
