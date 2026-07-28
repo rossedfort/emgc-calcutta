@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { formatPlayerName } from '$lib/players';
@@ -29,6 +30,9 @@
 			<p class="text-sm text-ink/70">
 				Every player in this tournament is already linked to someone. Ask an Admin to link you.
 			</p>
+			<Dialog.Footer>
+				<Button href={resolve('/')} variant="outline">Back</Button>
+			</Dialog.Footer>
 		{:else}
 			<form
 				method="POST"
@@ -61,6 +65,7 @@
 					{/each}
 				</select>
 				<Dialog.Footer>
+					<Button href={resolve('/')} variant="outline">Back</Button>
 					<Button type="submit" variant="brass" disabled={submitting}>
 						{submitting ? 'Linking…' : 'This is me'}
 					</Button>

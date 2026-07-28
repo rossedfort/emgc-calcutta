@@ -128,7 +128,7 @@
 								size="sm"
 								disabled={unlinkingPlayerId === linked.playerId}
 							>
-								{unlinkingPlayerId === linked.playerId ? 'Unlinking…' : 'Unlink'}
+								{unlinkingPlayerId === linked.playerId ? 'Leaving...' : 'Leave'}
 							</Button>
 						</form>
 					</li>
