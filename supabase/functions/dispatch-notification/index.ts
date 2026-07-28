@@ -109,12 +109,29 @@ function buildEmail(
         }),
       };
     }
-    case "bid_on_you":
+    case "bid_on_you": {
+      const subject = `A bid was placed on you in ${tournamentName}`;
+      const text =
+        `${formattedAmount} was just bid on you (${playerName}) in ${tournamentName}.`;
       return {
-        subject: `A bid was placed on you in ${tournamentName}`,
-        text:
-          `${formattedAmount} was just bid on you (${playerName}) in ${tournamentName}.`,
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            playerSlug
+              ? emailButton(
+                "View the auction",
+                playerUrl(tournamentSlug, playerSlug),
+              )
+              : "",
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
       };
+    }
     case "reserved":
       return {
         subject: `${playerName} has been reserved for the live auction`,
