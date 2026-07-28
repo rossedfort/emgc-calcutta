@@ -575,32 +575,19 @@ export type Database = {
         Args: { p_player_id: string };
         Returns: undefined;
       };
-      log_audit_event:
-        | {
-          Args: {
-            p_action: string;
-            p_after: Json;
-            p_before: Json;
-            p_entity_id: string;
-            p_entity_type: string;
-            p_player_id: string;
-            p_tournament_id: string;
-          };
-          Returns: undefined;
-        }
-        | {
-          Args: {
-            p_action: string;
-            p_after: Json;
-            p_before: Json;
-            p_entity_id: string;
-            p_entity_type: string;
-            p_entry_id?: string;
-            p_player_id: string;
-            p_tournament_id: string;
-          };
-          Returns: undefined;
+      log_audit_event: {
+        Args: {
+          p_action: string;
+          p_after: Json;
+          p_before: Json;
+          p_entity_id: string;
+          p_entity_type: string;
+          p_entry_id?: string;
+          p_player_id: string;
+          p_tournament_id: string;
         };
+        Returns: undefined;
+      };
       open_live_lot: { Args: { lot_id: string }; Returns: undefined };
       resequence_queue: {
         Args: { p_ordered_lot_ids: string[]; p_tournament_id: string };
