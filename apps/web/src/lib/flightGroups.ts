@@ -90,3 +90,57 @@ export function groupPlayersByFlight<T extends { flight: string; handicap_index:
 
 	return groups.filter((g) => g.players.length > 0);
 }
+
+// Shared by any view that needs the Championship flight's Gross/Net split
+// broken into visually separate sections rather than one flight-only group
+// with an inline badge (silent auction board — a participant reported real
+// confusion bidding on a Championship golfer without the board making it
+// obvious which of the two auction entries a given row was). Same shape as
+// groupPlayersByFlight (handicap-ascending sort, empty groups dropped, a
+// catch-all so a player never silently vanishes) but keyed by
+// deriveFlightDivisionGroups' (flight, division) groups instead of flight
+// alone — the Championship flight expands into two adjacent sections
+// instead of one.
+export interface FlightDivisionPlayerGroup<T> {
+	group: FlightDivisionGroup;
+	players: T[];
+}
+
+export function groupPlayersByFlightAndDivision<
+	T extends { flight: string; division: string; handicap_index: number | null }
+>(
+	players: T[],
+	flights: string[],
+	championshipFlight: string | null
+): FlightDivisionPlayerGroup<T>[] {
+	const sortByHandicap = (list: T[]) =>
+		[...list].sort((a, b) => {
+			if (a.handicap_index === null) return b.handicap_index === null ? 0 : 1;
+			if (b.handicap_index === null) return -1;
+			return a.handicap_index - b.handicap_index;
+		});
+
+	const definedGroups = deriveFlightDivisionGroups(flights, championshipFlight);
+	const matched = new Set<T>();
+	const groups: FlightDivisionPlayerGroup<T>[] = definedGroups.map((group) => {
+		const inGroup = players.filter(
+			(p) => p.flight === group.flight && p.division === group.division
+		);
+		inGroup.forEach((p) => matched.add(p));
+		return { group, players: sortByHandicap(inGroup) };
+	});
+
+	// Same "never silently drop a player" guarantee as groupPlayersByFlight's
+	// own leftover group — a player whose (flight, division) doesn't match
+	// any derived group (an unconfigured flight, or data predating a
+	// championship_flight change) still gets shown, rather than vanishing.
+	const leftover = sortByHandicap(players.filter((p) => !matched.has(p)));
+	if (leftover.length > 0) {
+		groups.push({
+			group: { flight: '', division: 'overall', label: 'Unassigned' },
+			players: leftover
+		});
+	}
+
+	return groups.filter((g) => g.players.length > 0);
+}

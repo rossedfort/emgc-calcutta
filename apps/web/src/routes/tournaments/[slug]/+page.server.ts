@@ -29,7 +29,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	const { data: tournament, error: tournamentError } = await supabase
 		.from('tournaments')
 		.select(
-			'id, slug, name, flights, status, silent_auction_start, silent_auction_end, live_auction_started_at, threshold_amount, min_increment'
+			'id, slug, name, flights, championship_flight, status, silent_auction_start, silent_auction_end, live_auction_started_at, threshold_amount, min_increment'
 		)
 		.eq('slug', params.slug)
 		.maybeSingle();
