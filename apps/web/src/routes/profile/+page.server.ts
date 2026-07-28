@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 
 	const { data, error: queryError } = await supabase
 		.from('users')
-		.select('first_name, last_name, email, avatar_url, role, name_confirmed_at')
+		.select('first_name, last_name, email, avatar_url, role, name_confirmed_at, rejected_at')
 		.eq('id', session.user.id)
 		.single();
 

@@ -523,6 +523,8 @@ export type Database = {
           last_name: string | null;
           name_confirmed_at: string | null;
           phone: string | null;
+          rejected_at: string | null;
+          rejected_by: string | null;
           role: Database["public"]["Enums"]["user_role"];
           sso_provider: Database["public"]["Enums"]["auth_provider"] | null;
         };
@@ -535,6 +537,8 @@ export type Database = {
           last_name?: string | null;
           name_confirmed_at?: string | null;
           phone?: string | null;
+          rejected_at?: string | null;
+          rejected_by?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
           sso_provider?: Database["public"]["Enums"]["auth_provider"] | null;
         };
@@ -547,10 +551,20 @@ export type Database = {
           last_name?: string | null;
           name_confirmed_at?: string | null;
           phone?: string | null;
+          rejected_at?: string | null;
+          rejected_by?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
           sso_provider?: Database["public"]["Enums"]["auth_provider"] | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "users_rejected_by_fkey";
+            columns: ["rejected_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
     Views: {
@@ -558,6 +572,10 @@ export type Database = {
     };
     Functions: {
       call_dispatch_notification: {
+        Args: { payload: Json };
+        Returns: undefined;
+      };
+      call_notify_account_event: {
         Args: { payload: Json };
         Returns: undefined;
       };
