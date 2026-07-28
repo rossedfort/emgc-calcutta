@@ -11,8 +11,8 @@ create table public.audit_events (
   -- Nullable: most events are tournament-scoped (bid placed, lot opened),
   -- but some aren't (a role change is a User-level action with no
   -- tournament of its own). `on delete set null` rather than cascade —
-  -- same "preserve the historical record" reasoning as Bid.player_id/
-  -- LiveLot.player_id: an Owner deleting a tournament's data (spec 4.3's
+  -- same "preserve the historical record" reasoning as Bid.entry_id/
+  -- LiveLot.entry_id: an Owner deleting a tournament's data (spec 4.3's
   -- role table explicitly grants this) shouldn't also erase the
   -- accountability trail of what happened in it.
   tournament_id uuid references public.tournaments (id) on delete set null,
@@ -39,12 +39,22 @@ create table public.audit_events (
   -- entity doesn't need to still exist for this row to still make sense.
   entity_id uuid,
   -- Denormalized alongside the polymorphic entity_type/entity_id: an
-  -- audit-log filter by player needs to match every player-related event
+  -- audit-log filter by golfer needs to match every player-related event
   -- regardless of what kind of event it is (e.g. a bid-placed event's
   -- entity is the Bid, not the Player, even though it's clearly "about" a
-  -- player). Nullable (not every event is player-related), on delete set
-  -- null matching tournament_id/actor_id's own reasoning.
+  -- player). Always resolves to the golfer's own players.id (identity),
+  -- even for an event that's actually about one specific entry — entry_id
+  -- below additionally carries that entry when there is one, so "filter by
+  -- this golfer" keeps working across their whole history regardless of
+  -- which specific entry an event concerned. Nullable (not every event is
+  -- player-related), on delete set null matching tournament_id/actor_id's
+  -- own reasoning.
   player_id uuid references public.players (id) on delete set null,
+  -- Nullable and additional, not a replacement for player_id — populated
+  -- only for events actually about one specific sellable unit (bid placed/
+  -- voided, reserved, lot opened/sold, marked paid, placement set), left
+  -- null for identity-level events (player linked/unlinked).
+  entry_id uuid references public.player_entries (id) on delete set null,
   before jsonb,
   after jsonb,
   reason text,
@@ -58,6 +68,7 @@ create index audit_events_actor_id_idx on public.audit_events (actor_id);
 create index audit_events_action_idx on public.audit_events (action);
 create index audit_events_entity_type_entity_id_idx on public.audit_events (entity_type, entity_id);
 create index audit_events_player_id_idx on public.audit_events (player_id);
+create index audit_events_entry_id_idx on public.audit_events (entry_id);
 create index audit_events_created_at_idx on public.audit_events (created_at);
 
 alter table public.audit_events enable row level security;
@@ -84,8 +95,8 @@ alter publication supabase_realtime add table public.audit_events;
 -- This is the *only* policy audit_events will ever have: still zero
 -- client-writable policies, per spec 6.5. actor_id/action/created_at
 -- filters fall out of this policy for free via ordinary PostgREST query
--- params (.eq()/.gte()/.lte()); player_id likewise via the denormalized
--- column above.
+-- params (.eq()/.gte()/.lte()); player_id/entry_id likewise via the
+-- denormalized columns above.
 create policy "audit_events_select_admin_owner" on public.audit_events
 for select to authenticated
 using (public.current_user_role() in ('admin', 'owner'));
