@@ -55,6 +55,7 @@ export type Database = {
           created_at: string;
           entity_id: string | null;
           entity_type: string;
+          entry_id: string | null;
           id: string;
           ip: string | null;
           player_id: string | null;
@@ -71,6 +72,7 @@ export type Database = {
           created_at?: string;
           entity_id?: string | null;
           entity_type: string;
+          entry_id?: string | null;
           id?: string;
           ip?: string | null;
           player_id?: string | null;
@@ -87,6 +89,7 @@ export type Database = {
           created_at?: string;
           entity_id?: string | null;
           entity_type?: string;
+          entry_id?: string | null;
           id?: string;
           ip?: string | null;
           player_id?: string | null;
@@ -100,6 +103,13 @@ export type Database = {
             columns: ["actor_id"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "audit_events_entry_id_fkey";
+            columns: ["entry_id"];
+            isOneToOne: false;
+            referencedRelation: "player_entries";
             referencedColumns: ["id"];
           },
           {
@@ -122,30 +132,30 @@ export type Database = {
         Row: {
           amount: number;
           bidder_id: string;
+          entry_id: string;
           id: string;
           phase: Database["public"]["Enums"]["bid_phase"];
           placed_at: string;
-          player_id: string;
           void_reason: string | null;
           voided_at: string | null;
         };
         Insert: {
           amount: number;
           bidder_id: string;
+          entry_id: string;
           id?: string;
           phase: Database["public"]["Enums"]["bid_phase"];
           placed_at?: string;
-          player_id: string;
           void_reason?: string | null;
           voided_at?: string | null;
         };
         Update: {
           amount?: number;
           bidder_id?: string;
+          entry_id?: string;
           id?: string;
           phase?: Database["public"]["Enums"]["bid_phase"];
           placed_at?: string;
-          player_id?: string;
           void_reason?: string | null;
           voided_at?: string | null;
         };
@@ -158,10 +168,10 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "bids_player_id_fkey";
-            columns: ["player_id"];
+            foreignKeyName: "bids_entry_id_fkey";
+            columns: ["entry_id"];
             isOneToOne: false;
-            referencedRelation: "players";
+            referencedRelation: "player_entries";
             referencedColumns: ["id"];
           },
         ];
@@ -170,9 +180,9 @@ export type Database = {
         Row: {
           closed_at: string | null;
           closes_at: string | null;
+          entry_id: string;
           id: string;
           opened_at: string | null;
-          player_id: string;
           queue_position: number;
           tournament_id: string;
           winning_bid_id: string | null;
@@ -180,9 +190,9 @@ export type Database = {
         Insert: {
           closed_at?: string | null;
           closes_at?: string | null;
+          entry_id: string;
           id?: string;
           opened_at?: string | null;
-          player_id: string;
           queue_position: number;
           tournament_id: string;
           winning_bid_id?: string | null;
@@ -190,19 +200,19 @@ export type Database = {
         Update: {
           closed_at?: string | null;
           closes_at?: string | null;
+          entry_id?: string;
           id?: string;
           opened_at?: string | null;
-          player_id?: string;
           queue_position?: number;
           tournament_id?: string;
           winning_bid_id?: string | null;
         };
         Relationships: [
           {
-            foreignKeyName: "live_lots_player_id_fkey";
-            columns: ["player_id"];
+            foreignKeyName: "live_lots_entry_id_fkey";
+            columns: ["entry_id"];
             isOneToOne: false;
-            referencedRelation: "players";
+            referencedRelation: "player_entries";
             referencedColumns: ["id"];
           },
           {
@@ -258,11 +268,11 @@ export type Database = {
           amount: number;
           bidder_id: string;
           calculated_at: string;
+          entry_id: string;
           id: string;
           marked_paid_at: string | null;
           marked_paid_by: string | null;
           placement: number;
-          player_id: string;
           pot_share: number;
           tournament_id: string;
         };
@@ -270,11 +280,11 @@ export type Database = {
           amount: number;
           bidder_id: string;
           calculated_at?: string;
+          entry_id: string;
           id?: string;
           marked_paid_at?: string | null;
           marked_paid_by?: string | null;
           placement: number;
-          player_id: string;
           pot_share: number;
           tournament_id: string;
         };
@@ -282,11 +292,11 @@ export type Database = {
           amount?: number;
           bidder_id?: string;
           calculated_at?: string;
+          entry_id?: string;
           id?: string;
           marked_paid_at?: string | null;
           marked_paid_by?: string | null;
           placement?: number;
-          player_id?: string;
           pot_share?: number;
           tournament_id?: string;
         };
@@ -299,17 +309,17 @@ export type Database = {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "payouts_entry_id_fkey";
+            columns: ["entry_id"];
+            isOneToOne: false;
+            referencedRelation: "player_entries";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "payouts_marked_paid_by_fkey";
             columns: ["marked_paid_by"];
             isOneToOne: false;
             referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "payouts_player_id_fkey";
-            columns: ["player_id"];
-            isOneToOne: false;
-            referencedRelation: "players";
             referencedColumns: ["id"];
           },
           {
@@ -321,24 +331,18 @@ export type Database = {
           },
         ];
       };
-      players: {
+      player_entries: {
         Row: {
           buyer_marked_paid_at: string | null;
           buyer_marked_paid_by: string | null;
           created_at: string;
           division: string;
-          first_name: string;
           flight: string;
-          handicap_index: number | null;
           id: string;
-          last_name: string;
-          photo_url: string | null;
           placement: number | null;
-          preferences: string | null;
-          slug: string;
+          player_id: string;
           status: Database["public"]["Enums"]["player_status"];
           tournament_id: string;
-          user_id: string | null;
           winning_bid_id: string | null;
         };
         Insert: {
@@ -346,18 +350,12 @@ export type Database = {
           buyer_marked_paid_by?: string | null;
           created_at?: string;
           division?: string;
-          first_name: string;
           flight?: string;
-          handicap_index?: number | null;
           id?: string;
-          last_name: string;
-          photo_url?: string | null;
           placement?: number | null;
-          preferences?: string | null;
-          slug?: string;
+          player_id: string;
           status?: Database["public"]["Enums"]["player_status"];
           tournament_id: string;
-          user_id?: string | null;
           winning_bid_id?: string | null;
         };
         Update: {
@@ -365,28 +363,86 @@ export type Database = {
           buyer_marked_paid_by?: string | null;
           created_at?: string;
           division?: string;
+          flight?: string;
+          id?: string;
+          placement?: number | null;
+          player_id?: string;
+          status?: Database["public"]["Enums"]["player_status"];
+          tournament_id?: string;
+          winning_bid_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "player_entries_buyer_marked_paid_by_fkey";
+            columns: ["buyer_marked_paid_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_entries_player_id_fkey";
+            columns: ["player_id"];
+            isOneToOne: false;
+            referencedRelation: "players";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_entries_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_entries_winning_bid_id_fkey";
+            columns: ["winning_bid_id"];
+            isOneToOne: false;
+            referencedRelation: "bids";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      players: {
+        Row: {
+          created_at: string;
+          first_name: string;
+          flight: string;
+          handicap_index: number | null;
+          id: string;
+          last_name: string;
+          photo_url: string | null;
+          preferences: string | null;
+          slug: string;
+          tournament_id: string;
+          user_id: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          first_name: string;
+          flight?: string;
+          handicap_index?: number | null;
+          id?: string;
+          last_name: string;
+          photo_url?: string | null;
+          preferences?: string | null;
+          slug?: string;
+          tournament_id: string;
+          user_id?: string | null;
+        };
+        Update: {
+          created_at?: string;
           first_name?: string;
           flight?: string;
           handicap_index?: number | null;
           id?: string;
           last_name?: string;
           photo_url?: string | null;
-          placement?: number | null;
           preferences?: string | null;
           slug?: string;
-          status?: Database["public"]["Enums"]["player_status"];
           tournament_id?: string;
           user_id?: string | null;
-          winning_bid_id?: string | null;
         };
         Relationships: [
-          {
-            foreignKeyName: "players_buyer_marked_paid_by_fkey";
-            columns: ["buyer_marked_paid_by"];
-            isOneToOne: false;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
           {
             foreignKeyName: "players_tournament_id_fkey";
             columns: ["tournament_id"];
@@ -399,13 +455,6 @@ export type Database = {
             columns: ["user_id"];
             isOneToOne: false;
             referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "players_winning_bid_id_fkey";
-            columns: ["winning_bid_id"];
-            isOneToOne: false;
-            referencedRelation: "bids";
             referencedColumns: ["id"];
           },
         ];
@@ -526,18 +575,32 @@ export type Database = {
         Args: { p_player_id: string };
         Returns: undefined;
       };
-      log_audit_event: {
-        Args: {
-          p_action: string;
-          p_after: Json;
-          p_before: Json;
-          p_entity_id: string;
-          p_entity_type: string;
-          p_player_id: string;
-          p_tournament_id: string;
+      log_audit_event:
+        | {
+          Args: {
+            p_action: string;
+            p_after: Json;
+            p_before: Json;
+            p_entity_id: string;
+            p_entity_type: string;
+            p_player_id: string;
+            p_tournament_id: string;
+          };
+          Returns: undefined;
+        }
+        | {
+          Args: {
+            p_action: string;
+            p_after: Json;
+            p_before: Json;
+            p_entity_id: string;
+            p_entity_type: string;
+            p_entry_id?: string;
+            p_player_id: string;
+            p_tournament_id: string;
+          };
+          Returns: undefined;
         };
-        Returns: undefined;
-      };
       open_live_lot: { Args: { lot_id: string }; Returns: undefined };
       resequence_queue: {
         Args: { p_ordered_lot_ids: string[]; p_tournament_id: string };
@@ -554,6 +617,10 @@ export type Database = {
       };
       unlink_self_from_player: {
         Args: { p_player_id: string };
+        Returns: undefined;
+      };
+      validate_flight_membership: {
+        Args: { p_flight: string; p_tournament_id: string };
         Returns: undefined;
       };
     };
