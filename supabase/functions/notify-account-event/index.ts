@@ -61,7 +61,7 @@ function buildEmail(
       const subject = "New sign-up awaiting approval";
       const text = `${
         subjectName ?? subjectEmail ?? "Someone"
-      } just signed up and is waiting for an Admin to assign their role. Review them at /admin/users.`;
+      } just signed up and is waiting for an Admin to assign their role. Review them at the admin > users page.`;
       return {
         subject,
         text,
