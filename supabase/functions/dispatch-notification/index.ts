@@ -35,6 +35,12 @@ import { Resend } from "resend";
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import { logAuditEvent } from "../_shared/audit.ts";
 import { sendNotificationEmail } from "../_shared/notify.ts";
+import {
+  emailButton,
+  emailParagraph,
+  renderEmailLayout,
+  settingsUrl,
+} from "../_shared/email-layout.ts";
 import type { Database } from "../_shared/database.ts";
 import type {
   DispatchNotificationRequest,
@@ -47,6 +53,16 @@ const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 interface EmailContent {
   subject: string;
   text: string;
+  // Only set for triggers migrated to the shared HTML layout (see
+  // emgc-calcutta-app-backlog.md Phase 13) — the rest still send
+  // text-only until their own template task.
+  html?: string;
+}
+
+function playerUrl(tournamentSlug: string, playerSlug: string): string {
+  return `${
+    Deno.env.get("SITE_URL")
+  }/tournaments/${tournamentSlug}/players/${playerSlug}`;
 }
 
 // Copy lives in exactly one place rather than scattered across every
@@ -55,7 +71,9 @@ interface EmailContent {
 function buildEmail(
   trigger: NotificationTrigger,
   playerName: string | null,
+  playerSlug: string | null,
   tournamentName: string,
+  tournamentSlug: string,
   amount: number | undefined,
 ): EmailContent {
   const formattedAmount = amount !== undefined
@@ -68,12 +86,29 @@ function buildEmail(
     : undefined;
 
   switch (trigger) {
-    case "outbid":
+    case "outbid": {
+      const subject = `You've been outbid on ${playerName}`;
+      const text =
+        `${formattedAmount} is the new high bid on ${playerName} in ${tournamentName}.`;
       return {
-        subject: `You've been outbid on ${playerName}`,
-        text:
-          `${formattedAmount} is the new high bid on ${playerName} in ${tournamentName}.`,
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            playerSlug
+              ? emailButton(
+                "View the auction",
+                playerUrl(tournamentSlug, playerSlug),
+              )
+              : "",
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
       };
+    }
     case "bid_on_you":
       return {
         subject: `A bid was placed on you in ${tournamentName}`,
@@ -189,7 +224,7 @@ export default {
       const { data: tournament, error: tournamentError } = await ctx
         .supabaseAdmin
         .from("tournaments")
-        .select("name")
+        .select("name, slug")
         .eq("id", body.tournamentId)
         .maybeSingle();
       if (tournamentError) {
@@ -204,10 +239,11 @@ export default {
       }
 
       let playerName: string | null = null;
+      let playerSlug: string | null = null;
       if (body.playerId) {
         const { data: player, error: playerError } = await ctx.supabaseAdmin
           .from("players")
-          .select("first_name, last_name")
+          .select("first_name, last_name, slug")
           .eq("id", body.playerId)
           .maybeSingle();
         if (playerError) {
@@ -216,12 +252,15 @@ export default {
           });
         }
         playerName = player ? `${player.first_name} ${player.last_name}` : null;
+        playerSlug = player?.slug ?? null;
       }
 
       const email = buildEmail(
         body.trigger,
         playerName,
+        playerSlug,
         tournament.name,
+        tournament.slug,
         body.amount,
       );
 
@@ -229,6 +268,7 @@ export default {
         to: recipient.email,
         subject: email.subject,
         text: email.text,
+        html: email.html,
         audit: {
           tournament_id: body.tournamentId,
           player_id: body.playerId ?? null,
