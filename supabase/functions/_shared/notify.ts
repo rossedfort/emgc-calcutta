@@ -18,6 +18,12 @@ export interface SendNotificationEmailParams {
   to: string;
   subject: string;
   text: string;
+  // Optional so triggers not yet migrated to a styled template (see
+  // emgc-calcutta-app-backlog.md Phase 13) keep sending their existing
+  // text-only email unchanged; Resend accepts both in one send when html
+  // is present, with text remaining the fallback for clients/previews that
+  // don't render HTML.
+  html?: string;
   audit: {
     tournament_id?: string | null;
     player_id?: string | null;
@@ -37,13 +43,14 @@ export interface SendNotificationEmailResult {
 export async function sendNotificationEmail(
   resend: Resend,
   supabaseAdmin: SupabaseClient<Database>,
-  { to, subject, text, audit }: SendNotificationEmailParams,
+  { to, subject, text, html, audit }: SendNotificationEmailParams,
 ): Promise<SendNotificationEmailResult> {
   const { error } = await resend.emails.send({
     from: Deno.env.get("RESEND_FROM_EMAIL")!,
     to,
     subject,
     text,
+    ...(html ? { html } : {}),
   });
 
   const after = {
