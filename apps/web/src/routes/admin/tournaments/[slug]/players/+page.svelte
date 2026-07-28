@@ -8,6 +8,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import {
 		PLAYER_STATUSES,
+		formatHandicapIndex,
 		formatPlayerName,
 		playerStatusBadgeVariant,
 		playerStatusLabel
@@ -93,7 +94,8 @@
 								{formatPlayerName(player)}
 								<DivisionBadge division={player.division} />
 							</Table.Cell>
-							<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
+							<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell
+							>
 							<Table.Cell>
 								<Badge variant={playerStatusBadgeVariant(player.status)}>
 									{playerStatusLabel(player.status)}

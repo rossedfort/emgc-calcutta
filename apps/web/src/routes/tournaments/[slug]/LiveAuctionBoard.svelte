@@ -16,7 +16,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { currentHighBid } from '$lib/bids';
-	import { formatPlayerName } from '$lib/players';
+	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
 	import type { FieldPlayerRow } from './+page.server';
 
 	let {
@@ -144,7 +144,9 @@
 						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 							{[
 								currentPlayer.flight ? `Flight ${currentPlayer.flight}` : null,
-								currentPlayer.handicap_index !== null ? `HCP ${currentPlayer.handicap_index}` : null
+								currentPlayer.handicap_index !== null
+									? `HCP ${formatHandicapIndex(currentPlayer.handicap_index)}`
+									: null
 							]
 								.filter(Boolean)
 								.join(' · ')}
@@ -235,7 +237,9 @@
 										<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 											{[
 												player.flight ? `Flight ${player.flight}` : null,
-												player.handicap_index !== null ? `HCP ${player.handicap_index}` : null
+												player.handicap_index !== null
+													? `HCP ${formatHandicapIndex(player.handicap_index)}`
+													: null
 											]
 												.filter(Boolean)
 												.join(' · ')}

@@ -4,7 +4,7 @@
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
-	import { formatPlayerName } from '$lib/players';
+	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
 
 	let { data, form } = $props();
 
@@ -98,7 +98,9 @@
 								<DivisionBadge division={lot.player.division} />
 							</Table.Cell>
 							<Table.Cell>{lot.player.flight || '—'}</Table.Cell>
-							<Table.Cell class="font-data">{lot.player.handicap_index ?? '—'}</Table.Cell>
+							<Table.Cell class="font-data"
+								>{formatHandicapIndex(lot.player.handicap_index)}</Table.Cell
+							>
 							<Table.Cell>
 								<div class="flex items-center gap-1">
 									<form

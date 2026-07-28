@@ -8,7 +8,12 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { currentHighBid } from '$lib/bids';
-	import { formatPlayerName, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import {
+		formatHandicapIndex,
+		formatPlayerName,
+		playerStatusBadgeVariant,
+		playerStatusLabel
+	} from '$lib/players';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data, form } = $props();
@@ -95,7 +100,9 @@
 						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 							{[
 								currentPlayer.flight ? `Flight ${currentPlayer.flight}` : null,
-								currentPlayer.handicap_index !== null ? `HCP ${currentPlayer.handicap_index}` : null
+								currentPlayer.handicap_index !== null
+									? `HCP ${formatHandicapIndex(currentPlayer.handicap_index)}`
+									: null
 							]
 								.filter(Boolean)
 								.join(' · ')}

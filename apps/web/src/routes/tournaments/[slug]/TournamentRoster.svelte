@@ -8,7 +8,12 @@
 	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
 	import { currentHighBid } from '$lib/bids';
-	import { PLAYER_STATUSES, formatPlayerName, playerStatusLabel } from '$lib/players';
+	import {
+		PLAYER_STATUSES,
+		formatHandicapIndex,
+		formatPlayerName,
+		playerStatusLabel
+	} from '$lib/players';
 	import { groupPlayersByFlight } from '$lib/flightGroups';
 	import { formatRelativeTime } from '$lib/time';
 	import type { FieldPlayerRow } from './+page.server';
@@ -110,7 +115,7 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>{player.flight || '—'}</Table.Cell>
-						<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
+						<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell>
 						<Table.Cell class="font-data">
 							{high ? formatCurrency(high.amount) : 'No bids yet'}
 						</Table.Cell>

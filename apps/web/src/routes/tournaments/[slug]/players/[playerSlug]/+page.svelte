@@ -4,7 +4,12 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
-	import { formatPlayerName, playerStatusBadgeVariant, playerStatusLabel } from '$lib/players';
+	import {
+		formatHandicapIndex,
+		formatPlayerName,
+		playerStatusBadgeVariant,
+		playerStatusLabel
+	} from '$lib/players';
 
 	let { data } = $props();
 
@@ -57,7 +62,7 @@
 			<dt class="text-ink/60">Flight</dt>
 			<dd>{data.player.flight || '—'}</dd>
 			<dt class="text-ink/60">Handicap</dt>
-			<dd class="font-data">{data.player.handicap_index ?? '—'}</dd>
+			<dd class="font-data">{formatHandicapIndex(data.player.handicap_index)}</dd>
 			<dt class="text-ink/60">Preferences</dt>
 			<dd>{data.player.preferences ?? '—'}</dd>
 		</dl>

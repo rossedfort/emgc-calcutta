@@ -3,7 +3,7 @@
 	import { resolve } from '$app/paths';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
-	import { formatPlayerName } from '$lib/players';
+	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
 	import type { FieldPlayerRow } from './+page.server';
 
 	let { unlinkedPlayers }: { unlinkedPlayers: FieldPlayerRow[] } = $props();
@@ -61,7 +61,9 @@
 				>
 					<option value="" disabled selected>Choose your name</option>
 					{#each unlinkedPlayers as player (player.id)}
-						<option value={player.id}>{formatPlayerName(player)} - {player.handicap_index}</option>
+						<option value={player.id}
+							>{formatPlayerName(player)} - {formatHandicapIndex(player.handicap_index)}</option
+						>
 					{/each}
 				</select>
 				<Dialog.Footer>
