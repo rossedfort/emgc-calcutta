@@ -16,6 +16,7 @@ import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import { logAuditEvent, requestMetadata } from "../_shared/audit.ts";
 import type { Database } from "../_shared/database.ts";
 import { isAdminOrOwner, isAssignableRole } from "../_shared/roles.ts";
+import type { NotifyAccountEventRequest } from "../_shared/contracts/notify-account-event.ts";
 
 export default {
   fetch: withSupabase<Database>(
@@ -99,6 +100,29 @@ export default {
         ip,
         user_agent,
       });
+
+      // "You're approved" (Phase 12): only the actual unassigned ->
+      // participant approval moment, not every role change — an Owner
+      // promoting an existing Participant to Admin, or a demotion,
+      // shouldn't re-fire a welcome email. Best-effort: a failed call here
+      // must never fail this request, since the role change itself already
+      // committed above (same reasoning as logAuditEvent's own failure
+      // handling just above).
+      if (target.role === "unassigned" && role === "participant") {
+        const { error: notifyError } = await ctx.supabaseAdmin.functions
+          .invoke("notify-account-event", {
+            body: {
+              userId,
+              trigger: "account_approved",
+            } satisfies NotifyAccountEventRequest,
+          });
+        if (notifyError) {
+          console.error(
+            "Failed to send account_approved notification:",
+            notifyError.message,
+          );
+        }
+      }
 
       return Response.json({ user: data });
     },
