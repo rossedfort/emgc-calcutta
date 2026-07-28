@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { onMount, untrack } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import type {
@@ -14,6 +12,7 @@
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import SlotMachineDigit from '$lib/components/SlotMachineDigit.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -78,35 +77,22 @@
 
 	let groupedPlayers = $derived(groupPlayersByFlight(filteredPlayers, tournament.flights));
 
-	// Briefly highlights a player's row when a new bid on them arrives over
-	// Realtime — from anyone, not just the current user's own submissions —
-	// so a busy board makes it obvious which players are actively being bid
-	// on without needing to stare at "Current high" for every row. Doesn't
-	// fire for the initial reconcile (createTournamentRealtime replaces the
-	// whole `liveBids` array once on connect/reconnect, which would
-	// otherwise look identical to "every player just got a new bid") — the
-	// startup grace period below skips that one-time bulk population.
-	const recentlyBidPlayerIds = new SvelteSet<string>();
-	let readyToHighlight = $state(false);
-	const seenBidIds = new SvelteSet<string>(untrack(() => liveBids.map((bid) => bid.id)));
-
-	onMount(() => {
-		const timer = setTimeout(() => (readyToHighlight = true), 1500);
-		return () => clearTimeout(timer);
-	});
-
-	$effect(() => {
-		const newBids = liveBids.filter((bid) => !seenBidIds.has(bid.id));
-		for (const bid of newBids) {
-			seenBidIds.add(bid.id);
-		}
-		if (!readyToHighlight || newBids.length === 0) return;
-
-		for (const bid of newBids) {
-			recentlyBidPlayerIds.add(bid.player_id);
-			setTimeout(() => recentlyBidPlayerIds.delete(bid.player_id), 1500);
-		}
-	});
+	// Splits a formatted amount ("$1,850.00") into characters for the
+	// slot-machine effect, each keyed by distance from the *end* of the
+	// string rather than the start — bid amounts only ever grow (a bid must
+	// beat the current high), so a new leading digit appearing (e.g.
+	// "$99.00" -> "$100.00") only ever prepends a character; keying from the
+	// right means the existing trailing digits' SlotMachineDigit instances
+	// (and the mid-spin state they're holding) keep their identity instead
+	// of every position remapping to a different character.
+	function currencyChars(formatted: string): { char: string; isDigit: boolean; key: number }[] {
+		const chars = formatted.split('');
+		return chars.map((char, i) => ({
+			char,
+			isDigit: char >= '0' && char <= '9',
+			key: chars.length - 1 - i
+		}));
+	}
 
 	function suggestedBid(playerId: string): number {
 		const high = currentHighBid(liveBids, playerId);
@@ -191,13 +177,7 @@
 				{#each players as player (player.id)}
 					{@const high = currentHighBid(liveBids, player.id)}
 					{@const isYou = player.user_id === currentUserId}
-					<Table.Row
-						class={recentlyBidPlayerIds.has(player.id)
-							? 'bg-fairway/15'
-							: player.status === 'reserved'
-								? 'bg-flag/10'
-								: ''}
-					>
+					<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
 						<Table.Cell class="font-medium text-ink">
 							<a
 								href={resolve('/tournaments/[slug]/players/[playerSlug]', {
@@ -218,7 +198,19 @@
 							</Badge>
 						</Table.Cell>
 						<Table.Cell class="font-data">
-							{high ? formatCurrency(high.amount) : 'No bids yet'}
+							{#if high}
+								<span class="inline-flex">
+									{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}
+										{#if isDigit}
+											<SlotMachineDigit digit={char} delayMs={key * 60} />
+										{:else}
+											<span class="inline-block">{char}</span>
+										{/if}
+									{/each}
+								</span>
+							{:else}
+								No bids yet
+							{/if}
 						</Table.Cell>
 						<Table.Cell>
 							{#if player.status === 'open'}
