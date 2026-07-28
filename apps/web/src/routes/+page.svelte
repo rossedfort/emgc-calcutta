@@ -7,7 +7,8 @@
 	let { data } = $props();
 	let { tournaments } = $derived(data);
 	let isAdmin = $derived(data.profile?.role === 'admin' || data.profile?.role === 'owner');
-	let isUnassigned = $derived(data.profile?.role === 'unassigned');
+	let isUnassigned = $derived(data.profile?.role === 'unassigned' && !data.profile?.rejected_at);
+	let isRejected = $derived(data.profile?.role === 'unassigned' && !!data.profile?.rejected_at);
 
 	function formatWindow(startIso: string, endIso: string): string {
 		const start = new Date(startIso);
@@ -102,6 +103,8 @@
 			<h1 class="mt-2 font-display text-3xl font-semibold text-ink">
 				{#if isAdmin}
 					No tournament set up yet
+				{:else if isRejected}
+					Account not approved
 				{:else if isUnassigned}
 					Almost there
 				{:else}
@@ -111,6 +114,9 @@
 			<p class="mt-2 text-sm text-ink/70">
 				{#if isAdmin}
 					Create this year's tournament to open it up for the league.
+				{:else if isRejected}
+					An Admin reviewed your sign-in and didn't approve it for this league. If that seems wrong,
+					reach out to a league Admin directly.
 				{:else if isUnassigned}
 					An Admin needs to approve your account before you can view or bid. Check back once that
 					happens.

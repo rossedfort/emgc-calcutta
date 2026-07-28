@@ -7,6 +7,7 @@ export interface UserProfile {
 	avatar_url: string | null;
 	role: Role;
 	name_confirmed_at: string | null;
+	rejected_at: string | null;
 }
 
 // null whenever either half is missing, rather than a partial "First" or

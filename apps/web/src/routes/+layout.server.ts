@@ -27,7 +27,7 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase }, co
 	if (session) {
 		const { data } = await supabase
 			.from('users')
-			.select('first_name, last_name, email, avatar_url, role, name_confirmed_at')
+			.select('first_name, last_name, email, avatar_url, role, name_confirmed_at, rejected_at')
 			.eq('id', session.user.id)
 			.single();
 		profile = (data as UserProfile) ?? null;
@@ -39,10 +39,15 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase }, co
 		// read every users row"), just narrowed to a count.
 		const isAdmin = profile?.role === 'admin' || profile?.role === 'owner';
 		if (isAdmin) {
+			// Excludes rejected_at rows (Phase 12.5) — the whole point of
+			// rejecting a signup is that they stop being "someone's waiting,"
+			// so they shouldn't keep inflating this badge, same as they're
+			// already excluded from /admin/users' own Pending approval section.
 			const { count } = await supabase
 				.from('users')
 				.select('*', { count: 'exact', head: true })
-				.eq('role', 'unassigned');
+				.eq('role', 'unassigned')
+				.is('rejected_at', null);
 			pendingUserCount = count ?? 0;
 		}
 
