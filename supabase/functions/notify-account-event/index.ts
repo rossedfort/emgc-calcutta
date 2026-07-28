@@ -24,6 +24,11 @@ import { Resend } from "resend";
 
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import { sendNotificationEmail } from "../_shared/notify.ts";
+import {
+  emailButton,
+  emailParagraph,
+  renderEmailLayout,
+} from "../_shared/email-layout.ts";
 import type { Database } from "../_shared/database.ts";
 import type {
   AccountEventTrigger,
@@ -36,6 +41,14 @@ const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 interface EmailContent {
   subject: string;
   text: string;
+  // Only set for triggers migrated to the shared HTML layout (see
+  // emgc-calcutta-app-backlog.md Phase 13). Deliberately never passes a
+  // settingsUrl to renderEmailLayout() — unlike dispatch-notification's
+  // triggers, neither new_signup nor account_approved is gated by
+  // notification_prefs (spec 4.7's opt-in only covers auction
+  // notifications), so a "manage preferences" link here would be
+  // misleading — there's nothing for the recipient to opt out of.
+  html?: string;
 }
 
 function buildEmail(
@@ -44,13 +57,27 @@ function buildEmail(
   subjectEmail: string | undefined,
 ): EmailContent {
   switch (trigger) {
-    case "new_signup":
+    case "new_signup": {
+      const subject = "New sign-up awaiting approval";
+      const text = `${
+        subjectName ?? subjectEmail ?? "Someone"
+      } just signed up and is waiting for an Admin to assign their role. Review them at /admin/users.`;
       return {
-        subject: "New sign-up awaiting approval",
-        text: `${
-          subjectName ?? subjectEmail ?? "Someone"
-        } just signed up and is waiting for an Admin to assign their role. Review them at /admin/users.`,
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            emailButton(
+              "Review sign-ups",
+              `${Deno.env.get("SITE_URL")}/admin/users`,
+            ),
+          ].join("\n"),
+        }),
       };
+    }
     case "account_approved":
       return {
         subject: "You're approved",
@@ -104,6 +131,7 @@ export default {
         to: recipient.email,
         subject: email.subject,
         text: email.text,
+        html: email.html,
         audit: {
           entity_type: "User",
           entity_id: body.userId,
