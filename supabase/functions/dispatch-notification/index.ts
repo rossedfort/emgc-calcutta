@@ -177,12 +177,29 @@ function buildEmail(
         }),
       };
     }
-    case "won":
+    case "won": {
+      const subject = `You won ${playerName}!`;
+      const text =
+        `Your bid of ${formattedAmount} won ${playerName} in ${tournamentName}. Congratulations!`;
       return {
-        subject: `You won ${playerName}!`,
-        text:
-          `Your bid of ${formattedAmount} won ${playerName} in ${tournamentName}. Congratulations!`,
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            playerSlug
+              ? emailButton(
+                "View the auction",
+                playerUrl(tournamentSlug, playerSlug),
+              )
+              : "",
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
       };
+    }
   }
 }
 
