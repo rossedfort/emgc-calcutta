@@ -10,6 +10,7 @@ export const AUDIT_ACTIONS = [
 	'bid_voided',
 	'player_reserved',
 	'player_linked',
+	'player_unlinked',
 	'lot_opened',
 	'lot_sold',
 	'csv_import',

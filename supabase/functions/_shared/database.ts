@@ -549,6 +549,10 @@ export type Database = {
         Args: { lot_a: string; lot_b: string };
         Returns: undefined;
       };
+      unlink_self_from_player: {
+        Args: { p_player_id: string };
+        Returns: undefined;
+      };
     };
     Enums: {
       auth_provider: "google" | "azure" | "email";

@@ -57,7 +57,7 @@
 				>
 					<option value="" disabled selected>Choose your name</option>
 					{#each unlinkedPlayers as player (player.id)}
-						<option value={player.id}>{formatPlayerName(player)}</option>
+						<option value={player.id}>{formatPlayerName(player)} - {player.handicap_index}</option>
 					{/each}
 				</select>
 				<Dialog.Footer>

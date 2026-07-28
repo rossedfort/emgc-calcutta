@@ -152,7 +152,7 @@
 			{#if currentStep === 'profile'}
 				<form
 					method="POST"
-					action={resolve('/profile')}
+					action="{resolve('/profile')}?/updateProfile"
 					class="flex flex-col gap-4"
 					use:enhance={() => {
 						profileSaving = true;
