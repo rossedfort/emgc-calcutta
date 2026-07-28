@@ -41,11 +41,23 @@ export interface EmailLayoutParams {
   heading: string;
   /** Pre-built inner HTML — compose with emailParagraph()/emailButton(). */
   bodyHtml: string;
+  // Absolute URL to /settings/notifications, footered as "Manage
+  // notification preferences". Include only for triggers a recipient can
+  // actually opt out of via notification_prefs — the five
+  // dispatch-notification triggers (see settingsUrl() below) — and omit
+  // for notify-account-event's new_signup/account_approved, which spec
+  // 4.7's opt-in only covers auction notifications, not account status.
+  settingsUrl?: string;
 }
 
 export function renderEmailLayout(
-  { previewText, heading, bodyHtml }: EmailLayoutParams,
+  { previewText, heading, bodyHtml, settingsUrl }: EmailLayoutParams,
 ): string {
+  const footerText = settingsUrl
+    ? `EMGC Calcutta &mdash; you're receiving this because of activity on your account. <a href="${
+      escapeHtml(settingsUrl)
+    }" style="color:${BRASS}; text-decoration:underline;">Manage notification preferences</a>.`
+    : `EMGC Calcutta &mdash; you're receiving this because of activity on your account.`;
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -91,7 +103,7 @@ ${bodyHtml}
         </tr>
         <tr>
           <td class="email-card-bg" style="background-color:${SCORECARD}; padding:0 24px 24px;">
-            <p class="email-muted-text" style="margin:0; font-family:${FONT_SANS}; font-size:12px; line-height:1.5; color:${MUTED};">EMGC Calcutta &mdash; you're receiving this because of activity on your account. Manage notification preferences in Settings.</p>
+            <p class="email-muted-text" style="margin:0; font-family:${FONT_SANS}; font-size:12px; line-height:1.5; color:${MUTED};">${footerText}</p>
           </td>
         </tr>
       </table>
@@ -120,6 +132,13 @@ export function emailButton(label: string, url: string): string {
                 </td>
               </tr>
             </table>`;
+}
+
+// Absolute /settings/notifications URL for the five dispatch-notification
+// triggers to pass as EmailLayoutParams.settingsUrl. Not used by
+// notify-account-event — see that field's own doc comment.
+export function settingsUrl(): string {
+  return `${Deno.env.get("SITE_URL")}/settings/notifications`;
 }
 
 function escapeHtml(value: string): string {
