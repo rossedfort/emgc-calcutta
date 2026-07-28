@@ -21,6 +21,7 @@
 	import { currentHighBid } from '$lib/bids';
 	import {
 		PLAYER_STATUSES,
+		formatHandicapIndex,
 		formatPlayerName,
 		playerStatusBadgeVariant,
 		playerStatusLabel
@@ -216,7 +217,7 @@
 								<Badge variant="brass">This is you</Badge>
 							{/if}
 						</Table.Cell>
-						<Table.Cell class="font-data">{player.handicap_index ?? '—'}</Table.Cell>
+						<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell>
 						<Table.Cell>
 							<Badge variant={playerStatusBadgeVariant(player.status)}>
 								{playerStatusLabel(player.status)}

@@ -7,6 +7,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { formatHandicapIndex } from '$lib/players';
 
 	let { data, form } = $props();
 
@@ -159,7 +160,7 @@
 								<Badge variant="brass">Gross + Net</Badge>
 							{/if}
 						</Table.Cell>
-						<Table.Cell class="font-data">{row.handicap_index ?? '—'}</Table.Cell>
+						<Table.Cell class="font-data">{formatHandicapIndex(row.handicap_index)}</Table.Cell>
 						<Table.Cell class="text-sm text-flag">
 							{row.errors.join(', ')}
 						</Table.Cell>

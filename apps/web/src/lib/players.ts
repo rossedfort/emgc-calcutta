@@ -41,3 +41,13 @@ export function playerStatusLabel(status: Player['status']): string {
 			return status.charAt(0).toUpperCase() + status.slice(1);
 	}
 }
+
+// A "plus" handicap (a golfer better than scratch) is stored as a negative
+// number — displaying it with a literal minus sign reads as a worse-than-
+// scratch handicap to anyone used to golf's own "+" convention, so every
+// display of a handicap index goes through this rather than the raw number.
+// null stays the existing em-dash placeholder for "not recorded."
+export function formatHandicapIndex(handicap: number | null): string {
+	if (handicap === null) return '—';
+	return handicap < 0 ? `+${-handicap}` : `${handicap}`;
+}
