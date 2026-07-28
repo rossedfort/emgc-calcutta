@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { onMount, untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import type {
@@ -75,6 +77,36 @@
 	);
 
 	let groupedPlayers = $derived(groupPlayersByFlight(filteredPlayers, tournament.flights));
+
+	// Briefly highlights a player's row when a new bid on them arrives over
+	// Realtime — from anyone, not just the current user's own submissions —
+	// so a busy board makes it obvious which players are actively being bid
+	// on without needing to stare at "Current high" for every row. Doesn't
+	// fire for the initial reconcile (createTournamentRealtime replaces the
+	// whole `liveBids` array once on connect/reconnect, which would
+	// otherwise look identical to "every player just got a new bid") — the
+	// startup grace period below skips that one-time bulk population.
+	const recentlyBidPlayerIds = new SvelteSet<string>();
+	let readyToHighlight = $state(false);
+	const seenBidIds = new SvelteSet<string>(untrack(() => liveBids.map((bid) => bid.id)));
+
+	onMount(() => {
+		const timer = setTimeout(() => (readyToHighlight = true), 1500);
+		return () => clearTimeout(timer);
+	});
+
+	$effect(() => {
+		const newBids = liveBids.filter((bid) => !seenBidIds.has(bid.id));
+		for (const bid of newBids) {
+			seenBidIds.add(bid.id);
+		}
+		if (!readyToHighlight || newBids.length === 0) return;
+
+		for (const bid of newBids) {
+			recentlyBidPlayerIds.add(bid.player_id);
+			setTimeout(() => recentlyBidPlayerIds.delete(bid.player_id), 1500);
+		}
+	});
 
 	function suggestedBid(playerId: string): number {
 		const high = currentHighBid(liveBids, playerId);
@@ -159,7 +191,13 @@
 				{#each players as player (player.id)}
 					{@const high = currentHighBid(liveBids, player.id)}
 					{@const isYou = player.user_id === currentUserId}
-					<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
+					<Table.Row
+						class={recentlyBidPlayerIds.has(player.id)
+							? 'bg-fairway/15'
+							: player.status === 'reserved'
+								? 'bg-flag/10'
+								: ''}
+					>
 						<Table.Cell class="font-medium text-ink">
 							<a
 								href={resolve('/tournaments/[slug]/players/[playerSlug]', {
@@ -207,7 +245,7 @@
 											disabled={bidPending[player.id]}
 											class="shrink-0"
 										>
-											{bidPending[player.id] ? 'Bidding…' : 'Bid'}
+											Bid
 										</Button>
 									</div>
 									{#if bidErrors[player.id]}
