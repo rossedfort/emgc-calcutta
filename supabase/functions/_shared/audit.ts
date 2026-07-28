@@ -16,7 +16,15 @@ import type { Database, Json } from "./database.ts";
 
 export interface AuditEventInput {
   tournament_id?: string | null;
+  // Always the golfer's own players.id (Phase 11) — for an entry-scoped
+  // event (bid placed/voided, reserved, lot opened/sold, marked paid,
+  // placement set), resolve this from the entry's own player_id rather
+  // than passing the entry id here, so "filter the audit log by this
+  // golfer" keeps working across their whole history regardless of which
+  // specific entry an event concerned. entry_id below is additionally
+  // populated for those entry-scoped events.
   player_id?: string | null;
+  entry_id?: string | null;
   actor_id?: string | null;
   actor_identity?: string | null;
   action: string;
@@ -48,6 +56,7 @@ export async function logAuditEvent(
   const { error } = await supabaseAdmin.from("audit_events").insert({
     tournament_id: event.tournament_id ?? null,
     player_id: event.player_id ?? null,
+    entry_id: event.entry_id ?? null,
     actor_id: event.actor_id ?? null,
     actor_identity: event.actor_identity ?? null,
     action: event.action,

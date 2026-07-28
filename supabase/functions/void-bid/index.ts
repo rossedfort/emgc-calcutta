@@ -21,7 +21,8 @@
 // open lot's "current high" self-corrects on the next bid with no
 // immediate recompute needed here.
 //
-// The recompute also keeps players.winning_bid_id in sync (Phase 7) —
+// The recompute also keeps player_entries.winning_bid_id in sync (Phase 7,
+// moved to player_entries in Phase 11) —
 // not called out in that column's own backlog line (which only names
 // close_silent_auctions/close_live_lot), but leaving it stale here would
 // undermine the exact thing the column exists for: pot calculation needs
@@ -75,16 +76,17 @@ export default {
         );
       }
 
-      // players!bids_player_id_fkey disambiguates the embed: Phase 7 added
-      // players.winning_bid_id -> bids.id, a second FK path between these
-      // two tables (the other direction from this one, bids.player_id ->
-      // players.id) — PostgREST can no longer infer which relationship
-      // this embed means without the hint, and fails the whole query with
-      // "more than one relationship was found" instead of guessing wrong.
+      // player_entries!bids_entry_id_fkey disambiguates the embed: Phase 7
+      // added players.winning_bid_id -> bids.id (now player_entries's own
+      // winning_bid_id), a second FK path between these two tables (the
+      // other direction from this one, bids.entry_id -> player_entries.id)
+      // — PostgREST can no longer infer which relationship this embed
+      // means without the hint, and fails the whole query with "more than
+      // one relationship was found" instead of guessing wrong.
       const { data: bid, error: bidError } = await ctx.supabaseAdmin
         .from("bids")
         .select(
-          "id, player_id, voided_at, amount, players!bids_player_id_fkey(tournament_id, winning_bid_id)",
+          "id, entry_id, voided_at, amount, player_entries!bids_entry_id_fkey(player_id, tournament_id, winning_bid_id)",
         )
         .eq("id", body.bidId)
         .maybeSingle();
@@ -101,16 +103,16 @@ export default {
       }
 
       // See the header comment: once any Payout exists in this
-      // tournament, voiding this player's current winning bid would
+      // tournament, voiding this entry's current winning bid would
       // silently invalidate the tournament-wide pot every existing
       // Payout was calculated from — blocked outright rather than
       // cascade-recomputed.
-      if (bid.players?.winning_bid_id === bid.id) {
+      if (bid.player_entries?.winning_bid_id === bid.id) {
         const { data: existingPayout, error: payoutCheckError } = await ctx
           .supabaseAdmin
           .from("payouts")
           .select("id")
-          .eq("tournament_id", bid.players.tournament_id)
+          .eq("tournament_id", bid.player_entries.tournament_id)
           .limit(1)
           .maybeSingle();
         if (payoutCheckError) {
@@ -162,7 +164,7 @@ export default {
           .supabaseAdmin
           .from("bids")
           .select("id")
-          .eq("player_id", bid.player_id)
+          .eq("entry_id", bid.entry_id)
           .is("voided_at", null)
           .order("amount", { ascending: false })
           .limit(1)
@@ -183,15 +185,15 @@ export default {
           });
         }
 
-        const { error: updatePlayerError } = await ctx.supabaseAdmin
-          .from("players")
+        const { error: updateEntryError } = await ctx.supabaseAdmin
+          .from("player_entries")
           .update({
             status: newHighBid ? "sold_live" : "no_bid",
             winning_bid_id: newHighBid?.id ?? null,
           })
-          .eq("id", bid.player_id);
-        if (updatePlayerError) {
-          return Response.json({ error: updatePlayerError.message }, {
+          .eq("id", bid.entry_id);
+        if (updateEntryError) {
+          return Response.json({ error: updateEntryError.message }, {
             status: 500,
           });
         }
@@ -202,8 +204,9 @@ export default {
 
       const { ip, user_agent } = requestMetadata(req);
       await logAuditEvent(ctx.supabaseAdmin, {
-        tournament_id: bid.players?.tournament_id ?? null,
-        player_id: bid.player_id,
+        tournament_id: bid.player_entries?.tournament_id ?? null,
+        player_id: bid.player_entries?.player_id ?? null,
+        entry_id: bid.entry_id,
         actor_id: ctx.userClaims!.id,
         actor_identity: ctx.userClaims?.email ?? null,
         action: "bid_voided",
