@@ -78,12 +78,23 @@ function buildEmail(
         }),
       };
     }
-    case "account_approved":
+    case "account_approved": {
+      const subject = "You're approved";
+      const text =
+        "An Admin has approved your account. You'll be able to view and bid once a tournament's auction opens.";
       return {
-        subject: "You're approved",
-        text:
-          "An Admin has approved your account. You'll be able to view and bid once a tournament's auction opens.",
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            emailButton("Go to EMGC Bet", `${Deno.env.get("SITE_URL")}/`),
+          ].join("\n"),
+        }),
       };
+    }
   }
 }
 
