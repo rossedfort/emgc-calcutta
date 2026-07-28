@@ -1,4 +1,4 @@
-import { Constants, type Tables } from '@emgc-calcutta/shared-types';
+import { Constants, type Enums, type Tables } from '@emgc-calcutta/shared-types';
 import type { BadgeVariant } from '$lib/components/ui/badge';
 
 // The full generated Row shape, not a hand-picked subset — used for both
@@ -15,7 +15,10 @@ export function formatPlayerName(player: Pick<Player, 'first_name' | 'last_name'
 	return `${player.first_name} ${player.last_name}`;
 }
 
-export function playerStatusBadgeVariant(status: Player['status']): BadgeVariant {
+// status is a player_entries.status (Phase 11 moved it off players), not a
+// field on Player itself — parameterized on the bare enum rather than
+// Player['status'] so this keeps working for any entry-shaped row.
+export function playerStatusBadgeVariant(status: Enums<'player_status'>): BadgeVariant {
 	switch (status) {
 		case 'reserved':
 			return 'flag';
@@ -29,7 +32,7 @@ export function playerStatusBadgeVariant(status: Player['status']): BadgeVariant
 	}
 }
 
-export function playerStatusLabel(status: Player['status']): string {
+export function playerStatusLabel(status: Enums<'player_status'>): string {
 	switch (status) {
 		case 'sold_silent':
 			return 'Sold (silent)';

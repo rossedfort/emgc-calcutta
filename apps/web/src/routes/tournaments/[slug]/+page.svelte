@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { RealtimeBid, RealtimeLiveLot, RealtimePlayer } from '@emgc-calcutta/shared-types';
+	import type {
+		RealtimeBid,
+		RealtimeLiveLot,
+		RealtimePlayerEntry
+	} from '@emgc-calcutta/shared-types';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
@@ -14,7 +18,7 @@
 	let { data } = $props();
 
 	let liveBids = $state<RealtimeBid[]>([]);
-	let livePlayers = $state<RealtimePlayer[]>([]);
+	let liveEntries = $state<RealtimePlayerEntry[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
 	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
 	// Ticks every second so the phase banner/countdown and whichever child
@@ -26,13 +30,13 @@
 	onMount(() => {
 		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
-		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
+		const unsubEntries = rt.entries.subscribe((entries) => (liveEntries = entries));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
 		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
-			unsubPlayers();
+			unsubEntries();
 			unsubLots();
 			unsubConnection();
 			rt.destroy();
@@ -44,7 +48,7 @@
 	// — it's meant to overlay onto the fuller SSR snapshot, not replace it.
 	let players = $derived(
 		data.players.map((player) => {
-			const live = livePlayers.find((p) => p.id === player.id);
+			const live = liveEntries.find((e) => e.id === player.id);
 			return live ? { ...player, status: live.status as typeof player.status } : player;
 		})
 	);

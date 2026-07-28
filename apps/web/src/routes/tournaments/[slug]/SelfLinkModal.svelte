@@ -61,7 +61,7 @@
 				>
 					<option value="" disabled selected>Choose your name</option>
 					{#each unlinkedPlayers as player (player.id)}
-						<option value={player.id}
+						<option value={player.playerId}
 							>{formatPlayerName(player)} - {formatHandicapIndex(player.handicap_index)}</option
 						>
 					{/each}

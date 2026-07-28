@@ -8,7 +8,7 @@ import type { Enums } from './database';
 // connected client can't otherwise get from its own SSR-loaded snapshot.
 export interface RealtimeBid {
 	id: string;
-	player_id: string;
+	entry_id: string;
 	bidder_id: string;
 	amount: number;
 	phase: Enums<'bid_phase'>;
@@ -16,18 +16,21 @@ export interface RealtimeBid {
 	voided_at: string | null;
 }
 
-export interface RealtimePlayer {
+// Renamed from RealtimePlayer (Phase 11) — status now lives on
+// player_entries, not players, so this carries a player_entries.id, not a
+// players.id.
+export interface RealtimePlayerEntry {
 	id: string;
 	status: Enums<'player_status'>;
 }
 
-// Unlike RealtimeBid/RealtimePlayer, this carries every live_lots column —
-// the live auction screen needs opened_at/closed_at to find the current
-// lot, closes_at for the anti-snipe countdown, and winning_bid_id for the
-// eventual sold display, so there's nothing left to narrow.
+// Unlike RealtimeBid/RealtimePlayerEntry, this carries every live_lots
+// column — the live auction screen needs opened_at/closed_at to find the
+// current lot, closes_at for the anti-snipe countdown, and winning_bid_id
+// for the eventual sold display, so there's nothing left to narrow.
 export interface RealtimeLiveLot {
 	id: string;
-	player_id: string;
+	entry_id: string;
 	queue_position: number;
 	opened_at: string | null;
 	closed_at: string | null;

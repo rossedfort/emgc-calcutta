@@ -1,19 +1,20 @@
 import { fail } from '@sveltejs/kit';
-import type { Tables } from '@emgc-calcutta/shared-types';
+import type { Enums } from '@emgc-calcutta/shared-types';
 import type { Actions, PageServerLoad } from './$types';
 
-export type LiveAdminPlayer = Pick<
-	Tables<'players'>,
-	| 'id'
-	| 'slug'
-	| 'first_name'
-	| 'last_name'
-	| 'flight'
-	| 'division'
-	| 'handicap_index'
-	| 'status'
-	| 'user_id'
->;
+// One row per player_entries row (Phase 11) — see FieldPlayerRow
+// (tournaments/[slug]/+page.server.ts) for the same shape and reasoning.
+export type LiveAdminPlayer = {
+	id: string;
+	slug: string;
+	first_name: string;
+	last_name: string;
+	flight: string;
+	division: string;
+	handicap_index: number | null;
+	status: Enums<'player_status'>;
+	user_id: string | null;
+};
 
 // No own tournament lookup — inherits it from the [slug] layout's load via
 // parent(), same as the queue page. Current lot / next-queued lot aren't
@@ -24,16 +25,38 @@ export type LiveAdminPlayer = Pick<
 export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
-	const { data: players } = await supabase
-		.from('players')
-		.select('id, slug, first_name, last_name, flight, division, handicap_index, status, user_id')
-		.eq('tournament_id', tournament.id)
-		.order('first_name')
-		.order('last_name');
+	const { data: entries } = await supabase
+		.from('player_entries')
+		.select(
+			'id, division, status, players(slug, first_name, last_name, flight, handicap_index, user_id)'
+		)
+		.eq('tournament_id', tournament.id);
+
+	const players: LiveAdminPlayer[] = (entries ?? [])
+		.flatMap((entry) =>
+			entry.players
+				? [
+						{
+							id: entry.id,
+							slug: entry.players.slug,
+							first_name: entry.players.first_name,
+							last_name: entry.players.last_name,
+							flight: entry.players.flight,
+							division: entry.division,
+							handicap_index: entry.players.handicap_index,
+							status: entry.status,
+							user_id: entry.players.user_id
+						}
+					]
+				: []
+		)
+		.sort(
+			(a, b) => a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name)
+		);
 
 	return {
 		tournament,
-		players: (players as LiveAdminPlayer[] | null) ?? [],
+		players,
 		title: `${tournament.name} · Live auction · EMGC Bet`,
 		description: `Run the live auction for ${tournament.name}.`
 	};
