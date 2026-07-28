@@ -65,6 +65,10 @@ function playerUrl(tournamentSlug: string, playerSlug: string): string {
   }/tournaments/${tournamentSlug}/players/${playerSlug}`;
 }
 
+function tournamentUrl(tournamentSlug: string): string {
+  return `${Deno.env.get("SITE_URL")}/tournaments/${tournamentSlug}`;
+}
+
 // Copy lives in exactly one place rather than scattered across every
 // future trigger-calling site (the Bid webhook, the LiveLot webhook,
 // ...), so updating the wording later is a one-file change.
@@ -155,12 +159,24 @@ function buildEmail(
         }),
       };
     }
-    case "live_starting":
+    case "live_starting": {
+      const subject = `The live auction for ${tournamentName} is starting`;
+      const text =
+        `The live auction for ${tournamentName} has opened. You have a reserved player in this event.`;
       return {
-        subject: `The live auction for ${tournamentName} is starting`,
-        text:
-          `The live auction for ${tournamentName} has opened. You have a reserved player in this event.`,
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            emailButton("View the live auction", tournamentUrl(tournamentSlug)),
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
       };
+    }
     case "won":
       return {
         subject: `You won ${playerName}!`,
