@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { deriveFlightDivisionGroups, groupPlayersByFlight } from './flightGroups';
+import {
+	deriveFlightDivisionGroups,
+	groupPlayersByFlight,
+	groupPlayersByFlightAndDivision
+} from './flightGroups';
 
 interface TestPlayer {
 	name: string;
@@ -9,6 +13,19 @@ interface TestPlayer {
 
 function player(name: string, flight: string, handicap_index: number | null): TestPlayer {
 	return { name, flight, handicap_index };
+}
+
+interface TestDivisionPlayer extends TestPlayer {
+	division: string;
+}
+
+function divisionPlayer(
+	name: string,
+	flight: string,
+	division: string,
+	handicap_index: number | null
+): TestDivisionPlayer {
+	return { name, flight, division, handicap_index };
 }
 
 describe('deriveFlightDivisionGroups', () => {
@@ -113,5 +130,62 @@ describe('groupPlayersByFlight', () => {
 	it('returns no groups at all for an empty player list', () => {
 		expect(groupPlayersByFlight([], [])).toEqual([]);
 		expect(groupPlayersByFlight([], ['A', 'B'])).toEqual([]);
+	});
+});
+
+describe('groupPlayersByFlightAndDivision', () => {
+	it('splits the championship flight into two adjacent Gross/Net sections', () => {
+		const players = [
+			divisionPlayer('Amy', 'A', 'overall', 10),
+			divisionPlayer('ChampGross', 'Championship', 'gross', 5),
+			divisionPlayer('ChampNet', 'Championship', 'net', 5)
+		];
+		const groups = groupPlayersByFlightAndDivision(players, ['A', 'Championship'], 'Championship');
+
+		expect(groups.map((g) => g.group.label)).toEqual([
+			'A',
+			'Championship — Gross',
+			'Championship — Net'
+		]);
+		expect(groups[1].players.map((p) => p.name)).toEqual(['ChampGross']);
+		expect(groups[2].players.map((p) => p.name)).toEqual(['ChampNet']);
+	});
+
+	it('sorts within each (flight, division) section by handicap ascending, nulls last', () => {
+		const players = [
+			divisionPlayer('High', 'Championship', 'gross', 20),
+			divisionPlayer('Low', 'Championship', 'gross', 2),
+			divisionPlayer('NoHandicap', 'Championship', 'gross', null)
+		];
+		const groups = groupPlayersByFlightAndDivision(players, ['Championship'], 'Championship');
+
+		expect(groups[0].players.map((p) => p.name)).toEqual(['Low', 'High', 'NoHandicap']);
+	});
+
+	it('drops a (flight, division) section entirely when it has no players', () => {
+		const players = [divisionPlayer('ChampGross', 'Championship', 'gross', 5)];
+		const groups = groupPlayersByFlightAndDivision(players, ['Championship'], 'Championship');
+
+		expect(groups.map((g) => g.group.label)).toEqual(['Championship — Gross']);
+	});
+
+	it('never silently drops a player whose (flight, division) matches no derived group', () => {
+		// Mirrors groupPlayersByFlight's own regression guard: data that
+		// predates a championship_flight change, or an unconfigured flight,
+		// should still be shown rather than vanish.
+		const players = [
+			divisionPlayer('Configured', 'A', 'overall', 5),
+			divisionPlayer('Stray', 'Championship', 'overall', 3)
+		];
+		const groups = groupPlayersByFlightAndDivision(players, ['A', 'Championship'], 'Championship');
+
+		const allNames = groups.flatMap((g) => g.players.map((p) => p.name));
+		expect(allNames).toContain('Stray');
+		expect(groups.map((g) => g.group.label)).toContain('Unassigned');
+	});
+
+	it('returns no groups at all for an empty player list', () => {
+		expect(groupPlayersByFlightAndDivision([], [], null)).toEqual([]);
+		expect(groupPlayersByFlightAndDivision([], ['A', 'Championship'], 'Championship')).toEqual([]);
 	});
 });

@@ -95,11 +95,20 @@ export const actions: Actions = {
 			return fail(404, { error: 'Tournament not found' });
 		}
 
+		const { data: player } = await supabase
+			.from('players')
+			.select('id, flight, division, first_name, last_name')
+			.eq('tournament_id', tournament.id)
+			.eq('slug', params.playerSlug)
+			.maybeSingle();
+		if (!player) {
+			return fail(404, { error: 'Player not found' });
+		}
+
 		const { error: updateError } = await supabase
 			.from('players')
 			.update({ user_id: userId })
-			.eq('tournament_id', tournament.id)
-			.eq('slug', params.playerSlug);
+			.eq('id', player.id);
 		if (updateError) {
 			// The dropdown already excludes taken links (see load), but this stays
 			// as defense in depth — e.g. two Admins editing at once — rather than
@@ -109,6 +118,27 @@ export const actions: Actions = {
 					? 'That participant is already linked to another player in this tournament.'
 					: updateError.message;
 			return fail(400, { error: message });
+		}
+
+		// A Championship-flight golfer is two independent rows (Gross/Net,
+		// same tournament/flight/first_name/last_name, different division —
+		// there's no shared "golfer id" to join on). Link the sibling too,
+		// matching how CSV import used to link both at once before
+		// self-service linking replaced that email-match auto-link (see
+		// link_self_to_player's own migration for the same reasoning).
+		// Filtered to a still-unlinked sibling so this never steals a link
+		// from someone else; a no-match here is a silent no-op, not an
+		// error, since the primary link above already succeeded.
+		if (player.division === 'gross' || player.division === 'net') {
+			await supabase
+				.from('players')
+				.update({ user_id: userId })
+				.eq('tournament_id', tournament.id)
+				.eq('flight', player.flight)
+				.eq('first_name', player.first_name)
+				.eq('last_name', player.last_name)
+				.eq('division', player.division === 'gross' ? 'net' : 'gross')
+				.is('user_id', null);
 		}
 	},
 
@@ -122,13 +152,39 @@ export const actions: Actions = {
 			return fail(404, { error: 'Tournament not found' });
 		}
 
+		const { data: player } = await supabase
+			.from('players')
+			.select('id, flight, division, first_name, last_name, user_id')
+			.eq('tournament_id', tournament.id)
+			.eq('slug', params.playerSlug)
+			.maybeSingle();
+		if (!player) {
+			return fail(404, { error: 'Player not found' });
+		}
+
 		const { error: updateError } = await supabase
 			.from('players')
 			.update({ user_id: null })
-			.eq('tournament_id', tournament.id)
-			.eq('slug', params.playerSlug);
+			.eq('id', player.id);
 		if (updateError) {
 			return fail(400, { error: updateError.message });
+		}
+
+		// Symmetric with the link action above: leaving the sibling still
+		// linked would recreate the same one-golfer-two-owners
+		// inconsistency. Only touches the sibling if it's linked to the
+		// *same* user that was just unlinked here — never unlinks someone
+		// else's link just because it shares a name/flight.
+		if ((player.division === 'gross' || player.division === 'net') && player.user_id) {
+			await supabase
+				.from('players')
+				.update({ user_id: null })
+				.eq('tournament_id', tournament.id)
+				.eq('flight', player.flight)
+				.eq('first_name', player.first_name)
+				.eq('last_name', player.last_name)
+				.eq('division', player.division === 'gross' ? 'net' : 'gross')
+				.eq('user_id', player.user_id);
 		}
 	},
 

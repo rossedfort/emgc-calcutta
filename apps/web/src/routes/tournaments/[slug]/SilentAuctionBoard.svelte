@@ -25,7 +25,7 @@
 		playerStatusBadgeVariant,
 		playerStatusLabel
 	} from '$lib/players';
-	import { groupPlayersByFlight } from '$lib/flightGroups';
+	import { groupPlayersByFlightAndDivision } from '$lib/flightGroups';
 	import type { FieldPlayerRow } from './+page.server';
 
 	let {
@@ -38,6 +38,7 @@
 		tournament: {
 			slug: string;
 			flights: string[];
+			championship_flight: string | null;
 			threshold_amount: number;
 			min_increment: number;
 		};
@@ -87,7 +88,19 @@
 		})
 	);
 
-	let groupedPlayers = $derived(groupPlayersByFlight(filteredPlayers, tournament.flights));
+	// Split into (flight, division) sections rather than flight alone — a
+	// Championship-flight golfer's Gross and Net rows are two completely
+	// independent auction entries (own bids, own "current high"), and
+	// sharing one flight section with just an inline badge wasn't a clear
+	// enough distinction for a participant actually placing a bid (reported
+	// directly). Each section header now reads e.g. "A — Gross"/"A — Net".
+	let groupedPlayers = $derived(
+		groupPlayersByFlightAndDivision(
+			filteredPlayers,
+			tournament.flights,
+			tournament.championship_flight
+		)
+	);
 
 	// Splits a formatted amount ("$1,850.00") into characters for the
 	// slot-machine effect, each keyed by distance from the *end* of the
@@ -180,7 +193,7 @@
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
-			{#each groupedPlayers as { group, players } (group.flight)}
+			{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
 				<Table.Row class="bg-sand/20 hover:bg-sand/20">
 					<Table.Cell colspan={5} class="font-data text-xs tracking-widest text-fairway uppercase">
 						{group.label}
