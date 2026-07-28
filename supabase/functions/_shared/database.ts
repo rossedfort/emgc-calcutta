@@ -472,6 +472,7 @@ export type Database = {
           first_name: string | null;
           id: string;
           last_name: string | null;
+          name_confirmed_at: string | null;
           phone: string | null;
           role: Database["public"]["Enums"]["user_role"];
           sso_provider: Database["public"]["Enums"]["auth_provider"] | null;
@@ -483,6 +484,7 @@ export type Database = {
           first_name?: string | null;
           id: string;
           last_name?: string | null;
+          name_confirmed_at?: string | null;
           phone?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
           sso_provider?: Database["public"]["Enums"]["auth_provider"] | null;
@@ -494,6 +496,7 @@ export type Database = {
           first_name?: string | null;
           id?: string;
           last_name?: string | null;
+          name_confirmed_at?: string | null;
           phone?: string | null;
           role?: Database["public"]["Enums"]["user_role"];
           sso_provider?: Database["public"]["Enums"]["auth_provider"] | null;

@@ -7,7 +7,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 	import { Switch } from '$lib/components/ui/switch';
-	import { isProfileComplete, type UserProfile } from '$lib/profile';
+	import { needsNameConfirmation, type UserProfile } from '$lib/profile';
 
 	let {
 		profile,
@@ -19,19 +19,23 @@
 	// open showing the second (this component instance persists across both
 	// steps; see +page.svelte, which renders it unconditionally rather than
 	// behind an {#if}).
-	const initialProfileIncomplete = untrack(() => !isProfileComplete(profile));
+	const initialNameConfirmationPending = untrack(() => needsNameConfirmation(profile));
 	const totalSteps =
-		(initialProfileIncomplete ? 1 : 0) + (untrack(() => notificationsSetupPending) ? 1 : 0);
+		(initialNameConfirmationPending ? 1 : 0) + (untrack(() => notificationsSetupPending) ? 1 : 0);
 
 	// These two *do* need to stay reactive — completing one step (via
 	// use:enhance's update() below, which invalidates root layout's load)
 	// is what advances currentStep to the next one, or clears it to null
-	// (closing the modal) once both are done.
-	let profileIncomplete = $derived(!isProfileComplete(profile));
+	// (closing the modal) once both are done. Always shows the name step at
+	// least once — needsNameConfirmation checks name_confirmed_at, not
+	// whether first_name/last_name happen to already be populated, so an
+	// OAuth sign-in that auto-filled both from the identity provider still
+	// gets a chance to review/correct them here.
+	let nameConfirmationPending = $derived(needsNameConfirmation(profile));
 	let currentStep = $derived(
-		profileIncomplete ? 'profile' : notificationsSetupPending ? 'notifications' : null
+		nameConfirmationPending ? 'profile' : notificationsSetupPending ? 'notifications' : null
 	);
-	let stepIndex = $derived(currentStep === 'profile' ? 1 : initialProfileIncomplete ? 2 : 1);
+	let stepIndex = $derived(currentStep === 'profile' ? 1 : initialNameConfirmationPending ? 2 : 1);
 
 	// --- Profile step ---
 	// Seeded once from the initial props, deliberately not reactively (see

@@ -88,6 +88,18 @@ INSERT INTO "public"."users" ("id", "first_name", "last_name", "email", "phone",
 	('563de983-bf4a-4e05-ab13-2bf4285c11d1', 'Jerry', 'Roberts', 'jerry.roberts49@example.com', NULL, NULL, NULL, 'participant', '2026-07-15 22:18:11.54921+00'),
 	('82971f4d-aaef-428e-a8f3-fcf177cad9b5', 'Ross', 'Edfort', 'rossedfort@gmail.com', NULL, 'google', NULL, 'owner', '2026-07-16 13:54:52.300807+00');
 
+-- Not part of the pg_dump above: name_confirmed_at didn't exist when this
+-- dump was taken. Migrations always apply before this file on a local
+-- `db reset` (the opposite order from a real `db push` against existing
+-- remote data, where that migration's own backfill already covers this) —
+-- without this, every demo account here would start unconfirmed and hit
+-- OnboardingModal's name step on next local sign-in, despite already having
+-- a complete name. Mirrors that migration's own backfill exactly.
+UPDATE "public"."users"
+SET "name_confirmed_at" = "created_at"
+WHERE "first_name" IS NOT NULL AND "first_name" <> ''
+  AND "last_name" IS NOT NULL AND "last_name" <> '';
+
 
 --
 -- Data for Name: players; Type: TABLE DATA; Schema: public; Owner: postgres

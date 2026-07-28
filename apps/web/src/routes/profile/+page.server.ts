@@ -16,7 +16,7 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 
 	const { data, error: queryError } = await supabase
 		.from('users')
-		.select('first_name, last_name, email, avatar_url, role')
+		.select('first_name, last_name, email, avatar_url, role, name_confirmed_at')
 		.eq('id', session.user.id)
 		.single();
 
@@ -58,6 +58,11 @@ export const actions: Actions = {
 	// first_name/last_name-only column grant (see the migration) is what
 	// makes this safe without an Edge Function, matching this codebase's
 	// "basic form validation doesn't need service-role" precedent.
+	//
+	// Also stamps name_confirmed_at on every successful save, whether called
+	// from the onboarding modal or an ordinary post-onboarding edit — this is
+	// the one signal the onboarding gate actually checks (see needsName
+	// Confirmation), separate from whether the names happen to be populated.
 	updateProfile: async ({ request, locals: { session, supabase } }) => {
 		if (!session) {
 			redirect(303, '/login');
@@ -77,7 +82,7 @@ export const actions: Actions = {
 
 		const { error: updateError } = await supabase
 			.from('users')
-			.update({ first_name, last_name })
+			.update({ first_name, last_name, name_confirmed_at: new Date().toISOString() })
 			.eq('id', session.user.id);
 
 		if (updateError) {
