@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { isProfileComplete, type UserProfile } from '$lib/profile';
+import { needsNameConfirmation, type UserProfile } from '$lib/profile';
 import type { LayoutServerLoad } from './$types';
 
 // Fallback <title>/meta description for any route that doesn't set its own
@@ -26,7 +26,7 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase }, co
 	if (session) {
 		const { data } = await supabase
 			.from('users')
-			.select('first_name, last_name, email, avatar_url, role')
+			.select('first_name, last_name, email, avatar_url, role, name_confirmed_at')
 			.eq('id', session.user.id)
 			.single();
 		profile = (data as UserProfile) ?? null;
@@ -44,18 +44,18 @@ export const load: LayoutServerLoad = async ({ locals: { session, supabase }, co
 			.maybeSingle();
 		notificationsSetupPending = !prefsRow;
 
-		// Onboarding gate: an incomplete profile (spec 4.1 — OAuth/
-		// passwordless sign-in only ever hands back a single name blob,
-		// best-effort split into first_name/last_name by handle_new_user(),
-		// not guaranteed for a single-word name, no name at all, or a
-		// multi-word surname that split oddly) or a still-pending
-		// notification choice sends every other route back to `/`, where
-		// OnboardingModal (see +page.svelte) is the single, non-dismissible
-		// place either gets finished — replaces what used to be two
-		// separate redirects to two separate pages.
-		const profileIncomplete = profile ? !isProfileComplete(profile) : false;
+		// Onboarding gate: an unconfirmed name (spec 4.1 — OAuth/passwordless
+		// sign-in only ever hands back a single name blob, best-effort split
+		// into first_name/last_name by handle_new_user(); name_confirmed_at
+		// is only set once the user has actually reviewed/submitted the name
+		// step, so this still gates even when the split happened to come out
+		// right) or a still-pending notification choice sends every other
+		// route back to `/`, where OnboardingModal (see +page.svelte) is the
+		// single, non-dismissible place either gets finished — replaces what
+		// used to be two separate redirects to two separate pages.
+		const nameConfirmationPending = profile ? needsNameConfirmation(profile) : false;
 		if (
-			(profileIncomplete || notificationsSetupPending) &&
+			(nameConfirmationPending || notificationsSetupPending) &&
 			!ONBOARDING_EXEMPT_PATHS.includes(url.pathname)
 		) {
 			redirect(303, '/');

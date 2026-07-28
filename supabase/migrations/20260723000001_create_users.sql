@@ -25,7 +25,16 @@ create table public.users (
   sso_provider auth_provider,
   avatar_url text,
   role user_role not null default 'unassigned',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Separate from "has a name": OAuth sign-in usually populates first_name/
+  -- last_name via handle_new_user()'s best-effort split, but that's a guess
+  -- the user never actually reviewed. The onboarding gate (root
+  -- +layout.server.ts) checks this instead of first_name/last_name being
+  -- non-null, so the profile step always shows at least once regardless of
+  -- where the name came from — only set once a real updateProfile submit
+  -- succeeds (which itself requires both names to be non-empty), so this is
+  -- a strict superset of "profile complete."
+  name_confirmed_at timestamptz
 );
 
 alter table public.users enable row level security;
@@ -78,8 +87,9 @@ using (
 -- policy on the whole row — role changes and other fields still go through
 -- service-role only. Column-scoped at the grant level (not just the
 -- policy), so even a crafted request naming other columns is rejected
--- before RLS is evaluated at all.
-grant update (first_name, last_name) on public.users to authenticated;
+-- before RLS is evaluated at all. name_confirmed_at included since
+-- updateProfile stamps it in the same write as first_name/last_name.
+grant update (first_name, last_name, name_confirmed_at) on public.users to authenticated;
 
 create policy "users_update_self" on public.users
 for update
