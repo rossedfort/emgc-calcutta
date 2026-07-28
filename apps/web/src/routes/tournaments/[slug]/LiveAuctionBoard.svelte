@@ -44,22 +44,22 @@
 		liveLots.find((lot) => lot.opened_at !== null && lot.closed_at === null) ?? null
 	);
 	let currentPlayer = $derived(
-		currentLot ? (players.find((p) => p.id === currentLot!.player_id) ?? null) : null
+		currentLot ? (players.find((p) => p.id === currentLot!.entry_id) ?? null) : null
 	);
 	let isCurrentPlayerYou = $derived(currentPlayer?.user_id === currentUserId);
-	let currentLotHigh = $derived(currentLot ? currentHighBid(liveBids, currentLot.player_id) : null);
+	let currentLotHigh = $derived(currentLot ? currentHighBid(liveBids, currentLot.entry_id) : null);
 
 	// The carousel strip below the current lot — every not-yet-opened lot, in
 	// queue order, so participants can see what's coming while the current
-	// player is being bid on. Skips a lot whose player can't be found the
-	// same way the queue admin screen does (can't happen today, player_id has
+	// player is being bid on. Skips a lot whose entry can't be found the
+	// same way the queue admin screen does (can't happen today, entry_id has
 	// no ON DELETE cascade — cheap insurance against a future inconsistency).
 	let upcomingLots = $derived(
 		liveLots
 			.filter((lot) => lot.opened_at === null)
 			.sort((a, b) => a.queue_position - b.queue_position)
 			.flatMap((lot) => {
-				const player = players.find((p) => p.id === lot.player_id);
+				const player = players.find((p) => p.id === lot.entry_id);
 				return player ? [{ lot, player }] : [];
 			})
 	);
@@ -99,7 +99,7 @@
 		bidError = '';
 
 		const { error: invokeError } = await supabase.functions.invoke<PlaceBidResponse>('place-bid', {
-			body: { playerId: currentPlayer.id, amount } satisfies PlaceBidRequest
+			body: { entryId: currentPlayer.id, amount } satisfies PlaceBidRequest
 		});
 
 		bidPending = false;

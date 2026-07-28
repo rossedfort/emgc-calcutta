@@ -72,26 +72,28 @@
 		return `${n}${suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]}`;
 	}
 
-	// Prefills each spot from whatever's already persisted (players.placement)
-	// so reopening the modal to correct a result starts from the current
-	// state, not a blank form — this is what makes "Edit results" the same
-	// modal as "Enter results" rather than a second component.
+	// Prefills each spot from whatever's already persisted
+	// (player_entries.placement) so reopening the modal to correct a result
+	// starts from the current state, not a blank form — this is what makes
+	// "Edit results" the same modal as "Enter results" rather than a second
+	// component. id (Phase 11) is a player_entries.id, matching set-placement's
+	// entryId.
 	async function loadExisting() {
 		loadingExisting = true;
 		const { data } = await supabase
-			.from('players')
-			.select('id, first_name, last_name, flight, division, placement')
+			.from('player_entries')
+			.select('id, flight, division, placement, players(first_name, last_name)')
 			.eq('tournament_id', tournamentId)
 			.not('placement', 'is', null);
 
 		const next: Record<string, Selection> = {};
 		for (const row of data ?? []) {
-			if (row.placement !== null) {
+			if (row.placement !== null && row.players) {
 				const key = spotKey({ flight: row.flight, division: row.division }, row.placement);
 				next[key] = {
 					id: row.id,
-					first_name: row.first_name,
-					last_name: row.last_name,
+					first_name: row.players.first_name,
+					last_name: row.players.last_name,
 					division: row.division
 				};
 			}
@@ -136,26 +138,35 @@
 		debounceTimers[key] = setTimeout(() => runSearch(group, placement, value), 300);
 	}
 
-	// Only sold players are eligible for a placement — set-placement itself
+	// Only sold entries are eligible for a placement — set-placement itself
 	// rejects anything else, so the type-ahead never offers a choice
 	// guaranteed to fail. Scoped to this group's own flight/division so a
-	// search from one group's box can never suggest another group's player.
+	// search from one group's box can never suggest another group's entry.
+	// Query root is player_entries (Phase 11) — first_name/last_name live on
+	// the embedded `players` resource, so the name search and its ordering
+	// are both scoped to that embedded table via { referencedTable }.
 	async function runSearch(group: Group, placement: number, value: string) {
 		const key = spotKey(group, placement);
 		const { data } = await supabase
-			.from('players')
-			.select('id, first_name, last_name, division')
+			.from('player_entries')
+			.select('id, division, players!inner(first_name, last_name)')
 			.eq('tournament_id', tournamentId)
 			.eq('flight', group.flight)
 			.eq('division', group.division)
 			.in('status', ['sold_silent', 'sold_live'])
-			.or(`first_name.ilike.%${value}%,last_name.ilike.%${value}%`)
-			.order('first_name')
-			.order('last_name')
+			.or(`first_name.ilike.%${value}%,last_name.ilike.%${value}%`, { referencedTable: 'players' })
+			.order('first_name', { referencedTable: 'players' })
+			.order('last_name', { referencedTable: 'players' })
 			.limit(8);
 
 		const exclude = usedPlayerIds(key);
-		suggestions[key] = ((data ?? []) as PlayerOption[]).filter((p) => !exclude.has(p.id));
+		const options: PlayerOption[] = (data ?? []).map((entry) => ({
+			id: entry.id,
+			first_name: entry.players.first_name,
+			last_name: entry.players.last_name,
+			division: entry.division
+		}));
+		suggestions[key] = options.filter((p) => !exclude.has(p.id));
 	}
 
 	function selectPlayer(group: Group, placement: number, player: PlayerOption) {
@@ -187,7 +198,7 @@
 			spots
 				.filter((s) => selections[spotKey(group, s.placement)])
 				.map((s) => ({
-					playerId: selections[spotKey(group, s.placement)]!.id,
+					entryId: selections[spotKey(group, s.placement)]!.id,
 					placement: s.placement
 				}))
 		);

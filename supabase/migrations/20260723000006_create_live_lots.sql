@@ -1,5 +1,5 @@
--- LiveLot (spec 4.4/5): the live-auction queue. One row per reserved player
--- as they come up for live bidding, in Admin-controlled order.
+-- LiveLot (spec 4.4/5): the live-auction queue. One row per reserved entry
+-- as it comes up for live bidding, in Admin-controlled order.
 --
 -- No explicit status column — outcome is derived from timestamp/FK
 -- nullability, mirroring the rest of the schema's bias toward derived
@@ -14,14 +14,15 @@
 -- window, so clients can count down from a synced value with no
 -- server-side timer process.
 --
--- player_id has no ON DELETE cascade, same reasoning as Bid: a lot that
+-- entry_id has no ON DELETE cascade, same reasoning as Bid: a lot that
 -- reached bidding carries real auction history (via winning_bid_id), so a
--- Player with live-lot history should block deletion rather than silently
--- losing it. tournament_id does cascade, matching Player's own FK.
+-- PlayerEntry with live-lot history should block deletion rather than
+-- silently losing it. tournament_id does cascade, matching PlayerEntry's
+-- own FK.
 create table public.live_lots (
   id uuid primary key default gen_random_uuid(),
   tournament_id uuid not null references public.tournaments (id) on delete cascade,
-  player_id uuid not null references public.players (id),
+  entry_id uuid not null references public.player_entries (id),
   queue_position integer not null,
   opened_at timestamptz,
   closed_at timestamptz,
@@ -30,7 +31,7 @@ create table public.live_lots (
 );
 
 create index live_lots_tournament_id_idx on public.live_lots (tournament_id);
-create index live_lots_player_id_idx on public.live_lots (player_id);
+create index live_lots_entry_id_idx on public.live_lots (entry_id);
 
 -- Deferrable: reordering the queue means swapping two rows' queue_position,
 -- which under a plain (immediate) unique constraint can't be done as a
@@ -52,7 +53,7 @@ alter publication supabase_realtime add table public.live_lots;
 
 -- Reads only, same visibility rule as players/bids: Admin/Owner see every
 -- lot; Participants see lots in tournaments they can see at all
--- (kind='production'), not just lots for players they're bidding on — spec
+-- (kind='production'), not just lots for entries they're bidding on — spec
 -- 4.5 requires every connected client to see lot state (opened, closed,
 -- current high) in near-real-time during the live event.
 create policy "live_lots_select_participant_plus" on public.live_lots
@@ -170,14 +171,18 @@ $$;
 
 grant execute on function public.resequence_queue(uuid, uuid[]) to authenticated;
 
--- Queues a player for the live auction the moment they cross the reserve
+-- Queues an entry for the live auction the moment it crosses the reserve
 -- threshold during the silent auction (called from place-bid, in the same
--- transaction that reserves them — no Admin hand-add step).
+-- transaction that reserves it — no Admin hand-add step). p_player_id is
+-- the parameter name kept for place-bid's own call site, even though the
+-- value passed is a player_entries.id, not a players.id — see
+-- create_player_entries.sql's own header for why this table holds the
+-- sellable unit rather than players itself.
 --
 -- Uses an advisory lock rather than relying on the deferred unique
 -- constraint above: this function has to *compute* the next queue_position
--- by reading the current max, and two players crossing the threshold at
--- the same instant (different players, same tournament) could otherwise
+-- by reading the current max, and two entries crossing the threshold at
+-- the same instant (different entries, same tournament) could otherwise
 -- both compute the same "next" position from two concurrent transactions
 -- before either commits — the deferred constraint only serializes multiple
 -- statements *within* one transaction, not across two. Locking on the
@@ -204,7 +209,7 @@ begin
   from public.live_lots
   where tournament_id = p_tournament_id;
 
-  insert into public.live_lots (tournament_id, player_id, queue_position)
+  insert into public.live_lots (tournament_id, entry_id, queue_position)
   values (p_tournament_id, p_player_id, next_position);
 end;
 $$;
@@ -223,6 +228,14 @@ grant execute on function public.enqueue_player_for_live_auction(uuid, uuid) to 
 -- function has no HTTP request to read those from, unlike an Edge
 -- Function — audit_events already treats both as nullable for this). No
 -- p_reason (a bid-void concept, not needed by either caller below).
+--
+-- p_player_id always resolves to the golfer's own players.id (identity),
+-- even for an event that's actually about one specific entry — p_entry_id
+-- is additionally populated for those entry-scoped events, so "filter the
+-- audit log by this golfer" keeps working across their whole history
+-- regardless of which specific entry an event concerned. Defaulted to null
+-- so a caller logging a golfer-identity-level event (not about any
+-- particular entry) doesn't need to pass it.
 create function public.log_audit_event(
   p_tournament_id uuid,
   p_player_id uuid,
@@ -230,7 +243,8 @@ create function public.log_audit_event(
   p_entity_type text,
   p_entity_id uuid,
   p_before jsonb,
-  p_after jsonb
+  p_after jsonb,
+  p_entry_id uuid default null
 )
 returns void
 language plpgsql
@@ -239,20 +253,20 @@ set search_path = ''
 as $$
 begin
   insert into public.audit_events (
-    tournament_id, player_id, actor_id, actor_identity,
+    tournament_id, player_id, entry_id, actor_id, actor_identity,
     action, entity_type, entity_id, before, after
   )
   values (
-    p_tournament_id, p_player_id, auth.uid(), auth.email(),
+    p_tournament_id, p_player_id, p_entry_id, auth.uid(), auth.email(),
     p_action, p_entity_type, p_entity_id, p_before, p_after
   );
 end;
 $$;
 
--- Only granted to the two functions below, not authenticated at large —
+-- Only granted to the functions below, not authenticated at large —
 -- nothing else can write an audit row just because it can call a SQL
 -- function.
-grant execute on function public.log_audit_event(uuid, uuid, text, text, uuid, jsonb, jsonb) to authenticated;
+grant execute on function public.log_audit_event(uuid, uuid, text, text, uuid, jsonb, jsonb, uuid) to authenticated;
 
 -- Open/close a live lot (spec 4.4). Both are read-then-write (need the
 -- tournament's anti_snipe_seconds/live_auction_started_at to open, need the
@@ -265,30 +279,35 @@ grant execute on function public.log_audit_event(uuid, uuid, text, text, uuid, j
 -- once their own write succeeds.
 --
 -- Both are plain SECURITY INVOKER (the default) — the existing
--- live_lots_write_admin_owner and players_update_admin_owner RLS policies
--- already let Admin/Owner make these writes directly, so these functions
--- grant no more authority than the caller already has; a non-admin caller
--- invoking either RPC still hits the same RLS denial the underlying UPDATE
--- would give them directly.
+-- live_lots_write_admin_owner and player_entries_update_admin_owner RLS
+-- policies already let Admin/Owner make these writes directly, so these
+-- functions grant no more authority than the caller already has; a
+-- non-admin caller invoking either RPC still hits the same RLS denial the
+-- underlying UPDATE would give them directly.
 create function public.open_live_lot(lot_id uuid)
 returns void
 language plpgsql
 as $$
 declare
   target_tournament_id uuid;
+  target_entry_id uuid;
   target_player_id uuid;
   snipe_seconds integer;
   already_open_count integer;
   started timestamptz;
   opened_ts timestamptz := now();
 begin
-  select tournament_id, player_id into target_tournament_id, target_player_id
+  select tournament_id, entry_id into target_tournament_id, target_entry_id
   from public.live_lots
   where id = lot_id;
 
   if target_tournament_id is null then
     raise exception 'Lot not found';
   end if;
+
+  select player_id into target_player_id
+  from public.player_entries
+  where id = target_entry_id;
 
   select live_auction_started_at into started
   from public.tournaments
@@ -339,7 +358,8 @@ begin
 
   perform public.log_audit_event(
     target_tournament_id, target_player_id, 'lot_opened', 'LiveLot', lot_id,
-    null, jsonb_build_object('opened_at', opened_ts)
+    null, jsonb_build_object('opened_at', opened_ts),
+    target_entry_id
   );
 end;
 $$;
@@ -352,30 +372,31 @@ language plpgsql
 as $$
 declare
   target_tournament_id uuid;
+  target_entry_id uuid;
   target_player_id uuid;
   before_status public.player_status;
   high_bid_id uuid;
   new_status public.player_status;
 begin
-  select tournament_id, player_id into target_tournament_id, target_player_id
+  select tournament_id, entry_id into target_tournament_id, target_entry_id
   from public.live_lots
   where id = lot_id and opened_at is not null and closed_at is null;
 
-  if target_player_id is null then
+  if target_entry_id is null then
     raise exception 'Lot not found or not currently open';
   end if;
-
-  select status into before_status
-  from public.players
-  where id = target_player_id;
 
   -- Same "current non-voided high bid" lookup place-bid itself uses — this
   -- is what makes the outcome auto-computed rather than a manual Admin
   -- choice between "Sold"/"No bid": a surviving bid means sold, no
   -- surviving bid (never bid, or every bid on it voided) means no_bid.
+  select status, player_id into before_status, target_player_id
+  from public.player_entries
+  where id = target_entry_id;
+
   select id into high_bid_id
   from public.bids
-  where player_id = target_player_id and voided_at is null
+  where entry_id = target_entry_id and voided_at is null
   order by amount desc
   limit 1;
 
@@ -389,18 +410,19 @@ begin
     raise exception 'Not permitted to close this lot';
   end if;
 
-  update public.players
+  update public.player_entries
   set status = new_status, winning_bid_id = high_bid_id
-  where id = target_player_id;
+  where id = target_entry_id;
 
   if not found then
-    raise exception 'Not permitted to update this player';
+    raise exception 'Not permitted to update this entry';
   end if;
 
   perform public.log_audit_event(
     target_tournament_id, target_player_id, 'lot_sold', 'LiveLot', lot_id,
     jsonb_build_object('status', before_status),
-    jsonb_build_object('status', new_status, 'winning_bid_id', high_bid_id)
+    jsonb_build_object('status', new_status, 'winning_bid_id', high_bid_id),
+    target_entry_id
   );
 end;
 $$;

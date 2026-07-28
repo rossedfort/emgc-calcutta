@@ -4,7 +4,7 @@ import type {
 	Database,
 	RealtimeBid,
 	RealtimeLiveLot,
-	RealtimePlayer
+	RealtimePlayerEntry
 } from '@emgc-calcutta/shared-types';
 
 // 'connecting' is the initial state before the channel has ever joined
@@ -18,7 +18,10 @@ export type RealtimeConnectionStatus = 'connecting' | 'connected' | 'reconnectin
 
 export interface TournamentRealtime {
 	bids: Readable<RealtimeBid[]>;
-	players: Readable<RealtimePlayer[]>;
+	// Renamed from `players` (Phase 11) — status now lives on player_entries,
+	// not players, so this stream tracks entries, keyed by
+	// player_entries.id, not players.id.
+	entries: Readable<RealtimePlayerEntry[]>;
 	liveLots: Readable<RealtimeLiveLot[]>;
 	connectionStatus: Readable<RealtimeConnectionStatus>;
 	/** Unsubscribes and tears down the channel — call on component unmount. */
@@ -39,33 +42,33 @@ export function createTournamentRealtime(
 	tournamentId: string
 ): TournamentRealtime {
 	const bids = writable<RealtimeBid[]>([]);
-	const players = writable<RealtimePlayer[]>([]);
+	const entries = writable<RealtimePlayerEntry[]>([]);
 	const liveLots = writable<RealtimeLiveLot[]>([]);
 	const connectionStatus = writable<RealtimeConnectionStatus>('connecting');
 
 	async function reconcile() {
-		const { data: playerRows } = await supabase
-			.from('players')
+		const { data: entryRows } = await supabase
+			.from('player_entries')
 			.select('id, status')
 			.eq('tournament_id', tournamentId);
-		players.set(playerRows ?? []);
+		entries.set(entryRows ?? []);
 
 		const { data: liveLotRows } = await supabase
 			.from('live_lots')
-			.select('id, player_id, queue_position, opened_at, closed_at, closes_at, winning_bid_id')
+			.select('id, entry_id, queue_position, opened_at, closed_at, closes_at, winning_bid_id')
 			.eq('tournament_id', tournamentId);
 		liveLots.set(liveLotRows ?? []);
 
-		const playerIds = (playerRows ?? []).map((p) => p.id);
-		if (playerIds.length === 0) {
+		const entryIds = (entryRows ?? []).map((e) => e.id);
+		if (entryIds.length === 0) {
 			bids.set([]);
 			return;
 		}
 
 		const { data: bidRows } = await supabase
 			.from('bids')
-			.select('id, player_id, bidder_id, amount, phase, placed_at, voided_at')
-			.in('player_id', playerIds)
+			.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at')
+			.in('entry_id', entryIds)
 			.order('placed_at', { ascending: true });
 		bids.set(bidRows ?? []);
 	}
@@ -77,24 +80,24 @@ export function createTournamentRealtime(
 			{
 				event: 'UPDATE',
 				schema: 'public',
-				table: 'players',
+				table: 'player_entries',
 				filter: `tournament_id=eq.${tournamentId}`
 			},
 			(payload) => {
-				const updated = payload.new as RealtimePlayer;
-				players.update((current) =>
-					current.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+				const updated = payload.new as RealtimePlayerEntry;
+				entries.update((current) =>
+					current.map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
 				);
 			}
 		)
 		.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bids' }, (payload) => {
 			const newBid = payload.new as RealtimeBid;
 			// `bids` has no tournament_id column to filter on server-side (see
-			// spec 5's data model — a Bid is scoped by playerId, not directly
+			// spec 5's data model — a Bid is scoped by entryId, not directly
 			// by tournament), so this table-wide subscription checks
-			// membership client-side against the already-reconciled player
+			// membership client-side against the already-reconciled entry
 			// list. Cheap at this app's scale (a single internal league).
-			if (get(players).some((p) => p.id === newBid.player_id)) {
+			if (get(entries).some((e) => e.id === newBid.entry_id)) {
 				bids.update((current) => [...current, newBid]);
 			}
 		})
@@ -140,7 +143,7 @@ export function createTournamentRealtime(
 
 	return {
 		bids,
-		players,
+		entries,
 		liveLots,
 		connectionStatus,
 		destroy: () => {

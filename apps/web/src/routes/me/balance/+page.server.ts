@@ -25,8 +25,8 @@ export interface WonRow {
 // Participants, since self-bidding (spec 4.9) means an Admin or Owner
 // can just as easily owe money into the pot or have won a payout.
 //
-// "What you owe": every player this user's winning bid bought, across
-// every tournament — winning_bid:bids!players_winning_bid_id_fkey!inner
+// "What you owe": every entry this user's winning bid bought, across
+// every tournament — winning_bid:bids!player_entries_winning_bid_id_fkey!inner
 // makes the embed an inner join so .eq('winning_bid.bidder_id', ...) can
 // filter on it; RLS alone isn't enough to scope this to "mine" for an
 // Admin/Owner caller, since bids_select_participant_plus deliberately
@@ -46,22 +46,49 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 	}
 	const userId = session.user.id;
 
-	const { data: owed, error: owedError } = await supabase
-		.from('players')
+	const { data: owedEntries, error: owedError } = await supabase
+		.from('player_entries')
 		.select(
-			'id, first_name, last_name, division, status, buyer_marked_paid_at, tournament:tournaments(name), winning_bid:bids!players_winning_bid_id_fkey!inner(amount, bidder_id)'
+			'id, division, status, buyer_marked_paid_at, tournament:tournaments(name), players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey!inner(amount, bidder_id)'
 		)
-		.eq('winning_bid.bidder_id', userId)
-		.order('first_name')
-		.order('last_name');
+		.eq('winning_bid.bidder_id', userId);
 	if (owedError) {
 		error(500, owedError.message);
 	}
 
-	const { data: won, error: wonError } = await supabase
+	// Sorted client-side, not via .order() — the query root is now
+	// player_entries (Phase 11), so first_name/last_name live on the
+	// embedded `players` resource rather than the queried table itself.
+	const owed: OwedRow[] = (owedEntries ?? [])
+		.flatMap((entry) =>
+			entry.players
+				? [
+						{
+							id: entry.id,
+							first_name: entry.players.first_name,
+							last_name: entry.players.last_name,
+							division: entry.division,
+							status: entry.status as 'sold_silent' | 'sold_live',
+							buyer_marked_paid_at: entry.buyer_marked_paid_at,
+							tournament: entry.tournament,
+							winning_bid: entry.winning_bid
+						}
+					]
+				: []
+		)
+		.sort(
+			(a, b) => a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name)
+		);
+
+	// entry:player_entries(division, players(first_name, last_name)) —
+	// payouts.entry_id has a single FK path to player_entries (no
+	// disambiguation hint needed there), but division lives on
+	// player_entries while first_name/last_name live on players, so this
+	// embed nests one level deeper than the pre-split query did.
+	const { data: wonRows, error: wonError } = await supabase
 		.from('payouts')
 		.select(
-			'id, placement, amount, marked_paid_at, tournament:tournaments(name), player:players(first_name, last_name, division)'
+			'id, placement, amount, marked_paid_at, tournament:tournaments(name), entry:player_entries(division, players(first_name, last_name))'
 		)
 		.eq('bidder_id', userId)
 		.order('placement');
@@ -69,9 +96,24 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 		error(500, wonError.message);
 	}
 
+	const won: WonRow[] = (wonRows ?? []).map((payout) => ({
+		id: payout.id,
+		placement: payout.placement,
+		amount: payout.amount,
+		marked_paid_at: payout.marked_paid_at,
+		tournament: payout.tournament,
+		player: payout.entry?.players
+			? {
+					first_name: payout.entry.players.first_name,
+					last_name: payout.entry.players.last_name,
+					division: payout.entry.division
+				}
+			: null
+	}));
+
 	return {
-		owed: (owed as OwedRow[] | null) ?? [],
-		won: (won as WonRow[] | null) ?? [],
+		owed,
+		won,
 		title: 'My balance · EMGC Bet',
 		description: "What you owe and what you've won across every EMGC Bet tournament."
 	};

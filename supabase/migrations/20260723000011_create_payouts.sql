@@ -1,17 +1,17 @@
--- Payout (spec 5/4.8). One row per placed player, created by the
--- set-placement Edge Function from Tournament.payoutStructure and the
--- total pot (sum of all winning bid amounts across the tournament).
--- marked_paid_at/marked_paid_by never trigger real payment — same
--- "record-keeping flag, not payment processing" pattern as
--- players.buyer_marked_paid_at/by (spec 2, Non-Goals).
+-- Payout (spec 5/4.8). One row per placed entry, created by the
+-- set-placement Edge Function from Tournament.payoutStructure and that
+-- entry's own (flight, division) group's pot. marked_paid_at/marked_paid_by
+-- never trigger real payment — same "record-keeping flag, not payment
+-- processing" pattern as player_entries.buyer_marked_paid_at/by (spec 2,
+-- Non-Goals).
 --
--- player_id/bidder_id: no cascade, matching this schema's established
--- financial-record pattern (Bid.player_id, LiveLot.player_id) — a Payout
--- is a financial record, so a Player/User with payout history should block
+-- entry_id/bidder_id: no cascade, matching this schema's established
+-- financial-record pattern (Bid.entry_id, LiveLot.entry_id) — a Payout is a
+-- financial record, so a PlayerEntry/User with payout history should block
 -- deletion rather than silently lose it. tournament_id cascades, matching
 -- every other tournament-scoped table.
 --
--- unique(player_id): spec 4.9/134 says "one row per placed player" — a
+-- unique(entry_id): spec 4.9/134 says "one row per placed entry" — a
 -- placement correction recalculates and re-logs the existing row (via
 -- upsert on this constraint) rather than accumulating stale duplicates.
 --
@@ -23,7 +23,7 @@
 create table public.payouts (
   id uuid primary key default gen_random_uuid(),
   tournament_id uuid not null references public.tournaments (id) on delete cascade,
-  player_id uuid not null references public.players (id),
+  entry_id uuid not null references public.player_entries (id),
   bidder_id uuid not null references public.users (id),
   placement integer not null check (placement > 0),
   pot_share numeric(5, 4) not null check (pot_share > 0 and pot_share <= 1),
@@ -33,7 +33,7 @@ create table public.payouts (
   marked_paid_by uuid references public.users (id) on delete set null
 );
 
-create unique index payouts_player_id_key on public.payouts (player_id);
+create unique index payouts_entry_id_key on public.payouts (entry_id);
 create index payouts_tournament_id_idx on public.payouts (tournament_id);
 create index payouts_bidder_id_idx on public.payouts (bidder_id);
 create index payouts_marked_paid_by_idx on public.payouts (marked_paid_by);

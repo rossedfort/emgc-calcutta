@@ -1,12 +1,19 @@
 import { error, fail } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Database, Tables } from '@emgc-calcutta/shared-types';
+import type { Database } from '@emgc-calcutta/shared-types';
 import type { Actions, PageServerLoad } from './$types';
 
-export type QueuePlayer = Pick<
-	Tables<'players'>,
-	'id' | 'slug' | 'first_name' | 'last_name' | 'flight' | 'division' | 'handicap_index'
->;
+// One row per player_entries row (Phase 11) — `id` is the entry's own id,
+// matching live_lots.entry_id, not players.id.
+export type QueuePlayer = {
+	id: string;
+	slug: string;
+	first_name: string;
+	last_name: string;
+	flight: string;
+	division: string;
+	handicap_index: number | null;
+};
 
 export interface QueueLot {
 	id: string;
@@ -26,7 +33,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	// opened, so the gap was latent, not reachable.
 	const { data: lots, error: lotsError } = await supabase
 		.from('live_lots')
-		.select('id, queue_position, player_id')
+		.select('id, queue_position, entry_id')
 		.eq('tournament_id', tournament.id)
 		.is('opened_at', null)
 		.order('queue_position');
@@ -34,27 +41,50 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		error(500, lotsError.message);
 	}
 
-	const lotPlayerIds = (lots ?? []).map((lot) => lot.player_id);
+	const lotEntryIds = (lots ?? []).map((lot) => lot.entry_id);
 
-	const { data: lotPlayers, error: lotPlayersError } =
-		lotPlayerIds.length > 0
+	const { data: lotEntries, error: lotEntriesError } =
+		lotEntryIds.length > 0
 			? await supabase
-					.from('players')
-					.select('id, slug, first_name, last_name, flight, division, handicap_index')
-					.in('id', lotPlayerIds)
-			: { data: [] as QueuePlayer[], error: null };
-	if (lotPlayersError) {
-		error(500, lotPlayersError.message);
+					.from('player_entries')
+					.select('id, division, players(slug, first_name, last_name, flight, handicap_index)')
+					.in('id', lotEntryIds)
+			: {
+					data: [] as { id: string; division: string; players: QueuePlayer | null }[],
+					error: null
+				};
+	if (lotEntriesError) {
+		error(500, lotEntriesError.message);
 	}
 
-	const playersById = new Map((lotPlayers ?? []).map((player) => [player.id, player]));
+	const entriesById = new Map(
+		(lotEntries ?? []).flatMap((entry) =>
+			entry.players
+				? [
+						[
+							entry.id,
+							{
+								id: entry.id,
+								slug: entry.players.slug,
+								first_name: entry.players.first_name,
+								last_name: entry.players.last_name,
+								flight: entry.players.flight,
+								division: entry.division,
+								handicap_index: entry.players.handicap_index
+							}
+						] as const
+					]
+				: []
+		)
+	);
 
-	// Skips any lot whose player row is missing rather than throwing — can't
-	// happen today (player_id has no ON DELETE cascade, see the create_live_lots
-	// migration), but failing soft here is cheap insurance against a future
-	// data inconsistency hiding the whole queue behind a 500.
+	// Skips any lot whose entry can't be found rather than throwing — can't
+	// happen today (entry_id has no ON DELETE cascade, see the
+	// create_live_lots migration), but failing soft here is cheap insurance
+	// against a future data inconsistency hiding the whole queue behind a
+	// 500.
 	const queue: QueueLot[] = (lots ?? []).flatMap((lot) => {
-		const player = playersById.get(lot.player_id);
+		const player = entriesById.get(lot.entry_id);
 		return player ? [{ id: lot.id, queue_position: lot.queue_position, player }] : [];
 	});
 
@@ -135,26 +165,34 @@ async function fetchSortableQueue(
 ): Promise<{ id: string; handicap_index: number | null }[] | null> {
 	const { data: lots, error: lotsError } = await supabase
 		.from('live_lots')
-		.select('id, player_id')
+		.select('id, entry_id')
 		.eq('tournament_id', tournamentId)
 		.is('opened_at', null);
 	if (lotsError || !lots) {
 		return null;
 	}
 
-	const playerIds = lots.map((lot) => lot.player_id);
-	const { data: players, error: playersError } =
-		playerIds.length > 0
-			? await supabase.from('players').select('id, handicap_index').in('id', playerIds)
-			: { data: [] as { id: string; handicap_index: number | null }[], error: null };
-	if (playersError || !players) {
+	const entryIds = lots.map((lot) => lot.entry_id);
+	const { data: entries, error: entriesError } =
+		entryIds.length > 0
+			? await supabase
+					.from('player_entries')
+					.select('id, players(handicap_index)')
+					.in('id', entryIds)
+			: {
+					data: [] as { id: string; players: { handicap_index: number | null } | null }[],
+					error: null
+				};
+	if (entriesError || !entries) {
 		return null;
 	}
 
-	const handicapByPlayerId = new Map(players.map((player) => [player.id, player.handicap_index]));
+	const handicapByEntryId = new Map(
+		entries.map((entry) => [entry.id, entry.players?.handicap_index ?? null])
+	);
 	return lots.map((lot) => ({
 		id: lot.id,
-		handicap_index: handicapByPlayerId.get(lot.player_id) ?? null
+		handicap_index: handicapByEntryId.get(lot.entry_id) ?? null
 	}));
 }
 
@@ -205,11 +243,11 @@ export const actions: Actions = {
 			return fail(404, { error: 'Tournament not found' });
 		}
 
-		// Need the player before the lot row is gone, to revert their status
+		// Need the entry before the lot row is gone, to revert its status
 		// below.
 		const { data: lot } = await supabase
 			.from('live_lots')
-			.select('player_id')
+			.select('entry_id')
 			.eq('id', lotId)
 			.eq('tournament_id', tournament.id)
 			.is('opened_at', null)
@@ -231,13 +269,13 @@ export const actions: Actions = {
 		// the silent auction has necessarily already ended by the time an
 		// Admin is looking at this screen (the silent auction always
 		// precedes the live one now, see the "Sequential auction phases"
-		// task), so this un-reserved player is picked up by the existing
+		// task), so this un-reserved entry is picked up by the existing
 		// close_silent_auctions() cron and swept to sold_silent on its next
-		// run, same as any other player who never crossed the threshold.
+		// run, same as any other entry who never crossed the threshold.
 		const { error: revertError } = await supabase
-			.from('players')
+			.from('player_entries')
 			.update({ status: 'open' })
-			.eq('id', lot.player_id);
+			.eq('id', lot.entry_id);
 		if (revertError) {
 			return fail(400, { error: revertError.message });
 		}

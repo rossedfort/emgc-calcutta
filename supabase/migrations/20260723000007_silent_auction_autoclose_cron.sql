@@ -1,7 +1,7 @@
 -- Silent auction auto-close (spec 4.3, 182): once a tournament's
--- silent_auction_end passes, any player who never crossed the reserve
+-- silent_auction_end passes, any entry that never crossed the reserve
 -- threshold (still status = 'open') is marked "sold_silent" to the current
--- high bidder. Players that got reserved along the way are left alone —
+-- high bidder. Entries that got reserved along the way are left alone —
 -- they roll into the live auction instead, per spec.
 --
 -- Runs as a pg_cron job rather than a Node interval process, per spec 182.
@@ -10,23 +10,23 @@
 -- project, no explicit grant to service_role is needed for this to work.
 create extension if not exists pg_cron;
 
--- A player with zero silent bids gets no_bid, not sold_silent — mirrors
+-- An entry with zero silent bids gets no_bid, not sold_silent — mirrors
 -- close_live_lot()'s own "a surviving bid means sold, none means no_bid"
 -- rule for the live phase. The status CASE and winning_bid_id below both
 -- run the same correlated scalar subquery rather than a LATERAL join in
 -- FROM: Postgres rejects a FROM-clause LATERAL referencing the UPDATE's
 -- own target table. Running the lookup twice per row is a non-issue for a
--- per-minute cron sweep over one tournament's player count.
+-- per-minute cron sweep over one tournament's entry count.
 create function public.close_silent_auctions()
 returns void
 language sql
 as $$
-  update public.players p
+  update public.player_entries e
   set
     status = case
       when (
         select b.id from public.bids b
-        where b.player_id = p.id and b.voided_at is null
+        where b.entry_id = e.id and b.voided_at is null
         order by b.amount desc limit 1
       ) is not null then 'sold_silent'::public.player_status
       else 'no_bid'::public.player_status
@@ -34,13 +34,13 @@ as $$
     winning_bid_id = (
       select b.id
       from public.bids b
-      where b.player_id = p.id and b.voided_at is null
+      where b.entry_id = e.id and b.voided_at is null
       order by b.amount desc
       limit 1
     )
   from public.tournaments t
-  where p.tournament_id = t.id
-    and p.status = 'open'
+  where e.tournament_id = t.id
+    and e.status = 'open'
     and t.silent_auction_end < now();
 $$;
 

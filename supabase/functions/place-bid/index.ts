@@ -88,9 +88,9 @@ export default {
       const body = await req.json().catch(() => null) as
         | Partial<PlaceBidRequest>
         | null;
-      if (!body?.playerId || typeof body.amount !== "number") {
+      if (!body?.entryId || typeof body.amount !== "number") {
         return Response.json(
-          { error: "playerId and amount are required" },
+          { error: "entryId and amount are required" },
           { status: 400 },
         );
       }
@@ -100,22 +100,22 @@ export default {
         });
       }
 
-      const { data: player, error: playerError } = await ctx.supabaseAdmin
-        .from("players")
-        .select("id, tournament_id, status")
-        .eq("id", body.playerId)
+      const { data: entry, error: entryError } = await ctx.supabaseAdmin
+        .from("player_entries")
+        .select("id, player_id, tournament_id, status")
+        .eq("id", body.entryId)
         .maybeSingle();
-      if (playerError) {
-        return Response.json({ error: playerError.message }, { status: 500 });
+      if (entryError) {
+        return Response.json({ error: entryError.message }, { status: 500 });
       }
-      if (!player) {
+      if (!entry) {
         return Response.json({ error: "Player not found" }, { status: 404 });
       }
 
       let phase: "silent" | "live";
-      if (player.status === "open") {
+      if (entry.status === "open") {
         phase = "silent";
-      } else if (player.status === "reserved") {
+      } else if (entry.status === "reserved") {
         phase = "live";
       } else {
         return Response.json(
@@ -130,7 +130,7 @@ export default {
         .select(
           "silent_auction_start, silent_auction_end, min_increment, threshold_amount, anti_snipe_seconds",
         )
-        .eq("id", player.tournament_id)
+        .eq("id", entry.tournament_id)
         .maybeSingle();
       if (tournamentError) {
         return Response.json({ error: tournamentError.message }, {
@@ -158,8 +158,8 @@ export default {
         const { data: liveLot, error: liveLotError } = await ctx.supabaseAdmin
           .from("live_lots")
           .select("id")
-          .eq("tournament_id", player.tournament_id)
-          .eq("player_id", body.playerId)
+          .eq("tournament_id", entry.tournament_id)
+          .eq("entry_id", body.entryId)
           .not("opened_at", "is", null)
           .is("closed_at", null)
           .maybeSingle();
@@ -183,7 +183,7 @@ export default {
       const { data: rosterEntry, error: rosterError } = await ctx.supabaseAdmin
         .from("players")
         .select("id")
-        .eq("tournament_id", player.tournament_id)
+        .eq("tournament_id", entry.tournament_id)
         .eq("user_id", ctx.userClaims!.id)
         .maybeSingle();
       if (rosterError) {
@@ -210,7 +210,7 @@ export default {
         .supabaseAdmin
         .from("bids")
         .select("id")
-        .eq("player_id", body.playerId)
+        .eq("entry_id", body.entryId)
         .eq("bidder_id", ctx.userClaims!.id)
         .eq("amount", body.amount)
         .gte("placed_at", idempotencyCutoff)
@@ -230,7 +230,7 @@ export default {
       const { data: highBid, error: highBidError } = await ctx.supabaseAdmin
         .from("bids")
         .select("amount")
-        .eq("player_id", body.playerId)
+        .eq("entry_id", body.entryId)
         .is("voided_at", null)
         .order("amount", { ascending: false })
         .limit(1)
@@ -271,7 +271,7 @@ export default {
       const { data: bid, error: insertError } = await ctx.supabaseAdmin
         .from("bids")
         .insert({
-          player_id: body.playerId,
+          entry_id: body.entryId,
           bidder_id: ctx.userClaims!.id,
           amount: body.amount,
           phase,
@@ -286,8 +286,9 @@ export default {
 
       const { ip, user_agent } = requestMetadata(req);
       await logAuditEvent(ctx.supabaseAdmin, {
-        tournament_id: player.tournament_id,
-        player_id: body.playerId,
+        tournament_id: entry.tournament_id,
+        player_id: entry.player_id,
+        entry_id: body.entryId,
         actor_id: ctx.userClaims!.id,
         actor_identity: ctx.userClaims?.email ?? null,
         action: "bid_placed",
@@ -306,16 +307,16 @@ export default {
       // freezes further silent bidding on them (spec 4.3) — a silent-only
       // concept, so this never runs for live bids: a live-phase player is
       // already "reserved", the very status this flip moves *into*.
-      // `player.status` was already confirmed "open" above for the silent
+      // `entry.status` was already confirmed "open" above for the silent
       // branch, so this is necessarily the first bid to cross it — no risk
       // of double-reserving (and so no risk of double-enqueuing below
       // either).
       let reserved = false;
       if (phase === "silent" && body.amount >= tournament.threshold_amount) {
         const { error: reserveError } = await ctx.supabaseAdmin
-          .from("players")
+          .from("player_entries")
           .update({ status: "reserved" })
-          .eq("id", body.playerId);
+          .eq("id", body.entryId);
         if (reserveError) {
           return Response.json({ error: reserveError.message }, {
             status: 500,
@@ -324,13 +325,14 @@ export default {
         reserved = true;
 
         await logAuditEvent(ctx.supabaseAdmin, {
-          tournament_id: player.tournament_id,
-          player_id: body.playerId,
+          tournament_id: entry.tournament_id,
+          player_id: entry.player_id,
+          entry_id: body.entryId,
           actor_id: ctx.userClaims!.id,
           actor_identity: ctx.userClaims?.email ?? null,
           action: "player_reserved",
-          entity_type: "Player",
-          entity_id: body.playerId,
+          entity_type: "PlayerEntry",
+          entity_id: body.entryId,
           before: { status: "open" },
           after: { status: "reserved" },
           ip,
@@ -341,10 +343,12 @@ export default {
         // queue builds itself as the silent auction progresses rather than
         // needing an Admin to hand-add reserved players afterward. See the
         // migration for why this is its own advisory-locked function
-        // rather than a plain insert here.
+        // rather than a plain insert here. p_player_id is deliberately
+        // unchanged as the SQL-side parameter name (Phase 11 task 1) even
+        // though it now receives a player_entries.id.
         const { error: enqueueError } = await ctx.supabaseAdmin.rpc(
           "enqueue_player_for_live_auction",
-          { p_tournament_id: player.tournament_id, p_player_id: body.playerId },
+          { p_tournament_id: entry.tournament_id, p_player_id: body.entryId },
         );
         if (enqueueError) {
           return Response.json({ error: enqueueError.message }, {

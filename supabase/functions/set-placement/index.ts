@@ -10,15 +10,16 @@
 // tournament has one full 1st/2nd/3rd... per flight (and, for the
 // Championship flight, per division within it), each with its own pot
 // (confirmed decision: pot is per-flight/division, not one tournament-
-// wide pot split across flights). `SetPlacementEntry` itself is
-// unchanged (`{playerId, placement}`) — flight/division aren't
-// client-supplied, they're read off each targeted player's own row,
-// since a player's flight/division is fixed once sold. This means two
-// entries in the same request can legitimately share a placement number
-// (Flight A's 1st and Flight B's 1st), so every uniqueness/clearing/pot
-// computation below groups by (flight, division) instead of comparing
-// placement numbers directly — the flat tournament-wide version of this
-// logic would incorrectly collide unrelated flights' placements.
+// wide pot split across flights). `SetPlacementEntry` targets a
+// `player_entries.id` (Phase 11, renamed from `playerId` to `entryId`) —
+// flight/division aren't client-supplied, they're read off each targeted
+// entry's own row (denormalized there since Phase 11), since an entry's
+// flight/division is fixed once sold. This means two entries in the same
+// request can legitimately share a placement number (Flight A's 1st and
+// Flight B's 1st), so every uniqueness/clearing/pot computation below
+// groups by (flight, division) instead of comparing placement numbers
+// directly — the flat tournament-wide version of this logic would
+// incorrectly collide unrelated flights' placements.
 //
 // This replaces an earlier single-player version of this function.
 // Rebuilt as bulk for two reasons, both surfaced by real usage of the
@@ -107,21 +108,21 @@ export default {
 
       for (const entry of placements) {
         if (
-          !entry?.playerId || !Number.isInteger(entry.placement) ||
+          !entry?.entryId || !Number.isInteger(entry.placement) ||
           entry.placement <= 0
         ) {
           return Response.json(
             {
               error:
-                "Each placement entry needs a playerId and a positive integer placement",
+                "Each placement entry needs an entryId and a positive integer placement",
             },
             { status: 400 },
           );
         }
       }
 
-      const playerIds = placements.map((p) => p.playerId);
-      if (new Set(playerIds).size !== playerIds.length) {
+      const entryIds = placements.map((p) => p.entryId);
+      if (new Set(entryIds).size !== entryIds.length) {
         return Response.json(
           {
             error: "The same player was submitted for more than one placement",
@@ -171,38 +172,38 @@ export default {
         }
       }
 
-      // winning_bid:bids!players_winning_bid_id_fkey disambiguates the
-      // embed the same way void-bid's own query does — players<->bids has
-      // two FK paths (bids.player_id and players.winning_bid_id), so
-      // PostgREST can't infer which one this embed means without the
-      // hint.
-      const { data: targetPlayers, error: targetPlayersError } = await ctx
+      // winning_bid:bids!player_entries_winning_bid_id_fkey disambiguates
+      // the embed the same way void-bid's own query does — player_entries
+      // <->bids has two FK paths (bids.entry_id and
+      // player_entries.winning_bid_id), so PostgREST can't infer which
+      // one this embed means without the hint.
+      const { data: targetEntries, error: targetEntriesError } = await ctx
         .supabaseAdmin
-        .from("players")
+        .from("player_entries")
         .select(
-          "id, tournament_id, flight, division, status, placement, winning_bid_id, winning_bid:bids!players_winning_bid_id_fkey(bidder_id)",
+          "id, player_id, tournament_id, flight, division, status, placement, winning_bid_id, winning_bid:bids!player_entries_winning_bid_id_fkey(bidder_id)",
         )
         .in(
           "id",
-          playerIds.length > 0
-            ? playerIds
+          entryIds.length > 0
+            ? entryIds
             : ["00000000-0000-0000-0000-000000000000"],
         );
-      if (targetPlayersError) {
-        return Response.json({ error: targetPlayersError.message }, {
+      if (targetEntriesError) {
+        return Response.json({ error: targetEntriesError.message }, {
           status: 500,
         });
       }
-      const targetById = new Map((targetPlayers ?? []).map((p) => [p.id, p]));
+      const targetById = new Map((targetEntries ?? []).map((p) => [p.id, p]));
 
       const { data: existingPayouts, error: existingPayoutsError } = await ctx
         .supabaseAdmin
         .from("payouts")
-        .select("player_id, id, placement, pot_share, amount, calculated_at")
+        .select("entry_id, id, placement, pot_share, amount, calculated_at")
         .in(
-          "player_id",
-          playerIds.length > 0
-            ? playerIds
+          "entry_id",
+          entryIds.length > 0
+            ? entryIds
             : ["00000000-0000-0000-0000-000000000000"],
         );
       if (existingPayoutsError) {
@@ -210,42 +211,42 @@ export default {
           status: 500,
         });
       }
-      const existingPayoutByPlayerId = new Map(
-        (existingPayouts ?? []).map((p) => [p.player_id, p]),
+      const existingPayoutByEntryId = new Map(
+        (existingPayouts ?? []).map((p) => [p.entry_id, p]),
       );
 
       for (const entry of placements) {
-        const player = targetById.get(entry.playerId);
-        if (!player || player.tournament_id !== tournamentId) {
+        const target = targetById.get(entry.entryId);
+        if (!target || target.tournament_id !== tournamentId) {
           return Response.json(
-            { error: `Player ${entry.playerId} not found in this tournament` },
+            { error: `Player ${entry.entryId} not found in this tournament` },
             { status: 404 },
           );
         }
-        if (player.status !== "sold_silent" && player.status !== "sold_live") {
+        if (target.status !== "sold_silent" && target.status !== "sold_live") {
           return Response.json(
-            { error: `${entry.playerId} has not sold and cannot be placed` },
+            { error: `${entry.entryId} has not sold and cannot be placed` },
             { status: 400 },
           );
         }
-        if (!player.winning_bid_id || !player.winning_bid) {
+        if (!target.winning_bid_id || !target.winning_bid) {
           return Response.json(
             {
               error:
-                `${entry.playerId} has no winning bid to compute a payout from`,
+                `${entry.entryId} has no winning bid to compute a payout from`,
             },
             { status: 400 },
           );
         }
       }
 
-      // Now that every entry's player (and therefore flight/division) is
-      // confirmed valid: two entries may share a placement number as long
-      // as they're in different (flight, division) groups, but not within
-      // the same one.
+      // Now that every entry's target row (and therefore flight/division)
+      // is confirmed valid: two entries may share a placement number as
+      // long as they're in different (flight, division) groups, but not
+      // within the same one.
       const entryGroupKeys = placements.map((p) => {
-        const player = targetById.get(p.playerId)!;
-        return groupKey(player.flight, player.division, p.placement);
+        const target = targetById.get(p.entryId)!;
+        return groupKey(target.flight, target.division, p.placement);
       });
       if (new Set(entryGroupKeys).size !== entryGroupKeys.length) {
         return Response.json(
@@ -259,8 +260,8 @@ export default {
 
       const { data: currentlyPlaced, error: currentlyPlacedError } = await ctx
         .supabaseAdmin
-        .from("players")
-        .select("id, flight, division, placement")
+        .from("player_entries")
+        .select("id, player_id, flight, division, placement")
         .eq("tournament_id", tournamentId)
         .not("placement", "is", null);
       if (currentlyPlacedError) {
@@ -269,20 +270,20 @@ export default {
         });
       }
 
-      // A currently-placed player is cleared unless this submission keeps
-      // *them specifically* on *their current* (flight, division,
-      // placement) — moved to a different number, their spot handed to a
-      // different player *within the same flight/division*, or simply
+      // A currently-placed entry is cleared unless this submission keeps
+      // *it specifically* on *its current* (flight, division,
+      // placement) — moved to a different number, its spot handed to a
+      // different entry *within the same flight/division*, or simply
       // dropped, all resolve to "clear." Keying by the group (not just
       // placement) is what keeps this scoped correctly: a request that
       // only touches Flight A must never clear Flight B's placement
       // holders just because they happen to share a placement number.
       const desiredByGroupPlacement = new Map(
         placements.map((p) => {
-          const player = targetById.get(p.playerId)!;
+          const target = targetById.get(p.entryId)!;
           return [
-            groupKey(player.flight, player.division, p.placement),
-            p.playerId,
+            groupKey(target.flight, target.division, p.placement),
+            p.entryId,
           ];
         }),
       );
@@ -296,8 +297,8 @@ export default {
         const { data: clearPayouts, error: clearPayoutsError } = await ctx
           .supabaseAdmin
           .from("payouts")
-          .select("player_id, placement, marked_paid_at")
-          .in("player_id", toClear.map((p) => p.id));
+          .select("entry_id, placement, marked_paid_at")
+          .in("entry_id", toClear.map((p) => p.id));
         if (clearPayoutsError) {
           return Response.json({ error: clearPayoutsError.message }, {
             status: 500,
@@ -325,7 +326,7 @@ export default {
         const { error: deletePayoutsError } = await ctx.supabaseAdmin
           .from("payouts")
           .delete()
-          .in("player_id", toClear.map((p) => p.id));
+          .in("entry_id", toClear.map((p) => p.id));
         if (deletePayoutsError) {
           return Response.json({ error: deletePayoutsError.message }, {
             status: 500,
@@ -333,7 +334,7 @@ export default {
         }
 
         const { error: clearPlacementError } = await ctx.supabaseAdmin
-          .from("players")
+          .from("player_entries")
           .update({ placement: null })
           .in("id", toClear.map((p) => p.id));
         if (clearPlacementError) {
@@ -349,21 +350,21 @@ export default {
       // ordinary flight has exactly one group (division always
       // 'overall'); the Championship flight has two ('gross' and 'net'),
       // each with its own separate pot, per the confirmed decision.
-      const { data: soldPlayers, error: soldPlayersError } = await ctx
+      const { data: soldEntries, error: soldEntriesError } = await ctx
         .supabaseAdmin
-        .from("players")
+        .from("player_entries")
         .select(
-          "flight, division, winning_bid:bids!players_winning_bid_id_fkey(amount)",
+          "flight, division, winning_bid:bids!player_entries_winning_bid_id_fkey(amount)",
         )
         .eq("tournament_id", tournamentId)
         .in("status", ["sold_silent", "sold_live"]);
-      if (soldPlayersError) {
-        return Response.json({ error: soldPlayersError.message }, {
+      if (soldEntriesError) {
+        return Response.json({ error: soldEntriesError.message }, {
           status: 500,
         });
       }
       const potByGroup = new Map<string, number>();
-      for (const p of soldPlayers ?? []) {
+      for (const p of soldEntries ?? []) {
         const key = JSON.stringify([p.flight, p.division]);
         potByGroup.set(
           key,
@@ -375,7 +376,7 @@ export default {
       const results: SetPlacementResultEntry[] = [];
 
       for (const entry of placements) {
-        const player = targetById.get(entry.playerId)!;
+        const target = targetById.get(entry.entryId)!;
 
         // Unchanged from what's already persisted — skip the write and
         // the audit event entirely rather than re-upserting the same
@@ -383,11 +384,11 @@ export default {
         // entries in a typical edit are untouched; without this check
         // every save would log a placement_set for every configured
         // place, not just the ones actually being changed.
-        if (player.placement === entry.placement) {
-          const existing = existingPayoutByPlayerId.get(entry.playerId);
+        if (target.placement === entry.placement) {
+          const existing = existingPayoutByEntryId.get(entry.entryId);
           if (existing) {
             results.push({
-              playerId: entry.playerId,
+              entryId: entry.entryId,
               placement: existing.placement,
               payout: {
                 id: existing.id,
@@ -402,7 +403,7 @@ export default {
 
         const potShare = payoutStructure[String(entry.placement)];
         const pot = potByGroup.get(
-          JSON.stringify([player.flight, player.division]),
+          JSON.stringify([target.flight, target.division]),
         ) ?? 0;
         const amount = Math.round(pot * potShare * 100) / 100;
 
@@ -411,14 +412,14 @@ export default {
           .upsert(
             {
               tournament_id: tournamentId,
-              player_id: entry.playerId,
-              bidder_id: player.winning_bid!.bidder_id,
+              entry_id: entry.entryId,
+              bidder_id: target.winning_bid!.bidder_id,
               placement: entry.placement,
               pot_share: potShare,
               amount,
               calculated_at: new Date().toISOString(),
             },
-            { onConflict: "player_id" },
+            { onConflict: "entry_id" },
           )
           .select("id, placement, pot_share, amount, calculated_at")
           .single();
@@ -428,25 +429,26 @@ export default {
           });
         }
 
-        const { error: updatePlayerError } = await ctx.supabaseAdmin
-          .from("players")
+        const { error: updateEntryError } = await ctx.supabaseAdmin
+          .from("player_entries")
           .update({ placement: entry.placement })
-          .eq("id", entry.playerId);
-        if (updatePlayerError) {
-          return Response.json({ error: updatePlayerError.message }, {
+          .eq("id", entry.entryId);
+        if (updateEntryError) {
+          return Response.json({ error: updateEntryError.message }, {
             status: 400,
           });
         }
 
         await logAuditEvent(ctx.supabaseAdmin, {
           tournament_id: tournamentId,
-          player_id: entry.playerId,
+          player_id: target.player_id,
+          entry_id: entry.entryId,
           actor_id: ctx.userClaims!.id,
           actor_identity: ctx.userClaims?.email ?? null,
           action: "placement_set",
-          entity_type: "Player",
-          entity_id: entry.playerId,
-          before: { placement: player.placement },
+          entity_type: "PlayerEntry",
+          entity_id: entry.entryId,
+          before: { placement: target.placement },
           after: {
             placement: entry.placement,
             payout_id: payout.id,
@@ -458,7 +460,7 @@ export default {
         });
 
         results.push({
-          playerId: entry.playerId,
+          entryId: entry.entryId,
           placement: payout.placement,
           payout: {
             id: payout.id,
@@ -472,11 +474,12 @@ export default {
       for (const cleared of toClear) {
         await logAuditEvent(ctx.supabaseAdmin, {
           tournament_id: tournamentId,
-          player_id: cleared.id,
+          player_id: cleared.player_id,
+          entry_id: cleared.id,
           actor_id: ctx.userClaims!.id,
           actor_identity: ctx.userClaims?.email ?? null,
           action: "placement_cleared",
-          entity_type: "Player",
+          entity_type: "PlayerEntry",
           entity_id: cleared.id,
           before: { placement: cleared.placement },
           after: { placement: null },

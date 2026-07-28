@@ -30,22 +30,59 @@ export const actions: Actions = {
 			});
 		}
 
-		// A Championship-flight player is auctioned twice (Gross + Net) — same
-		// rule CSV import applies in import-csv-confirm's flatMap. Division
-		// isn't a form field; it's always derived from flight vs. the
-		// tournament's configured championship_flight.
-		const insertRows =
-			tournament.championship_flight && data.flight === tournament.championship_flight
-				? [
-						{ tournament_id: tournament.id, ...data, division: 'gross' },
-						{ tournament_id: tournament.id, ...data, division: 'net' }
-					]
-				: [{ tournament_id: tournament.id, ...data, division: 'overall' }];
-
-		const { error: insertError } = await supabase.from('players').insert(insertRows);
+		// Two inserts now (Phase 11): the `players` identity row first, then
+		// one or two `player_entries` rows (Gross + Net for a Championship-
+		// flight player, same rule CSV import applies in
+		// import-csv-confirm's flatMap — division isn't a form field, it's
+		// always derived from flight vs. the tournament's configured
+		// championship_flight). If the second insert fails, the just-created
+		// player row is deleted rather than left behind with zero entries —
+		// see import-csv-confirm's header comment for why a compensating
+		// delete is used here instead of a real transaction.
+		const { data: player, error: insertError } = await supabase
+			.from('players')
+			.insert({ tournament_id: tournament.id, ...data })
+			.select('id')
+			.single();
 		if (insertError) {
 			return fail(400, {
 				errors: { form: insertError.message },
+				values: Object.fromEntries(formData)
+			});
+		}
+
+		const insertEntries =
+			tournament.championship_flight && data.flight === tournament.championship_flight
+				? [
+						{
+							player_id: player.id,
+							tournament_id: tournament.id,
+							flight: data.flight,
+							division: 'gross'
+						},
+						{
+							player_id: player.id,
+							tournament_id: tournament.id,
+							flight: data.flight,
+							division: 'net'
+						}
+					]
+				: [
+						{
+							player_id: player.id,
+							tournament_id: tournament.id,
+							flight: data.flight,
+							division: 'overall'
+						}
+					];
+
+		const { error: entriesInsertError } = await supabase
+			.from('player_entries')
+			.insert(insertEntries);
+		if (entriesInsertError) {
+			await supabase.from('players').delete().eq('id', player.id);
+			return fail(400, {
+				errors: { form: entriesInsertError.message },
 				values: Object.fromEntries(formData)
 			});
 		}

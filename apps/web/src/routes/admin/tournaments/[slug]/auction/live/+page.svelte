@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
-	import type { RealtimeBid, RealtimeLiveLot, RealtimePlayer } from '@emgc-calcutta/shared-types';
+	import type {
+		RealtimeBid,
+		RealtimeLiveLot,
+		RealtimePlayerEntry
+	} from '@emgc-calcutta/shared-types';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
@@ -21,7 +25,7 @@
 	let errorMessage = $derived(form && 'error' in form ? (form.error as string) : null);
 
 	let liveBids = $state<RealtimeBid[]>([]);
-	let livePlayers = $state<RealtimePlayer[]>([]);
+	let liveEntries = $state<RealtimePlayerEntry[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
 	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
 	let now = $state(new Date());
@@ -29,13 +33,13 @@
 	onMount(() => {
 		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
-		const unsubPlayers = rt.players.subscribe((players) => (livePlayers = players));
+		const unsubEntries = rt.entries.subscribe((entries) => (liveEntries = entries));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
 		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
-			unsubPlayers();
+			unsubEntries();
 			unsubLots();
 			unsubConnection();
 			rt.destroy();
@@ -45,7 +49,7 @@
 
 	let players = $derived(
 		data.players.map((player) => {
-			const live = livePlayers.find((p) => p.id === player.id);
+			const live = liveEntries.find((e) => e.id === player.id);
 			return live ? { ...player, status: live.status as typeof player.status } : player;
 		})
 	);
@@ -54,9 +58,9 @@
 		liveLots.find((lot) => lot.opened_at !== null && lot.closed_at === null) ?? null
 	);
 	let currentPlayer = $derived(
-		currentLot ? (players.find((p) => p.id === currentLot!.player_id) ?? null) : null
+		currentLot ? (players.find((p) => p.id === currentLot!.entry_id) ?? null) : null
 	);
-	let high = $derived(currentLot ? currentHighBid(liveBids, currentLot.player_id) : null);
+	let high = $derived(currentLot ? currentHighBid(liveBids, currentLot.entry_id) : null);
 
 	let nextQueuedLot = $derived(
 		liveLots
@@ -64,7 +68,7 @@
 			.sort((a, b) => a.queue_position - b.queue_position)[0] ?? null
 	);
 	let nextQueuedPlayer = $derived(
-		nextQueuedLot ? (players.find((p) => p.id === nextQueuedLot!.player_id) ?? null) : null
+		nextQueuedLot ? (players.find((p) => p.id === nextQueuedLot!.entry_id) ?? null) : null
 	);
 
 	let secondsRemaining = $derived.by(() => {

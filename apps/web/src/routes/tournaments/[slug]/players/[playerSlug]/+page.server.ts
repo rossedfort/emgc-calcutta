@@ -1,8 +1,12 @@
 import { error, redirect } from '@sveltejs/kit';
+import type { Enums } from '@emgc-calcutta/shared-types';
 import { formatPlayerName, type Player } from '$lib/players';
 import { formatUserName } from '$lib/profile';
 import type { PageServerLoad } from './$types';
 
+// Golfer identity only (Phase 11) — division/status moved to
+// PlayerEntryProfile below, since a golfer can have one or two
+// independently-statused sellable entries now.
 export type PlayerProfile = Pick<
 	Player,
 	| 'id'
@@ -12,9 +16,7 @@ export type PlayerProfile = Pick<
 	| 'preferences'
 	| 'photo_url'
 	| 'flight'
-	| 'division'
 	| 'handicap_index'
-	| 'status'
 	| 'user_id'
 >;
 
@@ -24,6 +26,16 @@ export interface BidHistoryRow {
 	phase: 'silent' | 'live';
 	placed_at: string;
 	voided_at: string | null;
+}
+
+// One per player_entries row — a Championship golfer has two (Gross and
+// Net), each rendered as its own section on this one profile page/URL,
+// each with its own status and bid history.
+export interface PlayerEntryProfile {
+	id: string;
+	division: string;
+	status: Enums<'player_status'>;
+	bids: BidHistoryRow[];
 }
 
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
@@ -49,7 +61,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	const { data: player, error: playerError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, first_name, last_name, preferences, photo_url, flight, division, handicap_index, status, user_id'
+			'id, slug, first_name, last_name, preferences, photo_url, flight, handicap_index, user_id'
 		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
@@ -76,23 +88,52 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		linkedUserName = data ? (formatUserName(data) ?? data.email) : null;
 	}
 
+	const { data: playerEntries, error: entriesError } = await supabase
+		.from('player_entries')
+		.select('id, division, status')
+		.eq('player_id', player.id)
+		.order('division');
+	if (entriesError) {
+		error(500, entriesError.message);
+	}
+
+	const entryIds = (playerEntries ?? []).map((entry) => entry.id);
+
 	// Deliberately no bidder identity here (confirmed with the user) — the
 	// same anonymity the silent/live auction boards already apply to other
 	// participants applies to this history too, amount and timing only.
-	const { data: bids, error: bidsError } = await supabase
-		.from('bids')
-		.select('id, amount, phase, placed_at, voided_at')
-		.eq('player_id', player.id)
-		.order('placed_at', { ascending: false });
+	const { data: bids, error: bidsError } =
+		entryIds.length > 0
+			? await supabase
+					.from('bids')
+					.select('id, entry_id, amount, phase, placed_at, voided_at')
+					.in('entry_id', entryIds)
+					.order('placed_at', { ascending: false })
+			: { data: [] as ({ entry_id: string } & BidHistoryRow)[], error: null };
 	if (bidsError) {
 		error(500, bidsError.message);
 	}
+
+	const bidsByEntryId = new Map<string, BidHistoryRow[]>();
+	for (const bid of bids ?? []) {
+		const { entry_id, ...rest } = bid;
+		const list = bidsByEntryId.get(entry_id) ?? [];
+		list.push(rest);
+		bidsByEntryId.set(entry_id, list);
+	}
+
+	const entries: PlayerEntryProfile[] = (playerEntries ?? []).map((entry) => ({
+		id: entry.id,
+		division: entry.division,
+		status: entry.status,
+		bids: bidsByEntryId.get(entry.id) ?? []
+	}));
 
 	return {
 		tournament,
 		player: player as PlayerProfile,
 		linkedUserName,
-		bids: (bids as BidHistoryRow[] | null) ?? [],
+		entries,
 		isYou: player.user_id === session.user.id,
 		title: `${formatPlayerName(player)} · ${tournament.name} · EMGC Bet`,
 		description: `Player profile and bidding status for ${formatPlayerName(player)} in ${tournament.name}.`

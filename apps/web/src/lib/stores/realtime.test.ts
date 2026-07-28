@@ -3,8 +3,8 @@ import { get } from 'svelte/store';
 import { createTournamentRealtime } from './realtime';
 
 // A minimal stand-in for the chainable supabase-js query builder — every
-// select() this module makes (players/live_lots/bids) terminates at either
-// .eq() or .in().order(), so both are wired to resolve empty data.
+// select() this module makes (player_entries/live_lots/bids) terminates at
+// either .eq() or .in().order(), so both are wired to resolve empty data.
 function createSupabaseMock() {
 	const chain = {
 		eq: vi.fn(() => Promise.resolve({ data: [] })),
@@ -56,7 +56,7 @@ describe('createTournamentRealtime connection status', () => {
 		await Promise.resolve();
 
 		expect(get(rt.connectionStatus)).toBe('connected');
-		expect(from).toHaveBeenCalledWith('players');
+		expect(from).toHaveBeenCalledWith('player_entries');
 		expect(from).toHaveBeenCalledWith('live_lots');
 	});
 

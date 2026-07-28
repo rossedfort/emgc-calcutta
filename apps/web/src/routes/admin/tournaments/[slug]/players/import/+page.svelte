@@ -45,9 +45,10 @@
 
 	let includedCount = $derived(Object.values(included).filter(Boolean).length);
 
-	// A Championship-flight row becomes two players rows on confirm — this
-	// is the actual number of rows that will be created, not just the
-	// number of CSV lines selected.
+	// A Championship-flight row becomes two player_entries rows on confirm
+	// (one players row either way) — this is the actual number of sellable
+	// entries that will be created, not just the number of CSV lines
+	// selected.
 	let entryCount = $derived(
 		(previewData?.rows ?? [])
 			.filter((row) => included[row.rowNumber])
@@ -75,8 +76,8 @@
 	}
 
 	// A row whose flight is the tournament's Championship flight becomes two
-	// players rows on confirm (Gross + Net) — flagged here so the preview
-	// isn't a silent surprise about the eventual player count.
+	// player_entries rows on confirm (Gross + Net) — flagged here so the
+	// preview isn't a silent surprise about the eventual entry count.
 	function isChampionshipRow(flight: string | null): boolean {
 		return !!data.tournament.championship_flight && flight === data.tournament.championship_flight;
 	}
@@ -190,7 +191,7 @@
 						? 'Importing…'
 						: entryCount === includedCount
 							? `Confirm import (${includedCount})`
-							: `Confirm import (${includedCount} rows → ${entryCount} players)`}
+							: `Confirm import (${includedCount} rows → ${entryCount} entries)`}
 				</Button>
 			</form>
 			<Button type="button" variant="outline" disabled={confirmSubmitting} onclick={cancelPreview}

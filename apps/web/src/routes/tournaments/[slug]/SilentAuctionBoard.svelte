@@ -120,8 +120,8 @@
 		}));
 	}
 
-	function suggestedBid(playerId: string): number {
-		const high = currentHighBid(liveBids, playerId);
+	function suggestedBid(entryId: string): number {
+		const high = currentHighBid(liveBids, entryId);
 		return high ? high.amount + tournament.min_increment : tournament.min_increment;
 	}
 
@@ -132,22 +132,22 @@
 	let bidPending = $state<Record<string, boolean>>({});
 	let bidErrors = $state<Record<string, string>>({});
 
-	async function placeBid(playerId: string) {
-		const raw = bidAmounts[playerId];
-		const amount = raw === undefined || raw === '' ? suggestedBid(playerId) : Number(raw);
+	async function placeBid(entryId: string) {
+		const raw = bidAmounts[entryId];
+		const amount = raw === undefined || raw === '' ? suggestedBid(entryId) : Number(raw);
 		if (!Number.isFinite(amount) || amount <= 0) {
-			bidErrors[playerId] = 'Enter a valid bid amount';
+			bidErrors[entryId] = 'Enter a valid bid amount';
 			return;
 		}
 
-		bidPending[playerId] = true;
-		bidErrors[playerId] = '';
+		bidPending[entryId] = true;
+		bidErrors[entryId] = '';
 
 		const { error: invokeError } = await supabase.functions.invoke<PlaceBidResponse>('place-bid', {
-			body: { playerId, amount } satisfies PlaceBidRequest
+			body: { entryId, amount } satisfies PlaceBidRequest
 		});
 
-		bidPending[playerId] = false;
+		bidPending[entryId] = false;
 
 		if (invokeError) {
 			// place-bid's actual { error: string } body is on
@@ -159,11 +159,11 @@
 				const body = (await invokeError.context.json().catch(() => null)) as ErrorResponse | null;
 				message = body?.error ?? message;
 			}
-			bidErrors[playerId] = message;
+			bidErrors[entryId] = message;
 			return;
 		}
 
-		bidAmounts[playerId] = '';
+		bidAmounts[entryId] = '';
 	}
 </script>
 
