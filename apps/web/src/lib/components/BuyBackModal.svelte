@@ -64,13 +64,16 @@
 
 	// This app doesn't send this email itself (unlike every other email it
 	// touches, all real Resend sends) — the whole point is it genuinely
-	// comes from the golfer, not noreply@mail.emgc.bet, so it opens the
-	// golfer's own mail client via mailto: instead. The Edge Function call
-	// happens first and only opens the mail draft on success — a failed
-	// request (already pending, too late, etc.) shouldn't leave the golfer
-	// halfway through composing an email for a request that was never
-	// actually recorded.
-	async function send() {
+	// comes from the golfer, not noreply@mail.emgc.bet. Opening the
+	// golfer's own mail client is a separate, explicit action (the "Email
+	// {buyer}" link below) rather than an automatic side effect of
+	// submitting the request — a mailto: navigation firing without the
+	// golfer choosing it was surprising in practice.
+	let mailtoHref = $derived(
+		`mailto:${buyer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+	);
+
+	async function submitRequest() {
 		submitting = true;
 		errorMessage = '';
 
@@ -89,7 +92,6 @@
 			return;
 		}
 
-		window.location.href = `mailto:${buyer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 		onSuccess?.();
 		open = false;
 	}
@@ -100,8 +102,8 @@
 		<Dialog.Header>
 			<Dialog.Title>Buy back your stake</Dialog.Title>
 			<Dialog.Description>
-				Sends a request to {buyerName || buyer.email}, then opens an email for you to send from your
-				own address.
+				Sends a request to {buyerName || buyer.email}. You can also email them directly using the
+				draft below.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -127,8 +129,9 @@
 
 		<Dialog.Footer>
 			<Button variant="brass" onclick={() => (open = false)} disabled={submitting}>Cancel</Button>
-			<Button variant="brass" onclick={send} disabled={submitting}>
-				{submitting ? 'Sending…' : 'Send'}
+			<Button variant="outline" href={mailtoHref}>Email {buyerName || buyer.email}</Button>
+			<Button variant="brass" onclick={submitRequest} disabled={submitting}>
+				{submitting ? 'Sending…' : 'Send request'}
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
