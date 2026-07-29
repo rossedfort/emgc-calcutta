@@ -14,6 +14,10 @@ export interface RealtimeBid {
 	phase: Enums<'bid_phase'>;
 	placed_at: string;
 	voided_at: string | null;
+	// Denormalized at write time (place-bid) rather than joined from
+	// `users` per row — see that column's own migration for why. Null
+	// only if the bidder hadn't set a name yet when the bid was placed.
+	bidder_name: string | null;
 }
 
 // Renamed from RealtimePlayer (Phase 11) — status now lives on

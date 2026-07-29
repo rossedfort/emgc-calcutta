@@ -68,7 +68,9 @@ schema_paths = []
 enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# Lives in .claude/ (gitignored, not committed) rather than here — see
+# CLAUDE.md's "Project state" section.
+sql_paths = ["../.claude/emgc-calcutta-seed.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.

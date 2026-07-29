@@ -237,6 +237,9 @@
 										{/if}
 									{/each}
 								</span>
+								{#if high.bidder_name}
+									<span class="ml-1 font-sans text-xs text-ink/60">({high.bidder_name})</span>
+								{/if}
 							{:else}
 								-
 							{/if}

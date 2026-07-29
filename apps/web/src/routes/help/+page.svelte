@@ -47,8 +47,8 @@
 		)}
 
 		{@render topic(
-			'Bids are anonymous',
-			"You'll always see the current high bid amount, but never who placed it — bidder identity stays private throughout the auction, including your own. Bidding on a player linked to your own account is completely normal Calcutta behavior and isn't restricted in any way."
+			'Bidder identity',
+			"The silent auction board shows who's currently holding the high bid on each player, right next to the amount. The live auction and a player's bid history still show only the amount, not who placed it. Bidding on a player linked to your own account is completely normal Calcutta behavior and isn't restricted in any way."
 		)}
 
 		{@render topic(
