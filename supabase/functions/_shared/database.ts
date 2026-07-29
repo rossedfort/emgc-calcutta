@@ -475,6 +475,7 @@ export type Database = {
           buyer_id: string;
           entry_id: string;
           id: string;
+          message: string | null;
           percentage: number;
           requested_at: string;
           requester_id: string;
@@ -488,6 +489,7 @@ export type Database = {
           buyer_id: string;
           entry_id: string;
           id?: string;
+          message?: string | null;
           percentage: number;
           requested_at?: string;
           requester_id: string;
@@ -501,6 +503,7 @@ export type Database = {
           buyer_id?: string;
           entry_id?: string;
           id?: string;
+          message?: string | null;
           percentage?: number;
           requested_at?: string;
           requester_id?: string;

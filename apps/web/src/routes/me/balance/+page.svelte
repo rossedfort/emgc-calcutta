@@ -265,7 +265,6 @@
 		bind:open={buyBackModalOpen}
 		{supabase}
 		entryId={selectedStakeRow.id}
-		golferName={formatPlayerName(selectedStakeRow)}
 		tournamentName={selectedStakeRow.tournament_name}
 		percentage={selectedStakeRow.buy_back_percentage}
 		amount={selectedStakeRow.buy_back_amount}

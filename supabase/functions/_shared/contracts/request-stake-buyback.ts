@@ -10,6 +10,13 @@
 // established for Payout.amount.
 export interface RequestStakeBuybackRequest {
   entryId: string;
+  // An optional personal note from the requesting golfer, sent as part of
+  // the automated stake_buyback_requested email alongside the pre-baked
+  // "X wants to buy back Y% for $Z" copy — trimmed and length-capped
+  // server-side (see request-stake-buyback/index.ts), never rendered as
+  // raw HTML (dispatch-notification's emailParagraph/emailQuote escape
+  // it same as everything else in these templates).
+  message?: string | null;
 }
 
 export interface RequestStakeBuybackResponse {

@@ -120,6 +120,23 @@ export function emailParagraph(text: string): string {
   }</p>`;
 }
 
+// A personal note quoted inside a notification email (currently just
+// stake_buyback_requested's optional message) — set apart from the
+// pre-baked copy with a brass left rule so it reads as "someone typed
+// this," not as more system-generated text. Escaped the same as
+// emailParagraph; \n in the source note becomes <br/> since these are
+// free-typed messages, not single-line copy.
+export function emailQuote(text: string): string {
+  const html = escapeHtml(text).replace(/\n/g, "<br/>");
+  return `            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px; width:100%;">
+              <tr>
+                <td style="border-left:3px solid ${BRASS}; padding:4px 0 4px 14px;">
+                  <p class="email-text" style="margin:0; font-family:${FONT_SANS}; font-style:italic; font-size:15px; line-height:1.6; color:${INK};">${html}</p>
+                </td>
+              </tr>
+            </table>`;
+}
+
 export function emailButton(label: string, url: string): string {
   return `            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 4px;">
               <tr>

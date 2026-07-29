@@ -18,7 +18,6 @@
 		open = $bindable(false),
 		supabase,
 		entryId,
-		golferName,
 		tournamentName,
 		percentage,
 		amount,
@@ -28,7 +27,6 @@
 		open?: boolean;
 		supabase: SupabaseClient<Database>;
 		entryId: string;
-		golferName: string;
 		tournamentName: string;
 		percentage: number;
 		amount: number;
@@ -41,44 +39,30 @@
 	}
 
 	let percentageDisplay = $derived(Math.round(percentage * 100));
-	let subject = $derived(`Buy-back request: ${golferName} — ${tournamentName}`);
 	let buyerName = $derived([buyer.first_name, buyer.last_name].filter(Boolean).join(' '));
 
-	let body = $state('');
+	let message = $state('');
 	let submitting = $state(false);
 	let errorMessage = $state('');
 
-	// Reset to the pre-baked draft every time the modal opens, not just
-	// once on mount — the same modal instance gets reused across different
-	// rows in "Your stake" (Phase 14), so a previous open's edits (or a
-	// previous row's golfer/amount) must never leak into the next one.
+	// No mailto: draft (that approach was tried and dropped) — this note
+	// travels with the request itself and is sent to the buyer inside the
+	// automated Resend email, alongside the pre-baked "X wants to buy back
+	// Y% for $Z" copy. Re-seeded every time the modal opens, not a live
+	// mirror of anything, since the golfer edits it freely from here.
 	$effect(() => {
 		if (open) {
 			errorMessage = '';
-			body =
-				`Hi${buyer.first_name ? ` ${buyer.first_name}` : ''},\n\n` +
-				`${golferName} would like to buy back ${percentageDisplay}% of their stake in ${tournamentName} for ${formatCurrency(amount)}.\n\n` +
-				`Let me know if that works.\n\nThanks!`;
+			message = `Hi${buyer.first_name ? ` ${buyer.first_name}` : ''}, let me know if that works. Thanks!`;
 		}
 	});
-
-	// This app doesn't send this email itself (unlike every other email it
-	// touches, all real Resend sends) — the whole point is it genuinely
-	// comes from the golfer, not noreply@mail.emgc.bet. Opening the
-	// golfer's own mail client is a separate, explicit action (the "Email
-	// {buyer}" link below) rather than an automatic side effect of
-	// submitting the request — a mailto: navigation firing without the
-	// golfer choosing it was surprising in practice.
-	let mailtoHref = $derived(
-		`mailto:${buyer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-	);
 
 	async function submitRequest() {
 		submitting = true;
 		errorMessage = '';
 
 		const { error } = await supabase.functions.invoke('request-stake-buyback', {
-			body: { entryId }
+			body: { entryId, message: message.trim() || null }
 		});
 
 		submitting = false;
@@ -102,8 +86,9 @@
 		<Dialog.Header>
 			<Dialog.Title>Buy back your stake</Dialog.Title>
 			<Dialog.Description>
-				Sends a request to {buyerName || buyer.email}. You can also email them directly using the
-				draft below.
+				We'll email {buyerName || buyer.email} that you want to buy back {percentageDisplay}% of
+				your stake in {tournamentName} for {formatCurrency(amount)}, along with the note below. No
+				need to email them yourself.
 			</Dialog.Description>
 		</Dialog.Header>
 
@@ -112,7 +97,7 @@
 		<div class="flex flex-col gap-3">
 			<div class="flex flex-col gap-1 text-sm">
 				<span class="text-ink/60">To</span>
-				<span class="text-ink">{buyer.email}</span>
+				<span class="text-ink">{buyerName || buyer.email}</span>
 			</div>
 			{#if buyer.phone}
 				<div class="flex flex-col gap-1 text-sm">
@@ -122,14 +107,13 @@
 			{/if}
 
 			<div class="flex flex-col gap-1.5">
-				<Label for="buyback-body">Email body</Label>
-				<Textarea id="buyback-body" rows={7} bind:value={body} disabled={submitting} />
+				<Label for="buyback-message">Note (optional)</Label>
+				<Textarea id="buyback-message" rows={5} bind:value={message} disabled={submitting} />
 			</div>
 		</div>
 
 		<Dialog.Footer>
 			<Button variant="brass" onclick={() => (open = false)} disabled={submitting}>Cancel</Button>
-			<Button variant="outline" href={mailtoHref}>Email {buyerName || buyer.email}</Button>
 			<Button variant="brass" onclick={submitRequest} disabled={submitting}>
 				{submitting ? 'Sending…' : 'Send request'}
 			</Button>

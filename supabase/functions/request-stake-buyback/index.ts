@@ -22,12 +22,14 @@
 // Phase 12.5's reject/un-reject). A 'pending' or 'accepted' existing row
 // blocks a new request outright; only 'rejected' allows it.
 //
-// Sending the actual ask to the buyer (a mailto: draft, composed
-// client-side) is separate from this call — this Edge Function only
-// creates the database row; the stake_buybacks_notify_after_insert/
-// _after_repending triggers (see the Phase 14 task 2 migration) handle
-// telling the buyer a request exists via the existing dispatch-
-// notification pipeline.
+// Sending the actual ask to the buyer is handled entirely by this app,
+// not a mailto: draft composed client-side (that approach was tried and
+// dropped) — this Edge Function creates the database row (including an
+// optional personal note the golfer typed into the modal), and the
+// stake_buybacks_notify_after_insert/_after_repending triggers (see the
+// Phase 14 task 2 migration, extended by the message column's own
+// migration) forward it into the existing dispatch-notification pipeline
+// so the buyer gets one real email with no client mail app involved.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 
@@ -51,6 +53,20 @@ export default {
           status: 400,
         });
       }
+
+      // Matches the message column's own check constraint (char_length
+      // <= 1000) — enforced here too so a too-long note comes back as a
+      // clear 400 rather than a raw Postgres constraint-violation message.
+      const messageRaw = typeof body.message === "string"
+        ? body.message.trim()
+        : null;
+      if (messageRaw && messageRaw.length > 1000) {
+        return Response.json(
+          { error: "Message must be 1000 characters or fewer" },
+          { status: 400 },
+        );
+      }
+      const message = messageRaw || null;
 
       // winning_bid:bids!player_entries_winning_bid_id_fkey disambiguates
       // the embed the same way mark-bid-paid/void-bid/set-placement's own
@@ -152,6 +168,7 @@ export default {
             buyer_id: entry.winning_bid.bidder_id,
             percentage,
             amount,
+            message,
             status: "pending",
             requested_at: new Date().toISOString(),
             responded_at: null,
@@ -182,6 +199,7 @@ export default {
           buyer_id: entry.winning_bid.bidder_id,
           percentage,
           amount,
+          message,
         },
         ip,
         user_agent,

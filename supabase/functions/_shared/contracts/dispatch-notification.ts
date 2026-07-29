@@ -31,6 +31,10 @@ export interface DispatchNotificationRequest {
   // amount (the dollar amount alone doesn't say what fraction of the
   // stake it represents).
   percentage?: number;
+  // stake_buyback_requested only: an optional personal note the
+  // requesting golfer added, included in the email verbatim (escaped)
+  // alongside the pre-baked "X wants to buy back Y% for $Z" copy.
+  message?: string | null;
 }
 
 export interface DispatchNotificationResponse {

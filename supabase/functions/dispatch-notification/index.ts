@@ -38,6 +38,7 @@ import { sendNotificationEmail } from "../_shared/notify.ts";
 import {
   emailButton,
   emailParagraph,
+  emailQuote,
   renderEmailLayout,
   settingsUrl,
 } from "../_shared/email-layout.ts";
@@ -84,6 +85,7 @@ function buildEmail(
   tournamentSlug: string,
   amount: number | undefined,
   percentage: number | undefined,
+  message: string | null | undefined,
 ): EmailContent {
   const formattedAmount = amount !== undefined
     ? `$${
@@ -210,8 +212,10 @@ function buildEmail(
     }
     case "stake_buyback_requested": {
       const subject = `${playerName} wants to buy back part of their stake`;
-      const text =
-        `${playerName} wants to buy back ${formattedPercentage}% of their stake in ${tournamentName} for ${formattedAmount}.`;
+      const text = [
+        `${playerName} wants to buy back ${formattedPercentage}% of their stake in ${tournamentName} for ${formattedAmount}.`,
+        message ? `"${message}"` : "",
+      ].filter(Boolean).join("\n\n");
       return {
         subject,
         text,
@@ -219,7 +223,10 @@ function buildEmail(
           previewText: text,
           heading: subject,
           bodyHtml: [
-            emailParagraph(text),
+            emailParagraph(
+              `${playerName} wants to buy back ${formattedPercentage}% of their stake in ${tournamentName} for ${formattedAmount}.`,
+            ),
+            message ? emailQuote(message) : "",
             emailButton("Respond on My Balance", meBalanceUrl()),
           ].join("\n"),
           settingsUrl: settingsUrl(),
@@ -392,6 +399,7 @@ export default {
         tournament.slug,
         body.amount,
         body.percentage,
+        body.message,
       );
 
       const result = await sendNotificationEmail(resend, ctx.supabaseAdmin, {
