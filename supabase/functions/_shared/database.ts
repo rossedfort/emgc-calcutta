@@ -274,6 +274,7 @@ export type Database = {
           marked_paid_by: string | null;
           placement: number;
           pot_share: number;
+          stake_buyback_id: string | null;
           tournament_id: string;
         };
         Insert: {
@@ -286,6 +287,7 @@ export type Database = {
           marked_paid_by?: string | null;
           placement: number;
           pot_share: number;
+          stake_buyback_id?: string | null;
           tournament_id: string;
         };
         Update: {
@@ -298,6 +300,7 @@ export type Database = {
           marked_paid_by?: string | null;
           placement?: number;
           pot_share?: number;
+          stake_buyback_id?: string | null;
           tournament_id?: string;
         };
         Relationships: [
@@ -320,6 +323,13 @@ export type Database = {
             columns: ["marked_paid_by"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payouts_stake_buyback_id_fkey";
+            columns: ["stake_buyback_id"];
+            isOneToOne: false;
+            referencedRelation: "stake_buybacks";
             referencedColumns: ["id"];
           },
           {
@@ -459,11 +469,94 @@ export type Database = {
           },
         ];
       };
+      stake_buybacks: {
+        Row: {
+          amount: number;
+          buyer_id: string;
+          entry_id: string;
+          id: string;
+          message: string | null;
+          percentage: number;
+          requested_at: string;
+          requester_id: string;
+          responded_at: string | null;
+          responded_by: string | null;
+          status: string;
+          tournament_id: string;
+        };
+        Insert: {
+          amount: number;
+          buyer_id: string;
+          entry_id: string;
+          id?: string;
+          message?: string | null;
+          percentage: number;
+          requested_at?: string;
+          requester_id: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: string;
+          tournament_id: string;
+        };
+        Update: {
+          amount?: number;
+          buyer_id?: string;
+          entry_id?: string;
+          id?: string;
+          message?: string | null;
+          percentage?: number;
+          requested_at?: string;
+          requester_id?: string;
+          responded_at?: string | null;
+          responded_by?: string | null;
+          status?: string;
+          tournament_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "stake_buybacks_buyer_id_fkey";
+            columns: ["buyer_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stake_buybacks_entry_id_fkey";
+            columns: ["entry_id"];
+            isOneToOne: false;
+            referencedRelation: "player_entries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stake_buybacks_requester_id_fkey";
+            columns: ["requester_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stake_buybacks_responded_by_fkey";
+            columns: ["responded_by"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "stake_buybacks_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       tournaments: {
         Row: {
           anti_snipe_seconds: number;
+          buy_back_percentage: number | null;
           championship_flight: string | null;
           created_at: string;
+          event_start_at: string | null;
           flights: string[];
           id: string;
           kind: string;
@@ -479,8 +572,10 @@ export type Database = {
         };
         Insert: {
           anti_snipe_seconds?: number;
+          buy_back_percentage?: number | null;
           championship_flight?: string | null;
           created_at?: string;
+          event_start_at?: string | null;
           flights?: string[];
           id?: string;
           kind?: string;
@@ -496,8 +591,10 @@ export type Database = {
         };
         Update: {
           anti_snipe_seconds?: number;
+          buy_back_percentage?: number | null;
           championship_flight?: string | null;
           created_at?: string;
+          event_start_at?: string | null;
           flights?: string[];
           id?: string;
           kind?: string;

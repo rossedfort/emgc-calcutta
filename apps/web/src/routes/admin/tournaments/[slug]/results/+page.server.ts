@@ -75,7 +75,20 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	if (payoutsError) {
 		error(500, payoutsError.message);
 	}
-	const payoutByEntryId = new Map((payouts ?? []).map((p) => [p.entry_id, p]));
+	// A split entry (Phase 14, an accepted stake buy-back) has two payout
+	// rows sharing an entry_id — summed into the one total this page shows
+	// per placement, rather than a plain last-wins Map silently dropping
+	// one row's amount. pot_share is identical across a split entry's rows
+	// (it's the placement's percentage, unaffected by the split), so the
+	// first row's value is fine to keep as-is.
+	const payoutByEntryId = new Map<string, { pot_share: number; amount: number }>();
+	for (const p of payouts ?? []) {
+		const existing = payoutByEntryId.get(p.entry_id);
+		payoutByEntryId.set(p.entry_id, {
+			pot_share: p.pot_share,
+			amount: (existing?.amount ?? 0) + p.amount
+		});
+	}
 
 	const rows: ResultsRow[] = (entries ?? [])
 		.flatMap((entry) =>

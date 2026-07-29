@@ -22,12 +22,27 @@ export interface BookkeepingRow {
 
 export interface PayoutRow {
 	id: string;
-	placement: number;
-	pot_share: number;
 	amount: number;
 	marked_paid_at: string | null;
-	player: { first_name: string; last_name: string; division: string } | null;
 	bidder: { id: string; first_name: string | null; last_name: string | null; email: string } | null;
+	// Which side of an accepted stake buy-back (Phase 14) this row pays
+	// out to — null for the ordinary (non-split) case, where `bidder` is
+	// simply the entry's one winning bidder and there's nothing to
+	// distinguish. 'buyer' is the winning bidder's remaining share,
+	// 'golfer' is the golfer's bought-back share.
+	role: 'buyer' | 'golfer' | null;
+}
+
+// One row per (entry, placement) — one or two payouts.PayoutRow entries
+// grouped underneath, two only when an accepted stake buy-back split
+// this entry's payout between the buyer and the golfer.
+export interface PayoutGroup {
+	entryId: string;
+	placement: number;
+	pot_share: number;
+	totalAmount: number;
+	player: { first_name: string; last_name: string; division: string } | null;
+	rows: PayoutRow[];
 }
 
 // Only sold entries have a winning bid to mark paid — open/reserved/no_bid
@@ -90,11 +105,18 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	// entry_id has a single FK path to player_entries (no disambiguation
 	// hint needed there), but division lives on player_entries while
 	// first_name/last_name live on players, so this embed nests one level
-	// deeper than the pre-split query did.
+	// deeper than the pre-split query did. stake_buyback:stake_buybacks(...)
+	// is null for an ordinary (non-split) payout — payouts.stake_buyback_id
+	// itself is nullable, only set on the two rows an accepted buy-back
+	// produced (Phase 14) — and has just the one FK path to stake_buybacks,
+	// no disambiguation needed.
 	const { data: payoutRows, error: payoutsError } = await supabase
 		.from('payouts')
 		.select(
-			'id, placement, pot_share, amount, marked_paid_at, entry:player_entries(division, players(first_name, last_name)), bidder:users!payouts_bidder_id_fkey(id, first_name, last_name, email)'
+			`id, entry_id, placement, pot_share, amount, marked_paid_at, bidder_id,
+			entry:player_entries(division, players(first_name, last_name)),
+			bidder:users!payouts_bidder_id_fkey(id, first_name, last_name, email),
+			stake_buyback:stake_buybacks(buyer_id, requester_id)`
 		)
 		.eq('tournament_id', tournament.id)
 		.order('placement');
@@ -102,25 +124,57 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		error(500, payoutsError.message);
 	}
 
-	const payouts: PayoutRow[] = (payoutRows ?? []).map((payout) => ({
-		id: payout.id,
-		placement: payout.placement,
-		pot_share: payout.pot_share,
-		amount: payout.amount,
-		marked_paid_at: payout.marked_paid_at,
-		player: payout.entry?.players
-			? {
-					first_name: payout.entry.players.first_name,
-					last_name: payout.entry.players.last_name,
-					division: payout.entry.division
-				}
-			: null,
-		bidder: payout.bidder
-	}));
+	// Grouped by entry_id — an accepted stake buy-back (Phase 14) produces
+	// two payouts rows for the same entry/placement, and this page shows
+	// them as one placement with two recipient sub-rows rather than two
+	// seemingly-unrelated payouts. stake_buyback (unlike the reverse
+	// embeds elsewhere in this app affected by the create-unique-index-vs-
+	// inline-unique type-inference quirk) is a normal forward FK to
+	// another table's primary key, so it's correctly inferred as a single
+	// nullable object here, not an array.
+	const groupsByEntryId = new Map<string, PayoutGroup>();
+	for (const payout of payoutRows ?? []) {
+		const buyback = payout.stake_buyback;
+		const role: PayoutRow['role'] = !buyback
+			? null
+			: payout.bidder_id === buyback.buyer_id
+				? 'buyer'
+				: 'golfer';
+
+		const row: PayoutRow = {
+			id: payout.id,
+			amount: payout.amount,
+			marked_paid_at: payout.marked_paid_at,
+			bidder: payout.bidder,
+			role
+		};
+
+		const existing = groupsByEntryId.get(payout.entry_id);
+		if (existing) {
+			existing.rows.push(row);
+			existing.totalAmount += payout.amount;
+			continue;
+		}
+		groupsByEntryId.set(payout.entry_id, {
+			entryId: payout.entry_id,
+			placement: payout.placement,
+			pot_share: payout.pot_share,
+			totalAmount: payout.amount,
+			player: payout.entry?.players
+				? {
+						first_name: payout.entry.players.first_name,
+						last_name: payout.entry.players.last_name,
+						division: payout.entry.division
+					}
+				: null,
+			rows: [row]
+		});
+	}
+	const payoutGroups = [...groupsByEntryId.values()].sort((a, b) => a.placement - b.placement);
 
 	return {
 		players,
-		payouts,
+		payoutGroups,
 		title: `${tournament.name} · Bookkeeping · EMGC Bet`,
 		description: `Track paid and unpaid winning bids and payouts for ${tournament.name}.`
 	};

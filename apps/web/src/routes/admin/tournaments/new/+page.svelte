@@ -15,7 +15,9 @@
 		threshold_amount: '',
 		min_increment: '',
 		anti_snipe_seconds: '15',
-		championship_flight: ''
+		championship_flight: '',
+		buy_back_percentage: '',
+		event_start_at: ''
 	};
 </script>
 

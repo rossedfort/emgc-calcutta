@@ -10,7 +10,13 @@ export type NotificationTrigger =
   | "bid_on_you"
   | "reserved"
   | "live_starting"
-  | "won";
+  | "won"
+  // Phase 14: a golfer wants to buy back part of their stake — sent to
+  // the buyer, not the golfer.
+  | "stake_buyback_requested"
+  // Phase 14: the buyer responded — sent to the golfer, not the buyer.
+  | "stake_buyback_accepted"
+  | "stake_buyback_rejected";
 
 export interface DispatchNotificationRequest {
   userId: string;
@@ -21,6 +27,14 @@ export interface DispatchNotificationRequest {
   playerId?: string;
   // outbid/won carry the bid amount that triggered them.
   amount?: number;
+  // stake_buyback_requested carries the buy-back percentage alongside
+  // amount (the dollar amount alone doesn't say what fraction of the
+  // stake it represents).
+  percentage?: number;
+  // stake_buyback_requested only: an optional personal note the
+  // requesting golfer added, included in the email verbatim (escaped)
+  // alongside the pre-baked "X wants to buy back Y% for $Z" copy.
+  message?: string | null;
 }
 
 export interface DispatchNotificationResponse {
