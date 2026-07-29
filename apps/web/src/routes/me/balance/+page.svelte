@@ -1,13 +1,41 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
+	import BuyBackModal from '$lib/components/BuyBackModal.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { formatPlayerName } from '$lib/players';
+	import type { StakeRow } from './+page.server';
 
 	let { data } = $props();
-	let { owed, won } = $derived(data);
+	let { supabase, owed, won, stake } = $derived(data);
+
+	let buyBackModalOpen = $state(false);
+	let selectedStakeRow = $state<StakeRow | null>(null);
+
+	function openBuyBackModal(row: StakeRow) {
+		selectedStakeRow = row;
+		buyBackModalOpen = true;
+	}
+
+	function stakeBuybackBadge(row: StakeRow): {
+		label: string;
+		variant: 'fairway' | 'flag' | 'sand';
+	} {
+		switch (row.stake_buyback_status) {
+			case 'accepted':
+				return { label: 'Buy-back accepted', variant: 'fairway' };
+			case 'pending':
+				return { label: 'Buy-back requested', variant: 'sand' };
+			case 'rejected':
+				return { label: 'Buy-back declined', variant: 'flag' };
+			default:
+				return { label: 'Sold', variant: 'sand' };
+		}
+	}
 
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -123,4 +151,59 @@
 			</Table.Root>
 		{/if}
 	</div>
+
+	{#if stake.length > 0}
+		<div class="flex flex-col gap-2">
+			<h2 class="font-display text-lg font-semibold text-ink">Your stake</h2>
+
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Tournament</Table.Head>
+						<Table.Head>Player</Table.Head>
+						<Table.Head>Bought for</Table.Head>
+						<Table.Head>Status</Table.Head>
+						<Table.Head></Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each stake as row (row.id)}
+						{@const badge = stakeBuybackBadge(row)}
+						<Table.Row>
+							<Table.Cell>{row.tournament_name}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								{formatPlayerName(row)}
+								<DivisionBadge division={row.division} />
+							</Table.Cell>
+							<Table.Cell class="font-data">{formatCurrency(row.amount)}</Table.Cell>
+							<Table.Cell>
+								<Badge variant={badge.variant}>{badge.label}</Badge>
+							</Table.Cell>
+							<Table.Cell>
+								{#if row.can_request}
+									<Button variant="brass" size="sm" onclick={() => openBuyBackModal(row)}>
+										Buy back stake
+									</Button>
+								{/if}
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		</div>
+	{/if}
 </div>
+
+{#if selectedStakeRow}
+	<BuyBackModal
+		bind:open={buyBackModalOpen}
+		{supabase}
+		entryId={selectedStakeRow.id}
+		golferName={formatPlayerName(selectedStakeRow)}
+		tournamentName={selectedStakeRow.tournament_name}
+		percentage={selectedStakeRow.buy_back_percentage}
+		amount={selectedStakeRow.buy_back_amount}
+		buyer={selectedStakeRow.buyer ?? { first_name: null, last_name: null, email: '', phone: null }}
+		onSuccess={() => invalidateAll()}
+	/>
+{/if}

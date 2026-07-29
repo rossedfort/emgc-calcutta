@@ -21,7 +21,8 @@ export const AUDIT_ACTIONS = [
 	'notification_skipped',
 	'bid_marked_paid',
 	'payout_marked_paid',
-	'placement_set'
+	'placement_set',
+	'stake_buyback_requested'
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

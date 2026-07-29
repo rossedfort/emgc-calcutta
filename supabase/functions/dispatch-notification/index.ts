@@ -69,6 +69,10 @@ function tournamentUrl(tournamentSlug: string): string {
   return `${Deno.env.get("SITE_URL")}/tournaments/${tournamentSlug}`;
 }
 
+function meBalanceUrl(): string {
+  return `${Deno.env.get("SITE_URL")}/me/balance`;
+}
+
 // Copy lives in exactly one place rather than scattered across every
 // future trigger-calling site (the Bid webhook, the LiveLot webhook,
 // ...), so updating the wording later is a one-file change.
@@ -79,6 +83,7 @@ function buildEmail(
   tournamentName: string,
   tournamentSlug: string,
   amount: number | undefined,
+  percentage: number | undefined,
 ): EmailContent {
   const formattedAmount = amount !== undefined
     ? `$${
@@ -87,6 +92,9 @@ function buildEmail(
         maximumFractionDigits: 2,
       })
     }`
+    : undefined;
+  const formattedPercentage = percentage !== undefined
+    ? Math.round(percentage * 100)
     : undefined;
 
   switch (trigger) {
@@ -195,6 +203,24 @@ function buildEmail(
                 playerUrl(tournamentSlug, playerSlug),
               )
               : "",
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
+      };
+    }
+    case "stake_buyback_requested": {
+      const subject = `${playerName} wants to buy back part of their stake`;
+      const text =
+        `${playerName} wants to buy back ${formattedPercentage}% of their stake in ${tournamentName} for ${formattedAmount}.`;
+      return {
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            emailButton("Respond on My Balance", meBalanceUrl()),
           ].join("\n"),
           settingsUrl: settingsUrl(),
         }),
@@ -329,6 +355,7 @@ export default {
         tournament.name,
         tournament.slug,
         body.amount,
+        body.percentage,
       );
 
       const result = await sendNotificationEmail(resend, ctx.supabaseAdmin, {
