@@ -25,7 +25,7 @@
 
 	// Supabase's default email template sends one email containing both a
 	// magic-link URL (handled by the existing /auth/callback route, same as
-	// the OAuth providers) and this 6-digit code — one call covers both entry
+	// the OAuth providers) and this 8-digit code — one call covers both entry
 	// points rather than these being two separate features.
 	async function sendCode(event: SubmitEvent) {
 		event.preventDefault();
@@ -129,16 +129,16 @@
 		{:else if step === 'code'}
 			<form class="mt-6 flex flex-col gap-3" onsubmit={verifyCode}>
 				<p class="text-sm text-ink/70">
-					We sent a sign-in link and a 6-digit code to <strong>{email}</strong>. Click the link, or
+					We sent a sign-in link and an 8-digit code to <strong>{email}</strong>. Click the link, or
 					enter the code below.
 				</p>
 				<div class="flex flex-col gap-1.5">
-					<Label for="code">6-digit code</Label>
+					<Label for="code">8-digit code</Label>
 					<Input
 						id="code"
 						inputmode="numeric"
 						autocomplete="one-time-code"
-						maxlength={6}
+						maxlength={8}
 						bind:value={code}
 						required
 						disabled={verifying}

@@ -233,8 +233,16 @@ enable_confirmations = false
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
-# Number of characters used in the email OTP.
-otp_length = 6
+# Number of characters used in the email OTP. Must match whatever's
+# actually configured for the hosted project's Auth settings — this file's
+# [auth.email.smtp] block being commented out (see its own comment) is
+# evidence this section has never been pushed via `supabase config push`,
+# so this value doesn't govern production. Confirmed via a real production
+# magic-link send that the hosted project's OTP length is 8, not 6 (the
+# CLI scaffold's stock default) — set to match reality rather than the
+# app's prior wrong assumption. If this is ever pushed, confirm production
+# still says 8 first so push doesn't silently change it.
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
