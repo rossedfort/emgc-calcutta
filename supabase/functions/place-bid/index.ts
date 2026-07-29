@@ -71,7 +71,7 @@ export default {
     async (req, ctx) => {
       const { data: caller, error: callerError } = await ctx.supabaseAdmin
         .from("users")
-        .select("role")
+        .select("role, first_name, last_name")
         .eq("id", ctx.userClaims!.id)
         .single();
       if (callerError) {
@@ -268,6 +268,17 @@ export default {
         }, { status: 400 });
       }
 
+      // Denormalized onto the row so it rides along on the existing
+      // postgres_changes Realtime channel with zero extra queries — see
+      // the bidder_name migration's own header comment for why this is
+      // safe under bids_select_participant_plus's existing whole-row
+      // grant. Null if the caller hasn't set a name yet (both columns are
+      // nullable on `users`); the UI omits the "(name)" suffix in that
+      // case rather than showing something empty/misleading.
+      const bidderName = [caller.first_name, caller.last_name]
+        .filter(Boolean)
+        .join(" ") || null;
+
       const { data: bid, error: insertError } = await ctx.supabaseAdmin
         .from("bids")
         .insert({
@@ -275,6 +286,7 @@ export default {
           bidder_id: ctx.userClaims!.id,
           amount: body.amount,
           phase,
+          bidder_name: bidderName,
         })
         .select("id, amount, phase, placed_at")
         .single();

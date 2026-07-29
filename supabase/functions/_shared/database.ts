@@ -132,6 +132,7 @@ export type Database = {
         Row: {
           amount: number;
           bidder_id: string;
+          bidder_name: string | null;
           entry_id: string;
           id: string;
           phase: Database["public"]["Enums"]["bid_phase"];
@@ -142,6 +143,7 @@ export type Database = {
         Insert: {
           amount: number;
           bidder_id: string;
+          bidder_name?: string | null;
           entry_id: string;
           id?: string;
           phase: Database["public"]["Enums"]["bid_phase"];
@@ -152,6 +154,7 @@ export type Database = {
         Update: {
           amount?: number;
           bidder_id?: string;
+          bidder_name?: string | null;
           entry_id?: string;
           id?: string;
           phase?: Database["public"]["Enums"]["bid_phase"];

@@ -67,7 +67,7 @@ export function createTournamentRealtime(
 
 		const { data: bidRows } = await supabase
 			.from('bids')
-			.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at')
+			.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at, bidder_name')
 			.in('entry_id', entryIds)
 			.order('placed_at', { ascending: true });
 		bids.set(bidRows ?? []);
