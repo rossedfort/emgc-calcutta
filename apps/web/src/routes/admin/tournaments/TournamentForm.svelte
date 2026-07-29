@@ -28,7 +28,9 @@
 	// component init, not reactively: the browser's own timezone doesn't
 	// change mid-session, and by the time a user could actually submit the
 	// form, hydration has already replaced any (irrelevant) SSR-computed
-	// value with this real client-side one.
+	// value with this real client-side one. Shared by every datetime-local
+	// input in this form, including event_start_at (Phase 14) — one offset
+	// for the whole form, not one per field.
 	const tzOffsetMinutes = new Date().getTimezoneOffset();
 
 	// Seeds local, independently-editable row state from the prop once — not
@@ -92,209 +94,278 @@
 	});
 </script>
 
-<div class="flex flex-col gap-4">
+{#snippet sectionHeading(text: string)}
+	<h3 class="font-data text-xs tracking-widest text-fairway uppercase">{text}</h3>
+{/snippet}
+
+<div class="flex flex-col gap-8">
 	{#if errors.form}
 		<p class="text-sm text-destructive">{errors.form}</p>
 	{/if}
 
-	<div class="flex flex-col gap-1.5">
-		<Label for="name">Name</Label>
-		<Input id="name" name="name" value={values.name} />
-		{#if errors.name}<p class="text-sm text-destructive">{errors.name}</p>{/if}
-	</div>
+	<div class="flex flex-col gap-4">
+		{@render sectionHeading('Basics')}
 
-	<div class="flex flex-col gap-1.5">
-		<Label>Type</Label>
-		<div class="flex gap-4 text-sm">
-			<label class="flex items-center gap-2">
-				<input
-					type="radio"
-					name="kind"
-					value="production"
-					checked={values.kind !== 'dry_run'}
-					class="accent-brass"
-				/>
-				Production
-			</label>
-			<label class="flex items-center gap-2">
-				<input
-					type="radio"
-					name="kind"
-					value="dry_run"
-					checked={values.kind === 'dry_run'}
-					class="accent-brass"
-				/>
-				Dry run
-			</label>
-		</div>
-	</div>
-
-	<div class="grid grid-cols-2 gap-4">
 		<div class="flex flex-col gap-1.5">
-			<Label for="silent_auction_start">Silent auction start</Label>
-			<Input
-				id="silent_auction_start"
-				name="silent_auction_start"
-				type="datetime-local"
-				value={values.silent_auction_start}
-			/>
-			{#if errors.silent_auction_start}<p class="text-sm text-destructive">
-					{errors.silent_auction_start}
-				</p>{/if}
+			<Label for="name">Name</Label>
+			<Input id="name" name="name" value={values.name} />
+			{#if errors.name}<p class="text-sm text-destructive">{errors.name}</p>{/if}
 		</div>
+
 		<div class="flex flex-col gap-1.5">
-			<Label for="silent_auction_end">Silent auction end</Label>
-			<Input
-				id="silent_auction_end"
-				name="silent_auction_end"
-				type="datetime-local"
-				value={values.silent_auction_end}
-			/>
-			{#if errors.silent_auction_end}<p class="text-sm text-destructive">
-					{errors.silent_auction_end}
-				</p>{/if}
-		</div>
-		<p class="col-span-2 text-xs text-muted-foreground">
-			Times are entered in your browser's local timezone.
-		</p>
-	</div>
-
-	<input type="hidden" name="tz_offset_minutes" value={tzOffsetMinutes} />
-
-	<div class="grid grid-cols-2 gap-4">
-		<div class="flex flex-col gap-1.5">
-			<Label for="threshold_amount">Reservation threshold ($)</Label>
-			<Input
-				id="threshold_amount"
-				name="threshold_amount"
-				type="number"
-				step="0.01"
-				min="0"
-				value={values.threshold_amount}
-			/>
-			{#if errors.threshold_amount}<p class="text-sm text-destructive">
-					{errors.threshold_amount}
-				</p>{/if}
-		</div>
-		<div class="flex flex-col gap-1.5">
-			<Label for="min_increment">Minimum bid increment ($)</Label>
-			<Input
-				id="min_increment"
-				name="min_increment"
-				type="number"
-				step="0.01"
-				min="0"
-				value={values.min_increment}
-			/>
-			{#if errors.min_increment}<p class="text-sm text-destructive">{errors.min_increment}</p>{/if}
-		</div>
-	</div>
-
-	<div class="flex flex-col gap-1.5">
-		<Label for="anti_snipe_seconds">Anti-snipe window (seconds)</Label>
-		<Input
-			id="anti_snipe_seconds"
-			name="anti_snipe_seconds"
-			type="number"
-			step="1"
-			min="0"
-			class="max-w-40"
-			value={values.anti_snipe_seconds}
-		/>
-		{#if errors.anti_snipe_seconds}<p class="text-sm text-destructive">
-				{errors.anti_snipe_seconds}
-			</p>{/if}
-	</div>
-
-	<div class="flex flex-col gap-2">
-		<Label>Flights (optional — order determines display/ranking order everywhere else)</Label>
-		{#each flightRows.keys() as i (i)}
-			<div class="flex items-center gap-2">
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					disabled={i === 0}
-					onclick={() => moveFlight(i, -1)}>↑</Button
-				>
-				<Button
-					type="button"
-					variant="ghost"
-					size="sm"
-					disabled={i === flightRows.length - 1}
-					onclick={() => moveFlight(i, 1)}>↓</Button
-				>
-				<Input placeholder="Flight name" bind:value={flightRows[i]} class="max-w-64" />
-				<Button type="button" variant="ghost" size="sm" onclick={() => removeFlight(i)}
-					>Remove</Button
-				>
+			<Label>Type</Label>
+			<div class="flex gap-4 text-sm">
+				<label class="flex items-center gap-2">
+					<input
+						type="radio"
+						name="kind"
+						value="production"
+						checked={values.kind !== 'dry_run'}
+						class="accent-brass"
+					/>
+					Production
+				</label>
+				<label class="flex items-center gap-2">
+					<input
+						type="radio"
+						name="kind"
+						value="dry_run"
+						checked={values.kind === 'dry_run'}
+						class="accent-brass"
+					/>
+					Dry run
+				</label>
 			</div>
-		{/each}
-		<Button type="button" variant="outline" size="sm" class="w-fit" onclick={addFlight}
-			>Add flight</Button
-		>
-		{#if errors.flights}<p class="text-sm text-destructive">{errors.flights}</p>{/if}
+		</div>
 	</div>
 
-	<div class="flex flex-col gap-1.5">
-		<Label for="championship_flight">Championship flight (optional)</Label>
-		<select
-			id="championship_flight"
-			name="championship_flight"
-			bind:value={championshipFlight}
-			disabled={flightNames.length === 0}
-			class="h-9 max-w-64 rounded-md border border-input bg-transparent px-3 text-sm"
-		>
-			<option value="">— None —</option>
-			{#each flightNames as name (name)}
-				<option value={name}>{name}</option>
-			{/each}
-		</select>
-		<p class="text-xs text-muted-foreground">
-			Players in this flight are auctioned twice — once for Gross, once for Net.
-		</p>
-		{#if errors.championship_flight}<p class="text-sm text-destructive">
-				{errors.championship_flight}
-			</p>{/if}
-	</div>
+	<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+		{@render sectionHeading('Auction settings')}
 
-	<input type="hidden" name="flights" value={flightsJson} />
-
-	<div class="flex flex-col gap-2">
-		<Label>Payout structure (optional — can be finalized later, before results are entered)</Label>
-		{#each rows as row, i (i)}
-			<div class="flex items-center gap-2">
+		<div class="grid grid-cols-2 gap-4">
+			<div class="flex flex-col gap-1.5">
+				<Label for="silent_auction_start">Silent auction start</Label>
 				<Input
+					id="silent_auction_start"
+					name="silent_auction_start"
+					type="datetime-local"
+					value={values.silent_auction_start}
+				/>
+				{#if errors.silent_auction_start}<p class="text-sm text-destructive">
+						{errors.silent_auction_start}
+					</p>{/if}
+			</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="silent_auction_end">Silent auction end</Label>
+				<Input
+					id="silent_auction_end"
+					name="silent_auction_end"
+					type="datetime-local"
+					value={values.silent_auction_end}
+				/>
+				{#if errors.silent_auction_end}<p class="text-sm text-destructive">
+						{errors.silent_auction_end}
+					</p>{/if}
+			</div>
+			<p class="col-span-2 text-xs text-muted-foreground">
+				Times are entered in your browser's local timezone.
+			</p>
+		</div>
+
+		<input type="hidden" name="tz_offset_minutes" value={tzOffsetMinutes} />
+
+		<div class="grid grid-cols-2 gap-4">
+			<div class="flex flex-col gap-1.5">
+				<Label for="threshold_amount">Reservation threshold ($)</Label>
+				<Input
+					id="threshold_amount"
+					name="threshold_amount"
+					type="number"
+					step="0.01"
+					min="0"
+					value={values.threshold_amount}
+				/>
+				{#if errors.threshold_amount}<p class="text-sm text-destructive">
+						{errors.threshold_amount}
+					</p>{/if}
+			</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="min_increment">Minimum bid increment ($)</Label>
+				<Input
+					id="min_increment"
+					name="min_increment"
+					type="number"
+					step="0.01"
+					min="0"
+					value={values.min_increment}
+				/>
+				{#if errors.min_increment}<p class="text-sm text-destructive">
+						{errors.min_increment}
+					</p>{/if}
+			</div>
+		</div>
+
+		<div class="flex flex-col gap-1.5">
+			<Label for="anti_snipe_seconds">Anti-snipe window (seconds)</Label>
+			<Input
+				id="anti_snipe_seconds"
+				name="anti_snipe_seconds"
+				type="number"
+				step="1"
+				min="0"
+				class="max-w-40"
+				value={values.anti_snipe_seconds}
+			/>
+			{#if errors.anti_snipe_seconds}<p class="text-sm text-destructive">
+					{errors.anti_snipe_seconds}
+				</p>{/if}
+		</div>
+	</div>
+
+	<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+		{@render sectionHeading('Buy-back')}
+		<p class="-mt-2 text-xs text-muted-foreground">
+			Lets a golfer buy back a share of their own stake from the winning bidder. Leave the
+			percentage blank to keep this off for the tournament.
+		</p>
+
+		<div class="grid grid-cols-2 gap-4">
+			<div class="flex flex-col gap-1.5">
+				<Label for="buy_back_percentage">Buy-back percentage (optional)</Label>
+				<Input
+					id="buy_back_percentage"
+					name="buy_back_percentage"
 					type="number"
 					min="1"
+					max="99"
 					step="1"
-					placeholder="Place"
-					bind:value={row.place}
-					class="w-24"
+					placeholder="e.g. 50"
+					class="max-w-40"
+					value={values.buy_back_percentage}
 				/>
-				<span class="text-sm text-muted-foreground">place gets</span>
-				<Input
-					type="number"
-					min="0"
-					max="100"
-					step="1"
-					placeholder="%"
-					bind:value={row.percent}
-					class="w-24"
-				/>
-				<span class="text-sm text-muted-foreground">%</span>
-				<Button type="button" variant="ghost" size="sm" onclick={() => removeRow(i)}>Remove</Button>
+				{#if errors.buy_back_percentage}<p class="text-sm text-destructive">
+						{errors.buy_back_percentage}
+					</p>{/if}
 			</div>
-		{/each}
-		<Button type="button" variant="outline" size="sm" class="w-fit" onclick={addRow}
-			>Add place</Button
-		>
-		{#if errors.payout_structure}<p class="text-sm text-destructive">
-				{errors.payout_structure}
-			</p>{/if}
+			<div class="flex flex-col gap-1.5">
+				<Label for="event_start_at">Tournament start (optional)</Label>
+				<Input
+					id="event_start_at"
+					name="event_start_at"
+					type="datetime-local"
+					value={values.event_start_at}
+				/>
+				{#if errors.event_start_at}<p class="text-sm text-destructive">
+						{errors.event_start_at}
+					</p>{/if}
+			</div>
+			<p class="col-span-2 text-xs text-muted-foreground">
+				When the actual golf starts — not the auction window above. Buy-back requests stop once this
+				passes. Leave blank for no cutoff.
+			</p>
+		</div>
 	</div>
 
-	<input type="hidden" name="payout_structure" value={payoutJson} />
+	<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+		{@render sectionHeading('Flights')}
+
+		<div class="flex flex-col gap-2">
+			<Label>Flights (optional — order determines display/ranking order everywhere else)</Label>
+			{#each flightRows.keys() as i (i)}
+				<div class="flex items-center gap-2">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						disabled={i === 0}
+						onclick={() => moveFlight(i, -1)}>↑</Button
+					>
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						disabled={i === flightRows.length - 1}
+						onclick={() => moveFlight(i, 1)}>↓</Button
+					>
+					<Input placeholder="Flight name" bind:value={flightRows[i]} class="max-w-64" />
+					<Button type="button" variant="ghost" size="sm" onclick={() => removeFlight(i)}
+						>Remove</Button
+					>
+				</div>
+			{/each}
+			<Button type="button" variant="outline" size="sm" class="w-fit" onclick={addFlight}
+				>Add flight</Button
+			>
+			{#if errors.flights}<p class="text-sm text-destructive">{errors.flights}</p>{/if}
+		</div>
+
+		<div class="flex flex-col gap-1.5">
+			<Label for="championship_flight">Championship flight (optional)</Label>
+			<select
+				id="championship_flight"
+				name="championship_flight"
+				bind:value={championshipFlight}
+				disabled={flightNames.length === 0}
+				class="h-9 max-w-64 rounded-md border border-input bg-transparent px-3 text-sm"
+			>
+				<option value="">— None —</option>
+				{#each flightNames as name (name)}
+					<option value={name}>{name}</option>
+				{/each}
+			</select>
+			<p class="text-xs text-muted-foreground">
+				Players in this flight are auctioned twice — once for Gross, once for Net.
+			</p>
+			{#if errors.championship_flight}<p class="text-sm text-destructive">
+					{errors.championship_flight}
+				</p>{/if}
+		</div>
+
+		<input type="hidden" name="flights" value={flightsJson} />
+	</div>
+
+	<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+		{@render sectionHeading('Payout structure')}
+
+		<div class="flex flex-col gap-2">
+			<Label>Payout structure (optional — can be finalized later, before results are entered)</Label
+			>
+			{#each rows as row, i (i)}
+				<div class="flex items-center gap-2">
+					<Input
+						type="number"
+						min="1"
+						step="1"
+						placeholder="Place"
+						bind:value={row.place}
+						class="w-24"
+					/>
+					<span class="text-sm text-muted-foreground">place gets</span>
+					<Input
+						type="number"
+						min="0"
+						max="100"
+						step="1"
+						placeholder="%"
+						bind:value={row.percent}
+						class="w-24"
+					/>
+					<span class="text-sm text-muted-foreground">%</span>
+					<Button type="button" variant="ghost" size="sm" onclick={() => removeRow(i)}
+						>Remove</Button
+					>
+				</div>
+			{/each}
+			<Button type="button" variant="outline" size="sm" class="w-fit" onclick={addRow}
+				>Add place</Button
+			>
+			{#if errors.payout_structure}<p class="text-sm text-destructive">
+					{errors.payout_structure}
+				</p>{/if}
+		</div>
+
+		<input type="hidden" name="payout_structure" value={payoutJson} />
+	</div>
 
 	<Button type="submit" variant="brass" class="w-fit">{submitLabel}</Button>
 </div>

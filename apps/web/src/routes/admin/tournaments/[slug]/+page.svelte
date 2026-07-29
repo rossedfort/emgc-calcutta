@@ -32,7 +32,16 @@
 		threshold_amount: String(data.tournament.threshold_amount),
 		min_increment: String(data.tournament.min_increment),
 		anti_snipe_seconds: String(data.tournament.anti_snipe_seconds),
-		championship_flight: data.tournament.championship_flight ?? ''
+		championship_flight: data.tournament.championship_flight ?? '',
+		// Stored as a 0-1 fraction, shown as a whole-number percentage —
+		// same convention payout_structure's own rows already use.
+		buy_back_percentage:
+			data.tournament.buy_back_percentage !== null
+				? String(data.tournament.buy_back_percentage * 100)
+				: '',
+		event_start_at: data.tournament.event_start_at
+			? toLocalInput(data.tournament.event_start_at)
+			: ''
 	});
 
 	let defaultPayoutRows = $derived<PayoutRow[]>(

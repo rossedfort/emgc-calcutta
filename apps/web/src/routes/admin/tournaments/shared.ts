@@ -18,6 +18,12 @@ export interface Tournament {
 	flights: string[];
 	championship_flight: string | null;
 	live_auction_started_at: string | null;
+	// Phase 14 (stake buy-back): both nullable/unset by default — a
+	// tournament that's never configured either has the feature off
+	// entirely, same "unconfigured means off" precedent as
+	// payout_structure defaulting to {}.
+	buy_back_percentage: number | null;
+	event_start_at: string | null;
 	created_at: string;
 }
 
@@ -30,6 +36,9 @@ export interface TournamentFormValues {
 	min_increment: string;
 	anti_snipe_seconds: string;
 	championship_flight: string;
+	// '' means unset for both, same as championship_flight above.
+	buy_back_percentage: string;
+	event_start_at: string;
 }
 
 export interface PayoutRow {
@@ -59,6 +68,8 @@ export interface ParsedTournament {
 	payout_structure: Record<string, number>;
 	flights: string[];
 	championship_flight: string | null;
+	buy_back_percentage: number | null;
+	event_start_at: string | null;
 }
 
 // Shared by the new/create and [slug]/edit/update form actions — same fields,
@@ -176,6 +187,32 @@ export function parseTournamentForm(formData: FormData): {
 		errors.championship_flight = 'Championship flight must be one of the flights listed above';
 	}
 
+	// Buy-back (Phase 14): both fields optional and independent — a
+	// tournament can set the percentage without a start-date cutoff (buy-
+	// back stays available indefinitely, matching request-stake-buyback's
+	// own "null event_start_at means no gate" behavior), or vice versa.
+	// Entered as a whole-number percentage (matching payout_structure's own
+	// convention above), converted to the 0-1 fraction the DB check
+	// constraint expects.
+	let buy_back_percentage: number | null = null;
+	const buyBackPercentageRaw = String(formData.get('buy_back_percentage') ?? '').trim();
+	if (buyBackPercentageRaw) {
+		const parsed = Number(buyBackPercentageRaw);
+		if (!Number.isFinite(parsed) || parsed <= 0 || parsed >= 100) {
+			errors.buy_back_percentage = 'Buy-back percentage must be between 1 and 99';
+		} else {
+			buy_back_percentage = parsed / 100;
+		}
+	}
+
+	const eventStartRaw = String(formData.get('event_start_at') ?? '');
+	const event_start_at = eventStartRaw
+		? localDateTimeToUtcIso(eventStartRaw, tzOffsetMinutes)
+		: null;
+	if (eventStartRaw && !event_start_at) {
+		errors.event_start_at = 'Tournament start is invalid';
+	}
+
 	if (Object.keys(errors).length > 0) {
 		return { data: null, errors };
 	}
@@ -191,7 +228,9 @@ export function parseTournamentForm(formData: FormData): {
 			anti_snipe_seconds,
 			payout_structure,
 			flights,
-			championship_flight
+			championship_flight,
+			buy_back_percentage,
+			event_start_at
 		},
 		errors
 	};
