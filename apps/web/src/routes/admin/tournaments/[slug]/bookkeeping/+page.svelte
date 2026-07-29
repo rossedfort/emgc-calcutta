@@ -10,7 +10,18 @@
 	import { formatUserName } from '$lib/profile';
 
 	let { data } = $props();
-	let { supabase, players, payouts } = $derived(data);
+	let { supabase, players, payoutGroups } = $derived(data);
+
+	function roleLabel(role: 'buyer' | 'golfer' | null): string {
+		switch (role) {
+			case 'buyer':
+				return 'Buyer share';
+			case 'golfer':
+				return 'Bought back by';
+			default:
+				return '';
+		}
+	}
 
 	let pendingBidId: string | null = $state(null);
 	let pendingPayoutId: string | null = $state(null);
@@ -128,7 +139,7 @@
 
 	<div class="flex flex-col gap-2">
 		<h2 class="font-display text-lg font-semibold text-ink">Payouts — owed from the pot</h2>
-		{#if payouts.length === 0}
+		{#if payoutGroups.length === 0}
 			<EmptyState title="No payouts yet" description="These appear once placements are entered." />
 		{:else}
 			<Table.Root>
@@ -143,43 +154,99 @@
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
-					{#each payouts as payout (payout.id)}
-						<Table.Row>
-							<Table.Cell class="font-data">{payout.placement}</Table.Cell>
-							<Table.Cell class="font-medium text-ink">
-								{payout.player ? formatPlayerName(payout.player) : '—'}
-								{#if payout.player}
-									<DivisionBadge division={payout.player.division} />
-								{/if}
-							</Table.Cell>
-							<Table.Cell>
-								{#if payout.bidder}
-									{formatUserName(payout.bidder) ?? payout.bidder.email}
-								{:else}
-									<span class="text-muted-foreground">—</span>
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="font-data">{formatCurrency(payout.amount)}</Table.Cell>
-							<Table.Cell>
-								{#if payout.marked_paid_at}
-									<Badge variant="fairway">Paid</Badge>
-								{:else}
-									<Badge variant="sand">Owed</Badge>
-								{/if}
-							</Table.Cell>
-							<Table.Cell>
-								{#if !payout.marked_paid_at}
-									<Button
-										variant="brass"
-										size="sm"
-										disabled={pendingPayoutId === payout.id}
-										onclick={() => markPayoutPaid(payout.id)}
-									>
-										Mark paid
-									</Button>
-								{/if}
-							</Table.Cell>
-						</Table.Row>
+					{#each payoutGroups as group (group.entryId)}
+						{#if group.rows.length === 1}
+							{@const payout = group.rows[0]}
+							<Table.Row>
+								<Table.Cell class="font-data">{group.placement}</Table.Cell>
+								<Table.Cell class="font-medium text-ink">
+									{group.player ? formatPlayerName(group.player) : '—'}
+									{#if group.player}
+										<DivisionBadge division={group.player.division} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell>
+									{#if payout.bidder}
+										{formatUserName(payout.bidder) ?? payout.bidder.email}
+									{:else}
+										<span class="text-muted-foreground">—</span>
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="font-data">{formatCurrency(payout.amount)}</Table.Cell>
+								<Table.Cell>
+									{#if payout.marked_paid_at}
+										<Badge variant="fairway">Paid</Badge>
+									{:else}
+										<Badge variant="sand">Owed</Badge>
+									{/if}
+								</Table.Cell>
+								<Table.Cell>
+									{#if !payout.marked_paid_at}
+										<Button
+											variant="brass"
+											size="sm"
+											disabled={pendingPayoutId === payout.id}
+											onclick={() => markPayoutPaid(payout.id)}
+										>
+											Mark paid
+										</Button>
+									{/if}
+								</Table.Cell>
+							</Table.Row>
+						{:else}
+							<!-- Split payout (Phase 14: an accepted stake buy-back) — a
+							     parent row for the placement/player/total, then one
+							     sub-row per recipient rather than presenting the two as
+							     unrelated payouts. -->
+							<Table.Row class="bg-brass/5">
+								<Table.Cell class="font-data">{group.placement}</Table.Cell>
+								<Table.Cell class="font-medium text-ink">
+									{group.player ? formatPlayerName(group.player) : '—'}
+									{#if group.player}
+										<DivisionBadge division={group.player.division} />
+									{/if}
+								</Table.Cell>
+								<Table.Cell class="text-ink/60">Split — {group.rows.length} recipients</Table.Cell>
+								<Table.Cell class="font-data font-medium">
+									{formatCurrency(group.totalAmount)}
+								</Table.Cell>
+								<Table.Cell></Table.Cell>
+								<Table.Cell></Table.Cell>
+							</Table.Row>
+							{#each group.rows as payout (payout.id)}
+								<Table.Row>
+									<Table.Cell></Table.Cell>
+									<Table.Cell class="pl-6 text-sm text-ink/60">{roleLabel(payout.role)}</Table.Cell>
+									<Table.Cell>
+										{#if payout.bidder}
+											{formatUserName(payout.bidder) ?? payout.bidder.email}
+										{:else}
+											<span class="text-muted-foreground">—</span>
+										{/if}
+									</Table.Cell>
+									<Table.Cell class="font-data">{formatCurrency(payout.amount)}</Table.Cell>
+									<Table.Cell>
+										{#if payout.marked_paid_at}
+											<Badge variant="fairway">Paid</Badge>
+										{:else}
+											<Badge variant="sand">Owed</Badge>
+										{/if}
+									</Table.Cell>
+									<Table.Cell>
+										{#if !payout.marked_paid_at}
+											<Button
+												variant="brass"
+												size="sm"
+												disabled={pendingPayoutId === payout.id}
+												onclick={() => markPayoutPaid(payout.id)}
+											>
+												Mark paid
+											</Button>
+										{/if}
+									</Table.Cell>
+								</Table.Row>
+							{/each}
+						{/if}
 					{/each}
 				</Table.Body>
 			</Table.Root>
