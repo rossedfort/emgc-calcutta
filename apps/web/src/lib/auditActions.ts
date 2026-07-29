@@ -22,7 +22,9 @@ export const AUDIT_ACTIONS = [
 	'bid_marked_paid',
 	'payout_marked_paid',
 	'placement_set',
-	'stake_buyback_requested'
+	'stake_buyback_requested',
+	'stake_buyback_accepted',
+	'stake_buyback_rejected'
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -24,12 +24,16 @@ export interface SetPlacementRequest {
 export interface SetPlacementResultEntry {
   entryId: string;
   placement: number;
-  payout: {
+  // One row normally; two (buyer + golfer) if this entry has an accepted
+  // stake_buybacks row (Phase 14) — bidder_id distinguishes which row
+  // belongs to whom, since it's no longer implied by "the only row".
+  payouts: {
     id: string;
+    bidder_id: string;
     pot_share: number;
     amount: number;
     calculated_at: string;
-  };
+  }[];
 }
 
 export interface SetPlacementResponse {

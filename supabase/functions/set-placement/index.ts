@@ -70,6 +70,12 @@ import { withSupabase } from "@supabase/server";
 import { resolveSupabaseEnv } from "../_shared/resolve-key.ts";
 import { isAdminOrOwner } from "../_shared/roles.ts";
 import { logAuditEvent, requestMetadata } from "../_shared/audit.ts";
+import {
+  type AcceptedBuyback,
+  computeEntryPayoutRows,
+  computePotByGroup,
+  potGroupKey,
+} from "../_shared/payouts.ts";
 import type { Database } from "../_shared/database.ts";
 import type {
   SetPlacementEntry,
@@ -199,7 +205,9 @@ export default {
       const { data: existingPayouts, error: existingPayoutsError } = await ctx
         .supabaseAdmin
         .from("payouts")
-        .select("entry_id, id, placement, pot_share, amount, calculated_at")
+        .select(
+          "entry_id, id, bidder_id, placement, pot_share, amount, calculated_at",
+        )
         .in(
           "entry_id",
           entryIds.length > 0
@@ -211,8 +219,41 @@ export default {
           status: 500,
         });
       }
-      const existingPayoutByEntryId = new Map(
-        (existingPayouts ?? []).map((p) => [p.entry_id, p]),
+      // A split entry (Phase 14) has two rows sharing an entry_id, so this
+      // groups rather than assuming one row per entry the way a plain Map
+      // keyed on entry_id would.
+      const existingPayoutsByEntryId = new Map<
+        string,
+        typeof existingPayouts
+      >();
+      for (const p of existingPayouts ?? []) {
+        const list = existingPayoutsByEntryId.get(p.entry_id) ?? [];
+        list.push(p);
+        existingPayoutsByEntryId.set(p.entry_id, list);
+      }
+
+      // Accepted stake_buybacks (Phase 14) for the targeted entries,
+      // fetched once up front rather than per-entry inside the loop below
+      // — an entry with an accepted buy-back gets its computed payout
+      // split across the buyer and the golfer instead of one row.
+      const { data: acceptedBuybacks, error: buybacksError } = await ctx
+        .supabaseAdmin
+        .from("stake_buybacks")
+        .select("id, entry_id, requester_id, percentage")
+        .eq("status", "accepted")
+        .in(
+          "entry_id",
+          entryIds.length > 0
+            ? entryIds
+            : ["00000000-0000-0000-0000-000000000000"],
+        );
+      if (buybacksError) {
+        return Response.json({ error: buybacksError.message }, {
+          status: 500,
+        });
+      }
+      const acceptedBuybackByEntryId = new Map<string, AcceptedBuyback>(
+        (acceptedBuybacks ?? []).map((b) => [b.entry_id, b]),
       );
 
       for (const entry of placements) {
@@ -350,27 +391,16 @@ export default {
       // ordinary flight has exactly one group (division always
       // 'overall'); the Championship flight has two ('gross' and 'net'),
       // each with its own separate pot, per the confirmed decision.
-      const { data: soldEntries, error: soldEntriesError } = await ctx
-        .supabaseAdmin
-        .from("player_entries")
-        .select(
-          "flight, division, winning_bid:bids!player_entries_winning_bid_id_fkey(amount)",
-        )
-        .eq("tournament_id", tournamentId)
-        .in("status", ["sold_silent", "sold_live"]);
-      if (soldEntriesError) {
-        return Response.json({ error: soldEntriesError.message }, {
+      const potByGroupResult = await computePotByGroup(
+        ctx.supabaseAdmin,
+        tournamentId,
+      );
+      if (potByGroupResult.potByGroup === null) {
+        return Response.json({ error: potByGroupResult.error }, {
           status: 500,
         });
       }
-      const potByGroup = new Map<string, number>();
-      for (const p of soldEntries ?? []) {
-        const key = JSON.stringify([p.flight, p.division]);
-        potByGroup.set(
-          key,
-          (potByGroup.get(key) ?? 0) + (p.winning_bid?.amount ?? 0),
-        );
-      }
+      const { potByGroup } = potByGroupResult;
 
       const { ip, user_agent } = requestMetadata(req);
       const results: SetPlacementResultEntry[] = [];
@@ -383,19 +413,25 @@ export default {
         // values. The modal always submits the full form state, so most
         // entries in a typical edit are untouched; without this check
         // every save would log a placement_set for every configured
-        // place, not just the ones actually being changed.
+        // place, not just the ones actually being changed. A split entry
+        // (Phase 14) has already been kept correct by whichever of
+        // set-placement's own last run or respond-stake-buyback's own
+        // accept-triggered recompute wrote it last — nothing about an
+        // accepted buy-back changes after acceptance, so there's nothing
+        // to re-derive here even for a split entry.
         if (target.placement === entry.placement) {
-          const existing = existingPayoutByEntryId.get(entry.entryId);
-          if (existing) {
+          const existing = existingPayoutsByEntryId.get(entry.entryId);
+          if (existing && existing.length > 0) {
             results.push({
               entryId: entry.entryId,
-              placement: existing.placement,
-              payout: {
-                id: existing.id,
-                pot_share: existing.pot_share,
-                amount: existing.amount,
-                calculated_at: existing.calculated_at,
-              },
+              placement: existing[0].placement,
+              payouts: existing.map((p) => ({
+                id: p.id,
+                bidder_id: p.bidder_id,
+                pot_share: p.pot_share,
+                amount: p.amount,
+                calculated_at: p.calculated_at,
+              })),
             });
             continue;
           }
@@ -403,30 +439,41 @@ export default {
 
         const potShare = payoutStructure[String(entry.placement)];
         const pot = potByGroup.get(
-          JSON.stringify([target.flight, target.division]),
+          potGroupKey(target.flight, target.division),
         ) ?? 0;
-        const amount = Math.round(pot * potShare * 100) / 100;
+        const rows = computeEntryPayoutRows({
+          tournamentId,
+          entryId: entry.entryId,
+          bidderId: target.winning_bid!.bidder_id,
+          placement: entry.placement,
+          potShare,
+          pot,
+          acceptedBuyback: acceptedBuybackByEntryId.get(entry.entryId) ??
+            null,
+        });
 
-        const { data: payout, error: payoutError } = await ctx.supabaseAdmin
-          .from("payouts")
-          .upsert(
-            {
-              tournament_id: tournamentId,
-              entry_id: entry.entryId,
-              bidder_id: target.winning_bid!.bidder_id,
-              placement: entry.placement,
-              pot_share: potShare,
-              amount,
-              calculated_at: new Date().toISOString(),
-            },
-            { onConflict: "entry_id" },
-          )
-          .select("id, placement, pot_share, amount, calculated_at")
-          .single();
-        if (payoutError) {
-          return Response.json({ error: payoutError.message }, {
-            status: 400,
-          });
+        const savedPayouts: {
+          id: string;
+          bidder_id: string;
+          pot_share: number;
+          amount: number;
+          calculated_at: string;
+        }[] = [];
+        for (const row of rows) {
+          const { data: payout, error: payoutError } = await ctx
+            .supabaseAdmin
+            .from("payouts")
+            .upsert(row, { onConflict: "entry_id,bidder_id" })
+            .select(
+              "id, bidder_id, placement, pot_share, amount, calculated_at",
+            )
+            .single();
+          if (payoutError) {
+            return Response.json({ error: payoutError.message }, {
+              status: 400,
+            });
+          }
+          savedPayouts.push(payout);
         }
 
         const { error: updateEntryError } = await ctx.supabaseAdmin
@@ -451,9 +498,12 @@ export default {
           before: { placement: target.placement },
           after: {
             placement: entry.placement,
-            payout_id: payout.id,
-            pot_share: payout.pot_share,
-            amount: payout.amount,
+            payouts: savedPayouts.map((p) => ({
+              payout_id: p.id,
+              bidder_id: p.bidder_id,
+              pot_share: p.pot_share,
+              amount: p.amount,
+            })),
           },
           ip,
           user_agent,
@@ -461,13 +511,14 @@ export default {
 
         results.push({
           entryId: entry.entryId,
-          placement: payout.placement,
-          payout: {
-            id: payout.id,
-            pot_share: payout.pot_share,
-            amount: payout.amount,
-            calculated_at: payout.calculated_at,
-          },
+          placement: entry.placement,
+          payouts: savedPayouts.map((p) => ({
+            id: p.id,
+            bidder_id: p.bidder_id,
+            pot_share: p.pot_share,
+            amount: p.amount,
+            calculated_at: p.calculated_at,
+          })),
         });
       }
 

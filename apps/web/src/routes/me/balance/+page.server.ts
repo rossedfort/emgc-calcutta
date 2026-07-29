@@ -10,6 +10,17 @@ export interface OwedRow {
 	buyer_marked_paid_at: string | null;
 	tournament: { name: string } | null;
 	winning_bid: { amount: number } | null;
+	// A pending stake buy-back request against this entry (Phase 14) —
+	// null if none exists, or if one exists but was already responded to
+	// (accepted/rejected requests aren't actionable, so they're not
+	// surfaced here; the golfer's own "Your stake" section is where an
+	// already-responded request's outcome shows).
+	pending_buyback: {
+		id: string;
+		percentage: number;
+		amount: number;
+		requester: { first_name: string | null; last_name: string | null } | null;
+	} | null;
 }
 
 export interface WonRow {
@@ -73,7 +84,9 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 	const { data: owedEntries, error: owedError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, division, status, buyer_marked_paid_at, tournament:tournaments(name), players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey!inner(amount, bidder_id)'
+			`id, division, status, buyer_marked_paid_at, tournament:tournaments(name), players(first_name, last_name),
+			winning_bid:bids!player_entries_winning_bid_id_fkey!inner(amount, bidder_id),
+			stake_buyback:stake_buybacks(id, status, percentage, amount, requester:users!stake_buybacks_requester_id_fkey(first_name, last_name))`
 		)
 		.eq('winning_bid.bidder_id', userId);
 	if (owedError) {
@@ -95,7 +108,15 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 							status: entry.status as 'sold_silent' | 'sold_live',
 							buyer_marked_paid_at: entry.buyer_marked_paid_at,
 							tournament: entry.tournament,
-							winning_bid: entry.winning_bid
+							winning_bid: entry.winning_bid,
+							// stake_buyback comes back as an array for the same
+							// reason "Your stake"'s own embed does (see that
+							// section's comment below) — unique(entry_id) is a
+							// plain `create unique index`, not an inline `unique`
+							// modifier, so the type generator doesn't infer
+							// one-to-one.
+							pending_buyback:
+								entry.stake_buyback[0]?.status === 'pending' ? entry.stake_buyback[0] : null
 						}
 					]
 				: []

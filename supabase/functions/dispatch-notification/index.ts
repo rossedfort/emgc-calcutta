@@ -226,6 +226,42 @@ function buildEmail(
         }),
       };
     }
+    case "stake_buyback_accepted": {
+      const subject = "Your buy-back request was accepted";
+      const text =
+        `Your request to buy back ${formattedPercentage}% of your stake in ${tournamentName} for ${formattedAmount} was accepted.`;
+      return {
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            emailButton("View My Balance", meBalanceUrl()),
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
+      };
+    }
+    case "stake_buyback_rejected": {
+      const subject = "Your buy-back request was declined";
+      const text =
+        `Your request to buy back ${formattedPercentage}% of your stake in ${tournamentName} for ${formattedAmount} was declined.`;
+      return {
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            emailButton("View My Balance", meBalanceUrl()),
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
+      };
+    }
   }
 }
 

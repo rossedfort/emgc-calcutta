@@ -12,9 +12,11 @@ export type NotificationTrigger =
   | "live_starting"
   | "won"
   // Phase 14: a golfer wants to buy back part of their stake — sent to
-  // the buyer, not the golfer. accepted/rejected (sent to the golfer once
-  // the buyer responds) are added by the respond-stake-buyback task.
-  | "stake_buyback_requested";
+  // the buyer, not the golfer.
+  | "stake_buyback_requested"
+  // Phase 14: the buyer responded — sent to the golfer, not the buyer.
+  | "stake_buyback_accepted"
+  | "stake_buyback_rejected";
 
 export interface DispatchNotificationRequest {
   userId: string;

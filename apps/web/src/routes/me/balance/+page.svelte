@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import { invalidateAll } from '$app/navigation';
 	import BuyBackModal from '$lib/components/BuyBackModal.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
@@ -8,7 +9,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { formatPlayerName } from '$lib/players';
-	import type { StakeRow } from './+page.server';
+	import type { OwedRow, StakeRow } from './+page.server';
 
 	let { data } = $props();
 	let { supabase, owed, won, stake } = $derived(data);
@@ -19,6 +20,34 @@
 	function openBuyBackModal(row: StakeRow) {
 		selectedStakeRow = row;
 		buyBackModalOpen = true;
+	}
+
+	// Keyed by entry id, not a single shared flag — responding to one
+	// row's request shouldn't disable every other row's buttons too.
+	let respondingTo = $state<Record<string, boolean>>({});
+	let respondError = $state<Record<string, string>>({});
+
+	async function respondToBuyback(row: OwedRow, decision: 'accept' | 'reject') {
+		respondingTo[row.id] = true;
+		respondError[row.id] = '';
+
+		const { error } = await supabase.functions.invoke('respond-stake-buyback', {
+			body: { entryId: row.id, decision }
+		});
+
+		respondingTo[row.id] = false;
+
+		if (error) {
+			let message = `Failed to ${decision} the request`;
+			if (error instanceof FunctionsHttpError) {
+				const body = await error.context.json().catch(() => null);
+				if (body?.error) message = body.error;
+			}
+			respondError[row.id] = message;
+			return;
+		}
+
+		await invalidateAll();
 	}
 
 	function stakeBuybackBadge(row: StakeRow): {
@@ -78,6 +107,7 @@
 						<Table.Head>Player</Table.Head>
 						<Table.Head>Amount</Table.Head>
 						<Table.Head>Status</Table.Head>
+						<Table.Head></Table.Head>
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
@@ -96,6 +126,42 @@
 									<Badge variant="fairway">Paid</Badge>
 								{:else}
 									<Badge variant="sand">Owed</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell>
+								{#if row.pending_buyback}
+									{@const buyback = row.pending_buyback}
+									{@const requesterName =
+										[buyback.requester?.first_name, buyback.requester?.last_name]
+											.filter(Boolean)
+											.join(' ') || 'They'}
+									<div class="flex flex-col items-end gap-1">
+										<span class="text-xs text-ink/60">
+											{requesterName} wants to buy back {Math.round(buyback.percentage * 100)}% for
+											{formatCurrency(buyback.amount)}
+										</span>
+										{#if respondError[row.id]}
+											<span class="text-xs text-destructive">{respondError[row.id]}</span>
+										{/if}
+										<div class="flex gap-2">
+											<Button
+												variant="brass"
+												size="sm"
+												disabled={respondingTo[row.id]}
+												onclick={() => respondToBuyback(row, 'reject')}
+											>
+												Reject
+											</Button>
+											<Button
+												variant="brass"
+												size="sm"
+												disabled={respondingTo[row.id]}
+												onclick={() => respondToBuyback(row, 'accept')}
+											>
+												Accept
+											</Button>
+										</div>
+									</div>
 								{/if}
 							</Table.Cell>
 						</Table.Row>
