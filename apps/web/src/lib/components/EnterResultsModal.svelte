@@ -224,7 +224,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="max-h-[85vh] overflow-y-auto">
+	<Dialog.Content>
 		<Dialog.Header>
 			<Dialog.Title>Enter results</Dialog.Title>
 			<Dialog.Description>

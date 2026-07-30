@@ -138,7 +138,7 @@
 					<Table.Row>
 						<Table.Cell>{user.email}</Table.Cell>
 						<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
-						<Table.Cell>
+						<Table.Cell class="whitespace-nowrap">
 							{#if user.role === 'unassigned' && user.rejected_at}
 								<Badge variant="destructive">Rejected</Badge>
 							{:else}

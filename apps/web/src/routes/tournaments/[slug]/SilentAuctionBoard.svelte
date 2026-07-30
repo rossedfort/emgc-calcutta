@@ -13,6 +13,7 @@
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import PlayerListCard from '$lib/components/PlayerListCard.svelte';
 	import SlotMachineDigit from '$lib/components/SlotMachineDigit.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
@@ -180,10 +181,32 @@
 	{/if}
 </div>
 
+{#snippet currentHigh(high: RealtimeBid | null)}
+	{#if high}
+		<span class="inline-flex">
+			{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}
+				{#if isDigit}
+					<SlotMachineDigit digit={char} delayMs={key * 60} spinIn={pastInitialLoad} />
+				{:else}
+					<span
+						class="inline-block text-center align-bottom"
+						style="height: 1.2em; width: 0.62em; line-height: 1.2em;">{char}</span
+					>
+				{/if}
+			{/each}
+		</span>
+		{#if high.bidder_name}
+			<span class="ml-1 font-sans text-xs text-ink/60">({high.bidder_name})</span>
+		{/if}
+	{:else}
+		-
+	{/if}
+{/snippet}
+
 {#if filteredPlayers.length === 0}
 	<EmptyState title="No players match these filters" />
 {:else}
-	<Table.Root>
+	<Table.Root class="hidden md:block">
 		<Table.Header>
 			<Table.Row>
 				<Table.Head>Player</Table.Head>
@@ -217,32 +240,16 @@
 								<Badge variant="brass">This is you</Badge>
 							{/if}
 						</Table.Cell>
-						<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell>
-						<Table.Cell>
+						<Table.Cell class="font-data whitespace-nowrap"
+							>{formatHandicapIndex(player.handicap_index)}</Table.Cell
+						>
+						<Table.Cell class="whitespace-nowrap">
 							<Badge variant={playerStatusBadgeVariant(player.status)}>
 								{playerStatusLabel(player.status)}
 							</Badge>
 						</Table.Cell>
-						<Table.Cell class="font-data">
-							{#if high}
-								<span class="inline-flex">
-									{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}
-										{#if isDigit}
-											<SlotMachineDigit digit={char} delayMs={key * 60} spinIn={pastInitialLoad} />
-										{:else}
-											<span
-												class="inline-block text-center align-bottom"
-												style="height: 1.2em; width: 0.62em; line-height: 1.2em;">{char}</span
-											>
-										{/if}
-									{/each}
-								</span>
-								{#if high.bidder_name}
-									<span class="ml-1 font-sans text-xs text-ink/60">({high.bidder_name})</span>
-								{/if}
-							{:else}
-								-
-							{/if}
+						<Table.Cell class="font-data whitespace-nowrap">
+							{@render currentHigh(high)}
 						</Table.Cell>
 						<Table.Cell>
 							{#if player.status === 'open'}
@@ -285,4 +292,70 @@
 			{/each}
 		</Table.Body>
 	</Table.Root>
+
+	<div class="flex flex-col gap-4 md:hidden">
+		{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
+			<div class="flex flex-col gap-2">
+				<h3 class="font-data text-xs tracking-widest text-fairway uppercase">{group.label}</h3>
+				<div class="flex flex-col gap-3">
+					{#each players as player (player.id)}
+						{@const high = currentHighBid(liveBids, player.id)}
+						{@const isYou = player.user_id === currentUserId}
+						<PlayerListCard
+							slug={tournament.slug}
+							playerSlug={player.slug}
+							name={formatPlayerName(player)}
+							division={player.division}
+							{isYou}
+							handicap={formatHandicapIndex(player.handicap_index)}
+							statusLabel={playerStatusLabel(player.status)}
+							statusVariant={playerStatusBadgeVariant(player.status)}
+							reserved={player.status === 'reserved'}
+						>
+							<div class="flex flex-col gap-3">
+								<div>
+									<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+										Current high
+									</p>
+									<p class="font-data text-lg">{@render currentHigh(high)}</p>
+								</div>
+								{#if player.status === 'open'}
+									<form
+										class="flex items-center gap-2"
+										onsubmit={(event) => {
+											event.preventDefault();
+											placeBid(player.id);
+										}}
+									>
+										<Input
+											type="number"
+											step="0.01"
+											min="0.01"
+											placeholder={suggestedBid(player.id).toFixed(2)}
+											bind:value={bidAmounts[player.id]}
+											disabled={bidPending[player.id]}
+											class="min-w-0 flex-1"
+										/>
+										<Button
+											type="submit"
+											variant="brass"
+											disabled={bidPending[player.id]}
+											class="shrink-0"
+										>
+											Bid
+										</Button>
+									</form>
+									{#if bidErrors[player.id]}
+										<p class="text-xs text-flag">{bidErrors[player.id]}</p>
+									{/if}
+								{:else}
+									<p class="text-xs text-ink/60">Not open for bidding.</p>
+								{/if}
+							</div>
+						</PlayerListCard>
+					{/each}
+				</div>
+			</div>
+		{/each}
+	</div>
 {/if}

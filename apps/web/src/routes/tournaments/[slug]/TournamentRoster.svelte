@@ -4,6 +4,7 @@
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import PlayerListCard from '$lib/components/PlayerListCard.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
@@ -80,7 +81,7 @@
 {#if filteredPlayers.length === 0}
 	<EmptyState title="No players match these filters" />
 {:else}
-	<Table.Root>
+	<Table.Root class="hidden md:block">
 		<Table.Header>
 			<Table.Row>
 				<Table.Head>Name</Table.Head>
@@ -115,8 +116,10 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>{player.flight || '—'}</Table.Cell>
-						<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell>
-						<Table.Cell class="font-data">
+						<Table.Cell class="font-data whitespace-nowrap"
+							>{formatHandicapIndex(player.handicap_index)}</Table.Cell
+						>
+						<Table.Cell class="font-data whitespace-nowrap">
 							{high ? formatCurrency(high.amount) : 'No bids yet'}
 						</Table.Cell>
 						<Table.Cell class="text-ink/70">
@@ -127,4 +130,41 @@
 			{/each}
 		</Table.Body>
 	</Table.Root>
+
+	<div class="flex flex-col gap-4 md:hidden">
+		{#each groupedPlayers as { group, players } (group.flight)}
+			<div class="flex flex-col gap-2">
+				<h3 class="font-data text-xs tracking-widest text-fairway uppercase">{group.label}</h3>
+				<div class="flex flex-col gap-3">
+					{#each players as player (player.id)}
+						{@const high = currentHighBid(liveBids, player.id)}
+						{@const isYou = player.user_id === currentUserId}
+						<PlayerListCard
+							slug={tournament.slug}
+							playerSlug={player.slug}
+							name={formatPlayerName(player)}
+							division={player.division}
+							{isYou}
+							handicap={formatHandicapIndex(player.handicap_index)}
+							reserved={player.status === 'reserved'}
+						>
+							<div class="flex items-baseline justify-between gap-2">
+								<div>
+									<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+										Current bid
+									</p>
+									<p class="font-data text-lg">
+										{high ? formatCurrency(high.amount) : 'No bids yet'}
+									</p>
+								</div>
+								<p class="text-xs text-ink/70">
+									{high ? formatRelativeTime(new Date(high.placed_at), now) : ''}
+								</p>
+							</div>
+						</PlayerListCard>
+					{/each}
+				</div>
+			</div>
+		{/each}
+	</div>
 {/if}

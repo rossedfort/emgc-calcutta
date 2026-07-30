@@ -95,8 +95,12 @@
 						<Table.Body>
 							{#each entry.bids as bid (bid.id)}
 								<Table.Row>
-									<Table.Cell class="font-data">{formatCurrency(bid.amount)}</Table.Cell>
-									<Table.Cell class="font-data">{formatDateTime(bid.placed_at)}</Table.Cell>
+									<Table.Cell class="font-data whitespace-nowrap"
+										>{formatCurrency(bid.amount)}</Table.Cell
+									>
+									<Table.Cell class="font-data whitespace-nowrap"
+										>{formatDateTime(bid.placed_at)}</Table.Cell
+									>
 									<Table.Cell>
 										{#if bid.voided_at}
 											<Badge variant="flag">Voided</Badge>

@@ -108,7 +108,7 @@
 									<span class="text-muted-foreground">—</span>
 								{/if}
 							</Table.Cell>
-							<Table.Cell class="font-data">
+							<Table.Cell class="font-data whitespace-nowrap">
 								{player.winning_bid ? formatCurrency(player.winning_bid.amount) : '—'}
 							</Table.Cell>
 							<Table.Cell>
@@ -172,7 +172,9 @@
 										<span class="text-muted-foreground">—</span>
 									{/if}
 								</Table.Cell>
-								<Table.Cell class="font-data">{formatCurrency(payout.amount)}</Table.Cell>
+								<Table.Cell class="font-data whitespace-nowrap"
+									>{formatCurrency(payout.amount)}</Table.Cell
+								>
 								<Table.Cell>
 									{#if payout.marked_paid_at}
 										<Badge variant="fairway">Paid</Badge>
@@ -207,7 +209,7 @@
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-ink/60">Split — {group.rows.length} recipients</Table.Cell>
-								<Table.Cell class="font-data font-medium">
+								<Table.Cell class="font-data font-medium whitespace-nowrap">
 									{formatCurrency(group.totalAmount)}
 								</Table.Cell>
 								<Table.Cell></Table.Cell>
@@ -224,7 +226,9 @@
 											<span class="text-muted-foreground">—</span>
 										{/if}
 									</Table.Cell>
-									<Table.Cell class="font-data">{formatCurrency(payout.amount)}</Table.Cell>
+									<Table.Cell class="font-data whitespace-nowrap"
+										>{formatCurrency(payout.amount)}</Table.Cell
+									>
 									<Table.Cell>
 										{#if payout.marked_paid_at}
 											<Badge variant="fairway">Paid</Badge>

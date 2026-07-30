@@ -51,18 +51,18 @@
 				{#each tournaments as tournament (tournament.id)}
 					<Table.Row>
 						<Table.Cell class="font-medium text-ink">{tournament.name}</Table.Cell>
-						<Table.Cell>
+						<Table.Cell class="whitespace-nowrap">
 							<Badge variant={kindBadgeVariant(tournament.kind)}>
 								{tournament.kind === 'dry_run' ? 'dry run' : 'production'}
 							</Badge>
 						</Table.Cell>
-						<Table.Cell>
+						<Table.Cell class="whitespace-nowrap">
 							<Badge variant={statusBadgeVariant(tournament.status)}>{tournament.status}</Badge>
 						</Table.Cell>
-						<Table.Cell class="font-data text-sm">
+						<Table.Cell class="font-data text-sm whitespace-nowrap">
 							{formatWindow(tournament.silent_auction_start, tournament.silent_auction_end)}
 						</Table.Cell>
-						<Table.Cell>
+						<Table.Cell class="whitespace-nowrap">
 							<Button
 								href={resolve('/admin/tournaments/[slug]', { slug: tournament.slug })}
 								variant="brass"
