@@ -217,13 +217,15 @@
 								<Badge variant="brass">This is you</Badge>
 							{/if}
 						</Table.Cell>
-						<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell>
-						<Table.Cell>
+						<Table.Cell class="font-data whitespace-nowrap"
+							>{formatHandicapIndex(player.handicap_index)}</Table.Cell
+						>
+						<Table.Cell class="whitespace-nowrap">
 							<Badge variant={playerStatusBadgeVariant(player.status)}>
 								{playerStatusLabel(player.status)}
 							</Badge>
 						</Table.Cell>
-						<Table.Cell class="font-data">
+						<Table.Cell class="font-data whitespace-nowrap">
 							{#if high}
 								<span class="inline-flex">
 									{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}

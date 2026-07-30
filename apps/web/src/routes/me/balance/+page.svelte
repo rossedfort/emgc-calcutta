@@ -118,7 +118,7 @@
 								{formatPlayerName(row)}
 								<DivisionBadge division={row.division} />
 							</Table.Cell>
-							<Table.Cell class="font-data">
+							<Table.Cell class="font-data whitespace-nowrap">
 								{row.winning_bid ? formatCurrency(row.winning_bid.amount) : '—'}
 							</Table.Cell>
 							<Table.Cell>
@@ -202,8 +202,10 @@
 									<DivisionBadge division={row.player.division} />
 								{/if}
 							</Table.Cell>
-							<Table.Cell class="font-data">{ordinal(row.placement)}</Table.Cell>
-							<Table.Cell class="font-data">{formatCurrency(row.amount)}</Table.Cell>
+							<Table.Cell class="font-data whitespace-nowrap">{ordinal(row.placement)}</Table.Cell>
+							<Table.Cell class="font-data whitespace-nowrap"
+								>{formatCurrency(row.amount)}</Table.Cell
+							>
 							<Table.Cell>
 								{#if row.marked_paid_at}
 									<Badge variant="fairway">Paid</Badge>
@@ -241,8 +243,10 @@
 								{formatPlayerName(row)}
 								<DivisionBadge division={row.division} />
 							</Table.Cell>
-							<Table.Cell class="font-data">{formatCurrency(row.amount)}</Table.Cell>
-							<Table.Cell>
+							<Table.Cell class="font-data whitespace-nowrap"
+								>{formatCurrency(row.amount)}</Table.Cell
+							>
+							<Table.Cell class="whitespace-nowrap">
 								<Badge variant={badge.variant}>{badge.label}</Badge>
 							</Table.Cell>
 							<Table.Cell>

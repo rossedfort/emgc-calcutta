@@ -89,10 +89,10 @@
 											<span class="text-muted-foreground">—</span>
 										{/if}
 									</Table.Cell>
-									<Table.Cell class="font-data">
+									<Table.Cell class="font-data whitespace-nowrap">
 										{player.winning_bid ? formatCurrency(player.winning_bid.amount) : '—'}
 									</Table.Cell>
-									<Table.Cell class="font-data">
+									<Table.Cell class="font-data whitespace-nowrap">
 										{#if player.payout}
 											{formatCurrency(player.payout.amount)}
 											<Badge variant="fairway">{(player.payout.pot_share * 100).toFixed(0)}%</Badge>

@@ -115,8 +115,10 @@
 							{/if}
 						</Table.Cell>
 						<Table.Cell>{player.flight || '—'}</Table.Cell>
-						<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell>
-						<Table.Cell class="font-data">
+						<Table.Cell class="font-data whitespace-nowrap"
+							>{formatHandicapIndex(player.handicap_index)}</Table.Cell
+						>
+						<Table.Cell class="font-data whitespace-nowrap">
 							{high ? formatCurrency(high.amount) : 'No bids yet'}
 						</Table.Cell>
 						<Table.Cell class="text-ink/70">

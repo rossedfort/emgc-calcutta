@@ -241,7 +241,7 @@
 						<Table.Cell class="bg-brass/10 font-medium text-fairway">
 							{event.actor_identity ?? '—'}
 						</Table.Cell>
-						<Table.Cell class="font-data text-xs text-ink/70">
+						<Table.Cell class="font-data text-xs whitespace-nowrap text-ink/70">
 							<a
 								href={resolve('/admin/audit/[id]', { id: event.id })}
 								class="text-ink hover:underline"
@@ -249,7 +249,7 @@
 								{formatDateTime(event.created_at)}
 							</a>
 						</Table.Cell>
-						<Table.Cell class="font-data text-xs">{event.action}</Table.Cell>
+						<Table.Cell class="font-data text-xs whitespace-nowrap">{event.action}</Table.Cell>
 						<Table.Cell>{event.entity_type}</Table.Cell>
 						<Table.Cell>{event.player_name ?? '—'}</Table.Cell>
 						<Table.Cell>{event.tournament_name ?? '—'}</Table.Cell>
