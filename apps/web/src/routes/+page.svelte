@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import * as Table from '$lib/components/ui/table';
 	import { tournamentPhase } from '$lib/tournamentPhase';
 	import OnboardingModal from './OnboardingModal.svelte';
 
 	let { data } = $props();
-	let { tournaments } = $derived(data);
+	let { tournaments, pastTournaments } = $derived(data);
 	let isAdmin = $derived(data.profile?.role === 'admin' || data.profile?.role === 'owner');
 	let isUnassigned = $derived(data.profile?.role === 'unassigned' && !data.profile?.rejected_at);
 	let isRejected = $derived(data.profile?.role === 'unassigned' && !!data.profile?.rejected_at);
@@ -133,4 +135,41 @@
 			{/if}
 		</div>
 	{/each}
+
+	<div class="mt-6 flex flex-col gap-3">
+		<h2 class="font-display text-lg font-semibold text-ink">Past tournaments</h2>
+		{#if pastTournaments.length === 0}
+			<EmptyState
+				title="No past tournaments yet"
+				description="Completed tournaments will show up here."
+			/>
+		{:else}
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Tournament</Table.Head>
+						<Table.Head>Window</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each pastTournaments as tournament (tournament.id)}
+						<Table.Row>
+							<Table.Cell class="font-medium text-ink">
+								<a
+									href={resolve('/tournaments/[slug]/results', { slug: tournament.slug })}
+									class="hover:underline"
+								>
+									{tournament.name}
+								</a>
+							</Table.Cell>
+							<Table.Cell class="font-data text-sm text-ink/70">
+								{formatWindow(tournament.silent_auction_start, tournament.silent_auction_end)} &middot;
+								{new Date(tournament.silent_auction_start).getFullYear()}
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		{/if}
+	</div>
 </div>
