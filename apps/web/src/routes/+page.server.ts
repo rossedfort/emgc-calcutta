@@ -10,8 +10,12 @@ export const load: PageServerLoad = async ({ locals: { session, supabase } }) =>
 	const { data } = await supabase
 		.from('tournaments')
 		.select('*')
-		.neq('status', 'complete')
 		.order('created_at', { ascending: false });
 
-	return { tournaments: (data as Tournament[] | null) ?? [] };
+	const tournaments = (data as Tournament[] | null) ?? [];
+
+	return {
+		tournaments: tournaments.filter((t) => t.status !== 'complete'),
+		pastTournaments: tournaments.filter((t) => t.status === 'complete')
+	};
 };
