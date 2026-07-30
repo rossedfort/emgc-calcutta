@@ -1,5 +1,10 @@
 import { error } from '@sveltejs/kit';
-import { deriveFlightDivisionGroups, type FlightDivisionGroup } from '$lib/flightGroups';
+import {
+	groupResultsByFlightDivision,
+	sortResultsByPlacement,
+	sumPayoutsByEntryId
+} from '$lib/results';
+import type { ResultsGroup as SharedResultsGroup } from '$lib/results';
 import type { PageServerLoad } from './$types';
 
 export interface ResultsRow {
@@ -22,10 +27,7 @@ export interface ResultsRow {
 	payout: { pot_share: number; amount: number } | null;
 }
 
-export interface ResultsGroup {
-	group: FlightDivisionGroup;
-	players: ResultsRow[];
-}
+export type ResultsGroup = SharedResultsGroup<ResultsRow>;
 
 // Route deliberately deviates from spec 6.9's flat /admin/results, same
 // precedent set on the bookkeeping task: results are entered per
@@ -75,23 +77,10 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	if (payoutsError) {
 		error(500, payoutsError.message);
 	}
-	// A split entry (Phase 14, an accepted stake buy-back) has two payout
-	// rows sharing an entry_id — summed into the one total this page shows
-	// per placement, rather than a plain last-wins Map silently dropping
-	// one row's amount. pot_share is identical across a split entry's rows
-	// (it's the placement's percentage, unaffected by the split), so the
-	// first row's value is fine to keep as-is.
-	const payoutByEntryId = new Map<string, { pot_share: number; amount: number }>();
-	for (const p of payouts ?? []) {
-		const existing = payoutByEntryId.get(p.entry_id);
-		payoutByEntryId.set(p.entry_id, {
-			pot_share: p.pot_share,
-			amount: (existing?.amount ?? 0) + p.amount
-		});
-	}
+	const payoutByEntryId = sumPayoutsByEntryId(payouts ?? []);
 
-	const rows: ResultsRow[] = (entries ?? [])
-		.flatMap((entry) =>
+	const rows: ResultsRow[] = sortResultsByPlacement(
+		(entries ?? []).flatMap((entry) =>
 			entry.players
 				? [
 						{
@@ -112,22 +101,11 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 					]
 				: []
 		)
-		.sort((a, b) => {
-			if (a.placement === null && b.placement === null) {
-				return a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name);
-			}
-			if (a.placement === null) return 1;
-			if (b.placement === null) return -1;
-			return a.placement - b.placement;
-		});
+	);
 
 	const flights = tournament.flights as string[];
 	const championshipFlight = tournament.championship_flight as string | null;
-	const groups = deriveFlightDivisionGroups(flights, championshipFlight);
-	const results: ResultsGroup[] = groups.map((group) => ({
-		group,
-		players: rows.filter((p) => p.flight === group.flight && p.division === group.division)
-	}));
+	const results: ResultsGroup[] = groupResultsByFlightDivision(rows, flights, championshipFlight);
 
 	return {
 		payoutStructure: tournament.payout_structure as Record<string, number>,
