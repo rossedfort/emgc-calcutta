@@ -81,7 +81,7 @@
 {#if filteredPlayers.length === 0}
 	<EmptyState title="No players match these filters" />
 {:else}
-	<Table.Root class="hidden md:block">
+	<Table.Root class="hidden md:table">
 		<Table.Header>
 			<Table.Row>
 				<Table.Head>Name</Table.Head>
