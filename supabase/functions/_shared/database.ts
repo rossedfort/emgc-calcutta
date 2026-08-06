@@ -685,6 +685,10 @@ export type Database = {
         Args: never;
         Returns: Database["public"]["Enums"]["user_role"];
       };
+      delete_tournament_cascade: {
+        Args: { p_tournament_id: string };
+        Returns: undefined;
+      };
       enqueue_player_for_live_auction: {
         Args: { p_player_id: string; p_tournament_id: string };
         Returns: undefined;
