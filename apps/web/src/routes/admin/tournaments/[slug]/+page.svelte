@@ -31,6 +31,7 @@
 		silent_auction_end: toLocalInput(data.tournament.silent_auction_end),
 		threshold_amount: String(data.tournament.threshold_amount),
 		min_increment: String(data.tournament.min_increment),
+		minimum_bid: String(data.tournament.minimum_bid),
 		anti_snipe_seconds: String(data.tournament.anti_snipe_seconds),
 		championship_flight: data.tournament.championship_flight ?? '',
 		// Stored as a 0-1 fraction, shown as a whole-number percentage —

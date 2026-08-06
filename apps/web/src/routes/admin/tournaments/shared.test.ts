@@ -13,6 +13,7 @@ function baseFormData(overrides: Record<string, string> = {}): FormData {
 		tz_offset_minutes: '0',
 		threshold_amount: '500',
 		min_increment: '5',
+		minimum_bid: '1',
 		anti_snipe_seconds: '15',
 		payout_structure: '{}',
 		flights: '[]',
