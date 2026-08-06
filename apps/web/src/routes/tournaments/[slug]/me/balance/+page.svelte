@@ -12,7 +12,7 @@
 	import type { OwedRow, StakeRow } from './+page.server';
 
 	let { data } = $props();
-	let { supabase, owed, won, stake } = $derived(data);
+	let { supabase, tournamentName, owed, won, stake } = $derived(data);
 
 	let buyBackModalOpen = $state(false);
 	let selectedStakeRow = $state<StakeRow | null>(null);
@@ -87,7 +87,7 @@
 </script>
 
 <div class="flex flex-col gap-8">
-	<PageHeader title="My balance" eyebrow="Self" />
+	<PageHeader title={tournamentName} eyebrow="My balance" />
 
 	<div class="flex flex-col gap-2">
 		<div class="flex items-baseline justify-between">
@@ -103,7 +103,6 @@
 			<Table.Root>
 				<Table.Header>
 					<Table.Row>
-						<Table.Head>Tournament</Table.Head>
 						<Table.Head>Player</Table.Head>
 						<Table.Head>Amount</Table.Head>
 						<Table.Head>Status</Table.Head>
@@ -113,7 +112,6 @@
 				<Table.Body>
 					{#each owed as row (row.id)}
 						<Table.Row>
-							<Table.Cell>{row.tournament?.name ?? '—'}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
 								{formatPlayerName(row)}
 								<DivisionBadge division={row.division} />
@@ -185,7 +183,6 @@
 			<Table.Root>
 				<Table.Header>
 					<Table.Row>
-						<Table.Head>Tournament</Table.Head>
 						<Table.Head>Player</Table.Head>
 						<Table.Head>Placement</Table.Head>
 						<Table.Head>Amount</Table.Head>
@@ -195,7 +192,6 @@
 				<Table.Body>
 					{#each won as row (row.id)}
 						<Table.Row>
-							<Table.Cell>{row.tournament?.name ?? '—'}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
 								{row.player ? formatPlayerName(row.player) : '—'}
 								{#if row.player}
@@ -227,7 +223,6 @@
 			<Table.Root>
 				<Table.Header>
 					<Table.Row>
-						<Table.Head>Tournament</Table.Head>
 						<Table.Head>Player</Table.Head>
 						<Table.Head>Bought for</Table.Head>
 						<Table.Head>Status</Table.Head>
@@ -238,7 +233,6 @@
 					{#each stake as row (row.id)}
 						{@const badge = stakeBuybackBadge(row)}
 						<Table.Row>
-							<Table.Cell>{row.tournament_name}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
 								{formatPlayerName(row)}
 								<DivisionBadge division={row.division} />
@@ -269,7 +263,7 @@
 		bind:open={buyBackModalOpen}
 		{supabase}
 		entryId={selectedStakeRow.id}
-		tournamentName={selectedStakeRow.tournament_name}
+		{tournamentName}
 		percentage={selectedStakeRow.buy_back_percentage}
 		amount={selectedStakeRow.buy_back_amount}
 		buyer={selectedStakeRow.buyer ?? { first_name: null, last_name: null, email: '', phone: null }}

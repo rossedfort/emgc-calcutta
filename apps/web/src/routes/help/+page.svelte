@@ -62,12 +62,8 @@
 
 		{@render topic(
 			'Your balance',
-			"See what you owe (players you won) and what you're owed (payouts for players you entered who placed), including which ones are already settled, on your Balance page."
+			'See what you owe (players you won) and what you\'re owed (payouts for players you entered who placed), including which ones are already settled — from the "My balance" link on each tournament\'s own page.'
 		)}
-
-		<a href={resolve('/me/balance')} class="text-sm font-medium text-fairway underline">
-			Go to my balance →
-		</a>
 	</section>
 
 	{#if isAdmin}

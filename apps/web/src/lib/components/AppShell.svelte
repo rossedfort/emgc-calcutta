@@ -112,10 +112,6 @@
 				{@render navDot('/')}
 				<span>Home</span>
 			</a>
-			<a href={resolve('/me/balance')} class={navLinkClass('/me/balance')}>
-				{@render navDot('/me/balance')}
-				<span>My balance</span>
-			</a>
 			<a href={resolve('/help')} class={navLinkClass('/help')}>
 				{@render navDot('/help')}
 				<span>Help</span>
