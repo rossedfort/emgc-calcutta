@@ -578,6 +578,7 @@ export type Database = {
           kind: string;
           live_auction_started_at: string | null;
           min_increment: number;
+          minimum_bid: number;
           name: string;
           payout_structure: Json;
           silent_auction_end: string;
@@ -597,6 +598,7 @@ export type Database = {
           kind?: string;
           live_auction_started_at?: string | null;
           min_increment: number;
+          minimum_bid?: number;
           name: string;
           payout_structure?: Json;
           silent_auction_end: string;
@@ -616,6 +618,7 @@ export type Database = {
           kind?: string;
           live_auction_started_at?: string | null;
           min_increment?: number;
+          minimum_bid?: number;
           name?: string;
           payout_structure?: Json;
           silent_auction_end?: string;
