@@ -47,6 +47,14 @@
 		currentLot ? (players.find((p) => p.id === currentLot!.entry_id) ?? null) : null
 	);
 	let isCurrentPlayerYou = $derived(currentPlayer?.user_id === currentUserId);
+
+	// Phase 20: who's actually pooled into this lot, if it's a field lot —
+	// bidders need to know before they bid, not just after winning.
+	// Derived from the same tournament-wide players list every board
+	// already has, no extra query.
+	function pooledPlayers(fieldEntryId: string): FieldPlayerRow[] {
+		return players.filter((p) => p.field_entry_id === fieldEntryId);
+	}
 	let currentLotHigh = $derived(currentLot ? currentHighBid(liveBids, currentLot.entry_id) : null);
 
 	// The carousel strip below the current lot — every not-yet-opened lot, in
@@ -140,7 +148,13 @@
 						</a>
 						<DivisionBadge division={currentPlayer.division} />
 					</span>
-					{#if currentPlayer.flight || currentPlayer.handicap_index !== null}
+					{#if currentPlayer.is_field}
+						{@const pooled = pooledPlayers(currentPlayer.id)}
+						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+							{currentPlayer.flight ? `Flight ${currentPlayer.flight} · ` : ''}Pooled players:
+							{pooled.length > 0 ? pooled.map((p) => formatPlayerName(p)).join(', ') : '—'}
+						</span>
+					{:else if currentPlayer.flight || currentPlayer.handicap_index !== null}
 						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 							{[
 								currentPlayer.flight ? `Flight ${currentPlayer.flight}` : null,
@@ -233,7 +247,13 @@
 									>
 										{formatPlayerName(player)}
 									</a>
-									{#if player.flight || player.handicap_index !== null}
+									{#if player.is_field}
+										{@const pooled = pooledPlayers(player.id)}
+										<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+											{player.flight ? `Flight ${player.flight} · ` : ''}Pooled:
+											{pooled.length > 0 ? pooled.map((p) => formatPlayerName(p)).join(', ') : '—'}
+										</span>
+									{:else if player.flight || player.handicap_index !== null}
 										<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 											{[
 												player.flight ? `Flight ${player.flight}` : null,

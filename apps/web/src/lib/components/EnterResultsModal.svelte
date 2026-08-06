@@ -138,22 +138,27 @@
 		debounceTimers[key] = setTimeout(() => runSearch(group, placement, value), 300);
 	}
 
-	// Only sold entries are eligible for a placement — set-placement itself
-	// rejects anything else, so the type-ahead never offers a choice
-	// guaranteed to fail. Scoped to this group's own flight/division so a
-	// search from one group's box can never suggest another group's entry.
-	// Query root is player_entries (Phase 11) — first_name/last_name live on
-	// the embedded `players` resource, so the name search and its ordering
-	// are both scoped to that embedded table via { referencedTable }.
+	// Sold entries and swept (status = 'field') entries are both eligible
+	// for a placement — set-placement itself allows either and rejects
+	// everything else, so the type-ahead never offers a choice guaranteed
+	// to fail. A field lot itself (players.is_field) is excluded outright:
+	// it has no real golf score of its own, only the players pooled into it
+	// do — set-placement rejects placing it directly too. Scoped to this
+	// group's own flight/division so a search from one group's box can
+	// never suggest another group's entry. Query root is player_entries
+	// (Phase 11) — first_name/last_name live on the embedded `players`
+	// resource, so the name search and its ordering are both scoped to
+	// that embedded table via { referencedTable }.
 	async function runSearch(group: Group, placement: number, value: string) {
 		const key = spotKey(group, placement);
 		const { data } = await supabase
 			.from('player_entries')
-			.select('id, division, players!inner(first_name, last_name)')
+			.select('id, division, players!inner(first_name, last_name, is_field)')
 			.eq('tournament_id', tournamentId)
 			.eq('flight', group.flight)
 			.eq('division', group.division)
-			.in('status', ['sold_silent', 'sold_live'])
+			.in('status', ['sold_silent', 'sold_live', 'field'])
+			.eq('players.is_field', false)
 			.or(`first_name.ilike.%${value}%,last_name.ilike.%${value}%`, { referencedTable: 'players' })
 			.order('first_name', { referencedTable: 'players' })
 			.order('last_name', { referencedTable: 'players' })

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { FunctionsHttpError } from '@supabase/supabase-js';
+	import { resolve } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
@@ -100,6 +101,9 @@
 							<Table.Cell class="font-medium text-ink">
 								{formatPlayerName(player)}
 								<DivisionBadge division={player.division} />
+								{#if player.isField}
+									<Badge variant="brass">Field lot</Badge>
+								{/if}
 							</Table.Cell>
 							<Table.Cell>
 								{#if player.winning_bid?.bidder}
@@ -164,6 +168,17 @@
 									{#if group.player}
 										<DivisionBadge division={group.player.division} />
 									{/if}
+									{#if group.viaField}
+										<a
+											href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+												slug: data.tournament.slug,
+												playerSlug: group.viaField.slug
+											})}
+											class="block text-xs text-brass hover:underline"
+										>
+											via {group.viaField.name}
+										</a>
+									{/if}
 								</Table.Cell>
 								<Table.Cell>
 									{#if payout.bidder}
@@ -206,6 +221,17 @@
 									{group.player ? formatPlayerName(group.player) : '—'}
 									{#if group.player}
 										<DivisionBadge division={group.player.division} />
+									{/if}
+									{#if group.viaField}
+										<a
+											href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+												slug: data.tournament.slug,
+												playerSlug: group.viaField.slug
+											})}
+											class="block text-xs text-brass hover:underline"
+										>
+											via {group.viaField.name}
+										</a>
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="text-ink/60">Split — {group.rows.length} recipients</Table.Cell>

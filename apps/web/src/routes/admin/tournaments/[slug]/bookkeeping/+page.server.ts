@@ -18,6 +18,9 @@ export interface BookkeepingRow {
 			email: string;
 		} | null;
 	} | null;
+	// Phase 20 ("the field"): flags "The Field" itself so the mark-paid
+	// list reads as a pooled lot, not a regular competitor's name.
+	isField: boolean;
 }
 
 export interface PayoutRow {
@@ -43,6 +46,11 @@ export interface PayoutGroup {
 	totalAmount: number;
 	player: { first_name: string; last_name: string; division: string } | null;
 	rows: PayoutRow[];
+	// Phase 20 ("the field"): set when this placement's own entry was a
+	// swept (status = 'field') player — a link to the field lot they were
+	// pooled into, since the payout above is credited to that lot's buyer,
+	// not to a bid this player ever received individually.
+	viaField: { slug: string; name: string } | null;
 }
 
 // Only sold entries have a winning bid to mark paid — open/reserved/no_bid
@@ -69,7 +77,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, division, status, buyer_marked_paid_at, players(slug, first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
+			'id, division, status, buyer_marked_paid_at, players(slug, first_name, last_name, is_field), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live']);
@@ -92,7 +100,8 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 							division: entry.division,
 							status: entry.status as 'sold_silent' | 'sold_live',
 							buyer_marked_paid_at: entry.buyer_marked_paid_at,
-							winning_bid: entry.winning_bid
+							winning_bid: entry.winning_bid,
+							isField: entry.players.is_field
 						}
 					]
 				: []
@@ -114,7 +123,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		.from('payouts')
 		.select(
 			`id, entry_id, placement, pot_share, amount, marked_paid_at, bidder_id,
-			entry:player_entries(division, players(first_name, last_name)),
+			entry:player_entries(division, status, field_entry_id, players(first_name, last_name)),
 			bidder:users!payouts_bidder_id_fkey(id, first_name, last_name, email),
 			stake_buyback:stake_buybacks(buyer_id, requester_id)`
 		)
@@ -123,6 +132,40 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	if (payoutsError) {
 		error(500, payoutsError.message);
 	}
+
+	// Phase 20 ("the field"): resolve each distinct field lot referenced by
+	// a swept payout's own entry above — see the results pages' own load
+	// functions for why this is a second query rather than a
+	// self-referencing embed.
+	const fieldEntryIds = [
+		...new Set(
+			(payoutRows ?? [])
+				.filter((p) => p.entry?.status === 'field' && p.entry.field_entry_id)
+				.map((p) => p.entry!.field_entry_id as string)
+		)
+	];
+	const { data: fieldLots, error: fieldLotsError } =
+		fieldEntryIds.length > 0
+			? await supabase
+					.from('player_entries')
+					.select('id, players(slug, first_name, last_name)')
+					.in('id', fieldEntryIds)
+			: { data: [], error: null };
+	if (fieldLotsError) {
+		error(500, fieldLotsError.message);
+	}
+	const fieldLotByEntryId = new Map(
+		(fieldLots ?? []).flatMap((lot) =>
+			lot.players
+				? [
+						[
+							lot.id,
+							{ slug: lot.players.slug, name: `${lot.players.first_name} ${lot.players.last_name}` }
+						] as const
+					]
+				: []
+		)
+	);
 
 	// Grouped by entry_id — an accepted stake buy-back (Phase 14) produces
 	// two payouts rows for the same entry/placement, and this page shows
@@ -167,6 +210,10 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 						division: payout.entry.division
 					}
 				: null,
+			viaField:
+				payout.entry?.status === 'field' && payout.entry.field_entry_id
+					? (fieldLotByEntryId.get(payout.entry.field_entry_id) ?? null)
+					: null,
 			rows: [row]
 		});
 	}

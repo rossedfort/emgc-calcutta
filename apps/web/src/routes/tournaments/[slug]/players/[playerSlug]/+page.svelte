@@ -54,14 +54,59 @@
 
 		<div class="mt-4 border-t border-brass/40"></div>
 
-		<dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-			<dt class="text-ink/60">Flight</dt>
-			<dd>{data.player.flight || '—'}</dd>
-			<dt class="text-ink/60">Handicap</dt>
-			<dd class="font-data">{formatHandicapIndex(data.player.handicap_index)}</dd>
-			<dt class="text-ink/60">Preferences</dt>
-			<dd>{data.player.preferences ?? '—'}</dd>
-		</dl>
+		{#if data.player.is_field}
+			<p class="text-sm text-ink/70">
+				A pooled lot — every player below drew zero silent-auction bids and was pooled together here
+				instead. Whoever wins this lot collects the payout for any of them who finishes in a paid
+				placement.
+			</p>
+			<dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+				<dt class="text-ink/60">Flight</dt>
+				<dd>{data.player.flight || '—'}</dd>
+			</dl>
+
+			<div class="mt-4 flex flex-col gap-2">
+				<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+					Players in this lot
+				</p>
+				{#if data.pooledPlayers.length === 0}
+					<p class="text-sm text-ink/70">No players pooled here yet.</p>
+				{:else}
+					<ul class="flex flex-col gap-1 text-sm">
+						{#each data.pooledPlayers as pooled (pooled.slug)}
+							<li>
+								<a
+									href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+										slug: data.tournament.slug,
+										playerSlug: pooled.slug
+									})}
+									class="text-ink hover:underline">{formatPlayerName(pooled)}</a
+								>
+								<span class="text-ink/60">
+									{[
+										pooled.flight ? `Flight ${pooled.flight}` : null,
+										pooled.handicap_index !== null
+											? `HCP ${formatHandicapIndex(pooled.handicap_index)}`
+											: null
+									]
+										.filter(Boolean)
+										.join(' · ')}
+								</span>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+			</div>
+		{:else}
+			<dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+				<dt class="text-ink/60">Flight</dt>
+				<dd>{data.player.flight || '—'}</dd>
+				<dt class="text-ink/60">Handicap</dt>
+				<dd class="font-data">{formatHandicapIndex(data.player.handicap_index)}</dd>
+				<dt class="text-ink/60">Preferences</dt>
+				<dd>{data.player.preferences ?? '—'}</dd>
+			</dl>
+		{/if}
 	</div>
 
 	<!-- One section per entry (Phase 11) — a Championship golfer has two
@@ -75,6 +120,15 @@
 				<Badge variant={playerStatusBadgeVariant(entry.status)}>
 					{playerStatusLabel(entry.status)}
 				</Badge>
+				{#if entry.fieldEntry}
+					<a
+						href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+							slug: data.tournament.slug,
+							playerSlug: entry.fieldEntry.slug
+						})}
+						class="text-sm text-brass hover:underline">See {entry.fieldEntry.name} →</a
+					>
+				{/if}
 			</div>
 
 			<div class="mt-4 border-t border-brass/40"></div>

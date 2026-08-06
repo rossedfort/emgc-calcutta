@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import PageHeader from '$lib/components/PageHeader.svelte';
@@ -7,7 +8,7 @@
 	import { formatPlayerName } from '$lib/players';
 
 	let { data } = $props();
-	let { results, payoutStructure, tournamentName } = $derived(data);
+	let { results, payoutStructure, tournamentName, tournamentSlug } = $derived(data);
 
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -72,6 +73,17 @@
 									<Table.Cell>
 										{#if player.winning_bid?.bidder_name}
 											{player.winning_bid.bidder_name}
+										{:else if player.viaField}
+											<span class="text-ink/70">{player.viaField.bidderName ?? '—'}</span>
+											<a
+												href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+													slug: tournamentSlug,
+													playerSlug: player.viaField.slug
+												})}
+												class="block text-xs text-brass hover:underline"
+											>
+												via {player.viaField.name}
+											</a>
 										{:else}
 											<span class="text-muted-foreground">—</span>
 										{/if}
