@@ -18,7 +18,8 @@
 		anti_snipe_seconds: '15',
 		championship_flight: '',
 		buy_back_percentage: '',
-		event_start_at: ''
+		event_start_at: '',
+		bid_anonymity_enabled: false
 	};
 </script>
 

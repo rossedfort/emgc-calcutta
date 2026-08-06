@@ -3,6 +3,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import { Switch } from '$lib/components/ui/switch';
 	import type { PayoutRow, TournamentFormValues } from './shared';
 
 	interface Props {
@@ -83,6 +84,8 @@
 	let flightsJson = $derived(JSON.stringify(flightNames));
 
 	let championshipFlight = $state(untrack(() => values.championship_flight));
+
+	let bidAnonymityEnabled = $state(untrack(() => values.bid_anonymity_enabled));
 
 	// The Championship flight (if any) must always be one of the currently
 	// entered flight names — if it's renamed or removed out from under it,
@@ -237,6 +240,21 @@
 			{#if errors.anti_snipe_seconds}<p class="text-sm text-destructive">
 					{errors.anti_snipe_seconds}
 				</p>{/if}
+		</div>
+
+		<div class="flex items-center justify-between gap-4">
+			<div class="flex flex-col gap-0.5">
+				<Label for="bid_anonymity_enabled">Hide bidder names</Label>
+				<p class="text-sm text-muted-foreground">
+					Suppress who's currently holding the high bid on the silent auction board and who won each
+					player on the results page — the amount still shows either way.
+				</p>
+			</div>
+			<Switch
+				id="bid_anonymity_enabled"
+				name="bid_anonymity_enabled"
+				bind:checked={bidAnonymityEnabled}
+			/>
 		</div>
 	</div>
 

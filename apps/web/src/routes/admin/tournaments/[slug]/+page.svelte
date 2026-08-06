@@ -42,7 +42,8 @@
 				: '',
 		event_start_at: data.tournament.event_start_at
 			? toLocalInput(data.tournament.event_start_at)
-			: ''
+			: '',
+		bid_anonymity_enabled: data.tournament.bid_anonymity_enabled
 	});
 
 	let defaultPayoutRows = $derived<PayoutRow[]>(

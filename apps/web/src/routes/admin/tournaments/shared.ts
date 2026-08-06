@@ -27,6 +27,10 @@ export interface Tournament {
 	// payout_structure defaulting to {}.
 	buy_back_percentage: number | null;
 	event_start_at: string | null;
+	// Phase 23: presentational only — suppresses bidder_name rendering on
+	// the silent auction board and the participant results page when true.
+	// bidder_name itself stays readable via existing RLS regardless.
+	bid_anonymity_enabled: boolean;
 	created_at: string;
 }
 
@@ -43,6 +47,7 @@ export interface TournamentFormValues {
 	// '' means unset for both, same as championship_flight above.
 	buy_back_percentage: string;
 	event_start_at: string;
+	bid_anonymity_enabled: boolean;
 }
 
 export interface PayoutRow {
@@ -75,6 +80,7 @@ export interface ParsedTournament {
 	championship_flight: string | null;
 	buy_back_percentage: number | null;
 	event_start_at: string | null;
+	bid_anonymity_enabled: boolean;
 }
 
 // Shared by the new/create and [slug]/edit/update form actions — same fields,
@@ -227,6 +233,11 @@ export function parseTournamentForm(formData: FormData): {
 		errors.event_start_at = 'Tournament start is invalid';
 	}
 
+	// Phase 23: a Switch, not a text/number field — same boolean
+	// `formData.has(name)` convention settings/notifications already uses,
+	// since bits-ui's Switch only submits its hidden input when checked.
+	const bid_anonymity_enabled = formData.has('bid_anonymity_enabled');
+
 	if (Object.keys(errors).length > 0) {
 		return { data: null, errors };
 	}
@@ -245,7 +256,8 @@ export function parseTournamentForm(formData: FormData): {
 			flights,
 			championship_flight,
 			buy_back_percentage,
-			event_start_at
+			event_start_at,
+			bid_anonymity_enabled
 		},
 		errors
 	};
