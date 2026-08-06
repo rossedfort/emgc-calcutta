@@ -83,6 +83,27 @@
 
 	let advanceSubmitting = $state(false);
 	let closeSubmitting = $state(false);
+	let closeFormEl = $state<HTMLFormElement | undefined>();
+
+	// Auto-close at zero (Phase 18): fires the same ?/close action the
+	// manual button uses, once per lot — autoClosedLotId guards against
+	// re-firing every subsequent tick while secondsRemaining sits at 0
+	// waiting for the submit to land. Naturally skips a lot Realtime has
+	// already closed out from under the timer (e.g. a second admin tab),
+	// since currentLot/secondsRemaining go null the moment that update
+	// arrives, before this effect's condition can hold.
+	let autoClosedLotId = $state<string | null>(null);
+	$effect(() => {
+		if (
+			currentLot &&
+			secondsRemaining === 0 &&
+			!closeSubmitting &&
+			autoClosedLotId !== currentLot.id
+		) {
+			autoClosedLotId = currentLot.id;
+			closeFormEl?.requestSubmit();
+		}
+	});
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -143,6 +164,7 @@
 				method="POST"
 				action="?/close"
 				class="mt-4"
+				bind:this={closeFormEl}
 				use:enhance={() => {
 					closeSubmitting = true;
 					return async ({ update }) => {
