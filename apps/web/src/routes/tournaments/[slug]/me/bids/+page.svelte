@@ -7,7 +7,6 @@
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import * as Table from '$lib/components/ui/table';
-	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { currentHighBid } from '$lib/bids';
 	import { formatPlayerName } from '$lib/players';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
@@ -80,9 +79,7 @@
 	);
 </script>
 
-<div class="flex flex-col gap-4">
-	<PageHeader title={data.tournament.name} eyebrow="My bids" />
-
+<div class="flex flex-col gap-4 pt-4">
 	<RealtimeStatusBanner status={connectionStatus} />
 
 	{#if myBidRows.length === 0}
