@@ -53,7 +53,7 @@
 	);
 </script>
 
-<div class="flex flex-col gap-4 pt-4">
+<div class="flex max-w-3xl flex-col gap-4 pt-4">
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center gap-2">
 			<span class="text-sm text-muted-foreground">Status</span>
