@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
 export interface OwedRow {
@@ -74,23 +74,8 @@ export interface StakeRow {
 // grants read access to *every* payout, not just this user's, so the
 // explicit bidder_id filter is still required for correctness, not just
 // defense-in-depth.
-export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
-	if (!session) {
-		redirect(303, '/login');
-	}
-	const userId = session.user.id;
-
-	const { data: tournament, error: tournamentError } = await supabase
-		.from('tournaments')
-		.select('id, name, buy_back_percentage, event_start_at')
-		.eq('slug', params.slug)
-		.maybeSingle();
-	if (tournamentError) {
-		error(500, tournamentError.message);
-	}
-	if (!tournament) {
-		error(404, 'Tournament not found');
-	}
+export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => {
+	const { tournament, currentUserId: userId } = await parent();
 
 	const { data: owedEntries, error: owedError } = await supabase
 		.from('player_entries')
@@ -227,7 +212,6 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	}
 
 	return {
-		tournamentName: tournament.name,
 		owed,
 		won,
 		stake,

@@ -7,12 +7,11 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
-	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { formatPlayerName } from '$lib/players';
 	import type { OwedRow, StakeRow } from './+page.server';
 
 	let { data } = $props();
-	let { supabase, tournamentName, owed, won, stake } = $derived(data);
+	let { supabase, tournament, owed, won, stake } = $derived(data);
 
 	let buyBackModalOpen = $state(false);
 	let selectedStakeRow = $state<StakeRow | null>(null);
@@ -86,9 +85,7 @@
 	}
 </script>
 
-<div class="flex flex-col gap-8">
-	<PageHeader title={tournamentName} eyebrow="My balance" />
-
+<div class="flex flex-col gap-8 pt-4">
 	<div class="flex flex-col gap-2">
 		<div class="flex items-baseline justify-between">
 			<h2 class="font-display text-lg font-semibold text-ink">What you owe</h2>
@@ -263,7 +260,7 @@
 		bind:open={buyBackModalOpen}
 		{supabase}
 		entryId={selectedStakeRow.id}
-		{tournamentName}
+		tournamentName={tournament.name}
 		percentage={selectedStakeRow.buy_back_percentage}
 		amount={selectedStakeRow.buy_back_amount}
 		buyer={selectedStakeRow.buyer ?? { first_name: null, last_name: null, email: '', phone: null }}

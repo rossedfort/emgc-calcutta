@@ -5,10 +5,7 @@
 		RealtimeLiveLot,
 		RealtimePlayerEntry
 	} from '@emgc-calcutta/shared-types';
-	import { resolve } from '$app/paths';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 	import { formatCountdown } from '$lib/time';
 	import { tournamentPhase } from '$lib/tournamentPhase';
@@ -61,26 +58,7 @@
 	let isLinkedToYou = $derived(players.some((p) => p.user_id === data.currentUserId));
 </script>
 
-<div class="flex flex-col gap-4">
-	<PageHeader title={data.tournament.name} eyebrow={phase.label}>
-		{#snippet actions()}
-			<Button
-				href={resolve('/tournaments/[slug]/me/bids', { slug: data.tournament.slug })}
-				variant="outline"
-				size="sm"
-			>
-				My bids
-			</Button>
-			<Button
-				href={resolve('/tournaments/[slug]/me/balance', { slug: data.tournament.slug })}
-				variant="outline"
-				size="sm"
-			>
-				My balance
-			</Button>
-		{/snippet}
-	</PageHeader>
-
+<div class="flex flex-col gap-4 pt-4">
 	<RealtimeStatusBanner status={connectionStatus} />
 
 	<div

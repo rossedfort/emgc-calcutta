@@ -42,7 +42,8 @@
 				: '',
 		event_start_at: data.tournament.event_start_at
 			? toLocalInput(data.tournament.event_start_at)
-			: ''
+			: '',
+		bid_anonymity_enabled: data.tournament.bid_anonymity_enabled
 	});
 
 	let defaultPayoutRows = $derived<PayoutRow[]>(
@@ -53,7 +54,7 @@
 	);
 </script>
 
-<div class="flex flex-col gap-4 pt-4">
+<div class="flex max-w-3xl flex-col gap-4 pt-4">
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center gap-2">
 			<span class="text-sm text-muted-foreground">Status</span>

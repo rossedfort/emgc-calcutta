@@ -1,4 +1,4 @@
-import { error, redirect } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import type { Enums } from '@emgc-calcutta/shared-types';
 import type { PageServerLoad } from './$types';
 
@@ -21,22 +21,8 @@ export type FieldEntryRow = {
 // history across all players") but it was never built — this is the
 // Phase 19 version, tournament-scoped from the start (see this phase's
 // backlog entry) rather than needing a later rework like /me/balance did.
-export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
-	if (!session) {
-		redirect(303, '/login');
-	}
-
-	const { data: tournament, error: tournamentError } = await supabase
-		.from('tournaments')
-		.select('id, slug, name')
-		.eq('slug', params.slug)
-		.maybeSingle();
-	if (tournamentError) {
-		error(500, tournamentError.message);
-	}
-	if (!tournament) {
-		error(404, 'Tournament not found');
-	}
+export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => {
+	const { tournament } = await parent();
 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
@@ -62,9 +48,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	);
 
 	return {
-		tournament,
 		players,
-		currentUserId: session.user.id,
 		title: `My bids · ${tournament.name} · EMGC Bet`,
 		description: `Your bid activity in the ${tournament.name} auction.`
 	};

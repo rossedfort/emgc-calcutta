@@ -569,6 +569,7 @@ export type Database = {
       tournaments: {
         Row: {
           anti_snipe_seconds: number;
+          bid_anonymity_enabled: boolean;
           buy_back_percentage: number | null;
           championship_flight: string | null;
           created_at: string;
@@ -589,6 +590,7 @@ export type Database = {
         };
         Insert: {
           anti_snipe_seconds?: number;
+          bid_anonymity_enabled?: boolean;
           buy_back_percentage?: number | null;
           championship_flight?: string | null;
           created_at?: string;
@@ -609,6 +611,7 @@ export type Database = {
         };
         Update: {
           anti_snipe_seconds?: number;
+          bid_anonymity_enabled?: boolean;
           buy_back_percentage?: number | null;
           championship_flight?: string | null;
           created_at?: string;

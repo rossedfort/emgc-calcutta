@@ -18,11 +18,12 @@
 		anti_snipe_seconds: '15',
 		championship_flight: '',
 		buy_back_percentage: '',
-		event_start_at: ''
+		event_start_at: '',
+		bid_anonymity_enabled: false
 	};
 </script>
 
-<div class="flex flex-col gap-4">
+<div class="flex max-w-3xl flex-col gap-4">
 	<PageHeader title="New tournament" eyebrow="Admin">
 		{#snippet actions()}
 			<a href={resolve('/admin/tournaments')} class="text-sm text-brass hover:underline">Cancel</a>

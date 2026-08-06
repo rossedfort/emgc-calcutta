@@ -54,7 +54,9 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	const { data: tournament, error: tournamentError } = await supabase
 		.from('tournaments')
-		.select('id, slug, name, flights, championship_flight, payout_structure, status')
+		.select(
+			'id, slug, name, flights, championship_flight, payout_structure, status, bid_anonymity_enabled'
+		)
 		.eq('slug', params.slug)
 		.maybeSingle();
 	if (tournamentError) {
@@ -66,6 +68,13 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	if (tournament.status !== 'complete') {
 		redirect(303, `/tournaments/${params.slug}`);
 	}
+
+	// Phase 23: presentational suppression only — bidder_name is dropped
+	// here, before it ever reaches the client, rather than fetched and hidden
+	// in the template. Live auction/bid history already never send this
+	// field at all for the same reason; this just makes that same behavior
+	// conditional per tournament instead of universal.
+	const hideBidderNames = tournament.bid_anonymity_enabled;
 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
@@ -109,7 +118,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 							{
 								slug: lot.players.slug,
 								name: `${lot.players.first_name} ${lot.players.last_name}`,
-								bidderName: lot.winning_bid?.bidder_name ?? null
+								bidderName: hideBidderNames ? null : (lot.winning_bid?.bidder_name ?? null)
 							}
 						] as const
 					]
@@ -142,7 +151,13 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 							// three values this query actually returns.
 							status: entry.status as 'sold_silent' | 'sold_live' | 'field',
 							placement: entry.placement,
-							winning_bid: entry.status === 'field' ? null : entry.winning_bid,
+							winning_bid:
+								entry.status === 'field' || !entry.winning_bid
+									? null
+									: {
+											amount: entry.winning_bid.amount,
+											bidder_name: hideBidderNames ? null : entry.winning_bid.bidder_name
+										},
 							payout: payoutByEntryId.get(entry.id) ?? null,
 							viaField:
 								entry.status === 'field' && entry.field_entry_id
@@ -161,7 +176,6 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	return {
 		payoutStructure: tournament.payout_structure as Record<string, number>,
 		results,
-		tournamentName: tournament.name,
 		tournamentSlug: tournament.slug,
 		title: `${tournament.name} · Results · EMGC Bet`,
 		description: `See how the ${tournament.name} auction paid out.`

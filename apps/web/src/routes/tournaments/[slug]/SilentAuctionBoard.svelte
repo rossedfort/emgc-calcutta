@@ -43,6 +43,7 @@
 			championship_flight: string | null;
 			threshold_amount: number;
 			min_increment: number;
+			bid_anonymity_enabled: boolean;
 		};
 		players: FieldPlayerRow[];
 		liveBids: RealtimeBid[];
@@ -195,7 +196,7 @@
 				{/if}
 			{/each}
 		</span>
-		{#if high.bidder_name}
+		{#if high.bidder_name && !tournament.bid_anonymity_enabled}
 			<span class="ml-1 font-sans text-xs text-ink/60">({high.bidder_name})</span>
 		{/if}
 	{:else}

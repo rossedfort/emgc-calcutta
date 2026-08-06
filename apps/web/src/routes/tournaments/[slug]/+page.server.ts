@@ -1,4 +1,4 @@
-import { error, fail, redirect } from '@sveltejs/kit';
+import { error, fail } from '@sveltejs/kit';
 import type { Enums, Tables } from '@emgc-calcutta/shared-types';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -40,30 +40,8 @@ export type FieldPlayerRow = {
 	field_entry_id: string | null;
 };
 
-export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
-	if (!session) {
-		redirect(303, '/login');
-	}
-
-	// RLS scopes both queries: a tournament a Participant can't see (a dry
-	// run) resolves to no rows here, same as a typo'd slug — a 404, not a
-	// 403, so this doesn't leak which slugs exist. Selects the union of what
-	// every phase's rendered UI needs (silent board's threshold/increment,
-	// live board's increment, the roster view's flights) since this one page
-	// now covers all of them.
-	const { data: tournament, error: tournamentError } = await supabase
-		.from('tournaments')
-		.select(
-			'id, slug, name, flights, championship_flight, status, silent_auction_start, silent_auction_end, live_auction_started_at, threshold_amount, min_increment'
-		)
-		.eq('slug', params.slug)
-		.maybeSingle();
-	if (tournamentError) {
-		error(500, tournamentError.message);
-	}
-	if (!tournament) {
-		error(404, 'Tournament not found');
-	}
+export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => {
+	const { tournament } = await parent();
 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
@@ -114,12 +92,8 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	}
 
 	return {
-		tournament,
 		players,
-		unlinkedPlayers: unlinkedPlayers ?? [],
-		currentUserId: session.user.id,
-		title: `${tournament.name} · EMGC Bet`,
-		description: `Browse the field and bid in the ${tournament.name} auction.`
+		unlinkedPlayers: unlinkedPlayers ?? []
 	};
 };
 
