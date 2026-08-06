@@ -161,7 +161,6 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	return {
 		payoutStructure: tournament.payout_structure as Record<string, number>,
 		results,
-		tournamentName: tournament.name,
 		tournamentSlug: tournament.slug,
 		title: `${tournament.name} · Results · EMGC Bet`,
 		description: `See how the ${tournament.name} auction paid out.`

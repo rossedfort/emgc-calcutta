@@ -25,6 +25,13 @@
 			>Auction</a
 		>
 		<a
+			href={resolve('/tournaments/[slug]/results', { slug: data.tournament.slug })}
+			class={tabClass(
+				resolve('/tournaments/[slug]/results', { slug: data.tournament.slug }),
+				false
+			)}>Results</a
+		>
+		<a
 			href={resolve('/tournaments/[slug]/me/bids', { slug: data.tournament.slug })}
 			class={tabClass(
 				resolve('/tournaments/[slug]/me/bids', { slug: data.tournament.slug }),

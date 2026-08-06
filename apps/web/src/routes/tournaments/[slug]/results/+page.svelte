@@ -2,13 +2,12 @@
 	import { resolve } from '$app/paths';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import PageHeader from '$lib/components/PageHeader.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Table from '$lib/components/ui/table';
 	import { formatPlayerName } from '$lib/players';
 
 	let { data } = $props();
-	let { results, payoutStructure, tournamentName, tournamentSlug } = $derived(data);
+	let { results, payoutStructure, tournamentSlug } = $derived(data);
 
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -25,9 +24,7 @@
 	let nonEmptyResults = $derived(results.filter((r) => r.players.length > 0));
 </script>
 
-<div class="flex flex-col gap-4">
-	<PageHeader title={tournamentName} eyebrow="Results" />
-
+<div class="flex flex-col gap-4 pt-4">
 	{#if payoutEntries.length > 0}
 		<p class="text-sm text-muted-foreground">
 			Payout structure:
