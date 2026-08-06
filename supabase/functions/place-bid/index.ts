@@ -128,7 +128,7 @@ export default {
         .supabaseAdmin
         .from("tournaments")
         .select(
-          "silent_auction_start, silent_auction_end, min_increment, threshold_amount, anti_snipe_seconds",
+          "silent_auction_start, silent_auction_end, min_increment, threshold_amount, anti_snipe_seconds, minimum_bid",
         )
         .eq("id", entry.tournament_id)
         .maybeSingle();
@@ -247,6 +247,22 @@ export default {
           error: `Bid must be at least $${minimum.toFixed(2)} (current high $${
             highBid.amount.toFixed(2)
           } + $${tournament.min_increment.toFixed(2)} minimum increment)`,
+        }, { status: 400 });
+      }
+
+      // Phase 21: a floor on the very first bid an entry ever receives —
+      // min_increment above only ever governs a bid once one already
+      // exists, so without this an opening bid of $0.01 was accepted
+      // outright (the only other floor being the generic amount > 0 check
+      // earlier). Applies equally to a field lot's (Phase 20) first live
+      // bid — a field entry enters the live auction having never received
+      // a bid of its own, hitting this exact same highBid === null branch,
+      // no phase-specific special-casing needed.
+      if (!highBid && body.amount < tournament.minimum_bid) {
+        return Response.json({
+          error: `Bid must be at least $${
+            tournament.minimum_bid.toFixed(2)
+          } (minimum opening bid)`,
         }, { status: 400 });
       }
 

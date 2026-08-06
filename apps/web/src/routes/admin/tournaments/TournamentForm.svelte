@@ -203,6 +203,24 @@
 						{errors.min_increment}
 					</p>{/if}
 			</div>
+			<div class="flex flex-col gap-1.5">
+				<Label for="minimum_bid">Minimum opening bid ($)</Label>
+				<Input
+					id="minimum_bid"
+					name="minimum_bid"
+					type="number"
+					step="0.01"
+					min="0"
+					value={values.minimum_bid}
+				/>
+				<p class="text-xs text-muted-foreground">
+					Floor for a player's very first bid only — the increment above governs every bid after
+					that.
+				</p>
+				{#if errors.minimum_bid}<p class="text-sm text-destructive">
+						{errors.minimum_bid}
+					</p>{/if}
+			</div>
 		</div>
 
 		<div class="flex flex-col gap-1.5">

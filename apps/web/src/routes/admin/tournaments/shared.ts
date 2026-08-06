@@ -13,6 +13,9 @@ export interface Tournament {
 	kind: 'production' | 'dry_run';
 	threshold_amount: number;
 	min_increment: number;
+	// Phase 21: floor on an entry's very first bid only — min_increment
+	// alone governs every bid after that, unchanged.
+	minimum_bid: number;
 	anti_snipe_seconds: number;
 	payout_structure: Record<string, number>;
 	flights: string[];
@@ -34,6 +37,7 @@ export interface TournamentFormValues {
 	silent_auction_end: string;
 	threshold_amount: string;
 	min_increment: string;
+	minimum_bid: string;
 	anti_snipe_seconds: string;
 	championship_flight: string;
 	// '' means unset for both, same as championship_flight above.
@@ -64,6 +68,7 @@ export interface ParsedTournament {
 	silent_auction_end: string;
 	threshold_amount: number;
 	min_increment: number;
+	minimum_bid: number;
 	anti_snipe_seconds: number;
 	payout_structure: Record<string, number>;
 	flights: string[];
@@ -121,6 +126,15 @@ export function parseTournamentForm(formData: FormData): {
 	const min_increment = Number(minIncrementRaw);
 	if (!minIncrementRaw || !Number.isFinite(min_increment) || min_increment <= 0) {
 		errors.min_increment = 'Minimum increment must be a positive number';
+	}
+
+	// Phase 21: floor on an entry's very first bid only (place-bid's own
+	// min_increment check is skipped entirely when no bid exists yet) —
+	// same positive-number validation as threshold_amount/min_increment.
+	const minimumBidRaw = String(formData.get('minimum_bid') ?? '');
+	const minimum_bid = Number(minimumBidRaw);
+	if (!minimumBidRaw || !Number.isFinite(minimum_bid) || minimum_bid <= 0) {
+		errors.minimum_bid = 'Minimum opening bid must be a positive number';
 	}
 
 	const antiSnipeRaw = String(formData.get('anti_snipe_seconds') ?? '15');
@@ -225,6 +239,7 @@ export function parseTournamentForm(formData: FormData): {
 			silent_auction_end: end!,
 			threshold_amount,
 			min_increment,
+			minimum_bid,
 			anti_snipe_seconds,
 			payout_structure,
 			flights,

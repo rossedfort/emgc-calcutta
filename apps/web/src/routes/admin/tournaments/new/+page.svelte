@@ -14,6 +14,7 @@
 		silent_auction_end: '',
 		threshold_amount: '',
 		min_increment: '',
+		minimum_bid: '',
 		anti_snipe_seconds: '15',
 		championship_flight: '',
 		buy_back_percentage: '',
