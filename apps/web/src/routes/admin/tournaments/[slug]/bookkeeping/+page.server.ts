@@ -6,6 +6,7 @@ export interface BookkeepingRow {
 	slug: string;
 	first_name: string;
 	last_name: string;
+	flight: string;
 	division: string;
 	status: 'sold_silent' | 'sold_live';
 	buyer_marked_paid_at: string | null;
@@ -16,11 +17,38 @@ export interface BookkeepingRow {
 			first_name: string | null;
 			last_name: string | null;
 			email: string;
+			phone: string | null;
 		} | null;
 	} | null;
 	// Phase 20 ("the field"): flags "The Field" itself so the mark-paid
 	// list reads as a pooled lot, not a regular competitor's name.
 	isField: boolean;
+}
+
+// Phase 22 (CSV export) reconciling Phase 20's own forward-looking note:
+// a swept player has no winning_bid of their own and isn't sold_silent/
+// sold_live, so they'd otherwise be silently missing from the "who won
+// whom" export even though they do have a real winner once their field
+// lot sells — the field's buyer, resolved through field_entry_id. Kept
+// entirely separate from BookkeepingRow/the on-screen "Winning bids"
+// table (which stays scoped to individually-sold entries only, matching
+// its own "owed to the pot" purpose — a swept player owes nothing
+// individually, their pool-mate's buyer does) rather than folding these
+// into that same list, which would misrepresent who owes what.
+export interface SweptExportRow {
+	id: string;
+	slug: string;
+	first_name: string;
+	last_name: string;
+	flight: string;
+	division: string;
+	fieldLotName: string;
+	bidder: {
+		first_name: string | null;
+		last_name: string | null;
+		email: string;
+		phone: string | null;
+	} | null;
 }
 
 export interface PayoutRow {
@@ -77,7 +105,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, division, status, buyer_marked_paid_at, players(slug, first_name, last_name, is_field), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
+			'id, flight, division, status, buyer_marked_paid_at, players(slug, first_name, last_name, is_field), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email, phone))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live']);
@@ -97,6 +125,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 							slug: entry.players.slug,
 							first_name: entry.players.first_name,
 							last_name: entry.players.last_name,
+							flight: entry.flight,
 							division: entry.division,
 							status: entry.status as 'sold_silent' | 'sold_live',
 							buyer_marked_paid_at: entry.buyer_marked_paid_at,
@@ -109,6 +138,74 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		.sort(
 			(a, b) => a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name)
 		);
+
+	// Phase 22: swept players, resolved through their field lot's own
+	// winning bid — see SweptExportRow's own comment for why these are
+	// kept out of `players` above. field_entry_id -> player_entries.id is
+	// a self-referencing FK that only ever resolves the reverse direction
+	// via a PostgREST embed (confirmed directly while building Phase 20),
+	// so this is two queries, not one.
+	const { data: sweptEntries, error: sweptEntriesError } = await supabase
+		.from('player_entries')
+		.select('id, flight, division, field_entry_id, players(slug, first_name, last_name)')
+		.eq('tournament_id', tournament.id)
+		.eq('status', 'field');
+	if (sweptEntriesError) {
+		error(500, sweptEntriesError.message);
+	}
+
+	const fieldLotIdsForSwept = [
+		...new Set((sweptEntries ?? []).flatMap((e) => (e.field_entry_id ? [e.field_entry_id] : [])))
+	];
+	const { data: sweptFieldLots, error: sweptFieldLotsError } =
+		fieldLotIdsForSwept.length > 0
+			? await supabase
+					.from('player_entries')
+					.select(
+						'id, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(bidder:users(first_name, last_name, email, phone))'
+					)
+					.in('id', fieldLotIdsForSwept)
+			: { data: [], error: null };
+	if (sweptFieldLotsError) {
+		error(500, sweptFieldLotsError.message);
+	}
+	const sweptFieldLotById = new Map(
+		(sweptFieldLots ?? []).flatMap((lot) =>
+			lot.players
+				? [
+						[
+							lot.id,
+							{
+								name: `${lot.players.first_name} ${lot.players.last_name}`,
+								bidder: lot.winning_bid?.bidder ?? null
+							}
+						] as const
+					]
+				: []
+		)
+	);
+
+	// bidder is null until the field lot itself actually sells — excluded
+	// until then, same "only show what's actually resolved" scope the
+	// on-screen Winning bids table already applies via its own sold-status
+	// filter. A blank-buyer row would be premature, not just incomplete.
+	const sweptExportRows: SweptExportRow[] = (sweptEntries ?? []).flatMap((entry) => {
+		const fieldLot = entry.field_entry_id ? sweptFieldLotById.get(entry.field_entry_id) : undefined;
+		return entry.players && fieldLot?.bidder
+			? [
+					{
+						id: entry.id,
+						slug: entry.players.slug,
+						first_name: entry.players.first_name,
+						last_name: entry.players.last_name,
+						flight: entry.flight,
+						division: entry.division,
+						fieldLotName: fieldLot.name,
+						bidder: fieldLot.bidder
+					}
+				]
+			: [];
+	});
 
 	// player_entries(division, players(first_name, last_name)) — payouts.
 	// entry_id has a single FK path to player_entries (no disambiguation
@@ -222,6 +319,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	return {
 		players,
 		payoutGroups,
+		sweptExportRows,
 		title: `${tournament.name} · Bookkeeping · EMGC Bet`,
 		description: `Track paid and unpaid winning bids and payouts for ${tournament.name}.`
 	};

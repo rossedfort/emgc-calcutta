@@ -1,4 +1,10 @@
 <script lang="ts">
+	// papaparse is CommonJS — a named `unparse` import fails under Vite's
+	// SSR module runner ("Named export 'unparse' not found"), confirmed
+	// directly by actually loading this page, not just via typecheck
+	// (@types/papaparse declares it as a named export, so svelte-check
+	// alone doesn't catch this).
+	import Papa from 'papaparse';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import { resolve } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
@@ -11,7 +17,56 @@
 	import { formatUserName } from '$lib/profile';
 
 	let { data } = $props();
-	let { supabase, players, payoutGroups } = $derived(data);
+	let { supabase, players, payoutGroups, sweptExportRows } = $derived(data);
+
+	// "Who won whom" — a downloadable sheet for an Admin to distribute to
+	// participants outside the app, not gated behind results/placements
+	// the way the Results page's data implicitly is (this is a pre-event
+	// outreach tool, used right after the live auction closes). Built
+	// client-side from data this page already fetched, not a new Edge
+	// Function or fresh query. `players` (individually sold) and
+	// `sweptExportRows` (Phase 20 field-lot players, resolved separately
+	// so they never pollute the on-screen "owed to the pot" table above —
+	// see that array's own server-side comment) are combined only here,
+	// for the export, with a "Sold via" column distinguishing the two: a
+	// swept player's own "Winning bid" is deliberately left blank rather
+	// than showing the field lot's sale price as if it were their own —
+	// the pool sold together, not them individually.
+	function exportCsv() {
+		const rows = [
+			...players.map((p) => ({
+				Player: formatPlayerName(p),
+				Flight: p.flight,
+				Division: p.division,
+				'Winning bid': p.winning_bid ? p.winning_bid.amount.toFixed(2) : '',
+				'Buyer first name': p.winning_bid?.bidder?.first_name ?? '',
+				'Buyer last name': p.winning_bid?.bidder?.last_name ?? '',
+				'Buyer email': p.winning_bid?.bidder?.email ?? '',
+				'Buyer phone': p.winning_bid?.bidder?.phone ?? '',
+				'Sold via': ''
+			})),
+			...sweptExportRows.map((r) => ({
+				Player: formatPlayerName(r),
+				Flight: r.flight,
+				Division: r.division,
+				'Winning bid': '',
+				'Buyer first name': r.bidder?.first_name ?? '',
+				'Buyer last name': r.bidder?.last_name ?? '',
+				'Buyer email': r.bidder?.email ?? '',
+				'Buyer phone': r.bidder?.phone ?? '',
+				'Sold via': r.fieldLotName
+			}))
+		];
+
+		const csv = Papa.unparse(rows);
+		const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `${data.tournament.slug}-winners.csv`;
+		link.click();
+		URL.revokeObjectURL(url);
+	}
 
 	function roleLabel(role: 'buyer' | 'golfer' | null): string {
 		switch (role) {
@@ -78,6 +133,12 @@
 <div class="flex flex-col gap-8 pt-4">
 	{#if errorMessage}
 		<p class="text-sm text-destructive">{errorMessage}</p>
+	{/if}
+
+	{#if players.length > 0 || sweptExportRows.length > 0}
+		<div class="flex justify-end">
+			<Button variant="outline" size="sm" onclick={exportCsv}>Export CSV</Button>
+		</div>
 	{/if}
 
 	<div class="flex flex-col gap-2">
