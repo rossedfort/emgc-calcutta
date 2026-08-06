@@ -64,6 +64,11 @@
 			'Your balance',
 			'See what you owe (players you won) and what you\'re owed (payouts for players you entered who placed), including which ones are already settled — from the "My balance" link on each tournament\'s own page.'
 		)}
+
+		{@render topic(
+			'Your bids',
+			"See every player you've bid on in a tournament, your own bid next to the current high, and whether you're leading, outbid, or the auction's already settled — from the \"My bids\" link on each tournament's own page."
+		)}
 	</section>
 
 	{#if isAdmin}

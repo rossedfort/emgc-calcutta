@@ -65,6 +65,13 @@
 	<PageHeader title={data.tournament.name} eyebrow={phase.label}>
 		{#snippet actions()}
 			<Button
+				href={resolve('/tournaments/[slug]/me/bids', { slug: data.tournament.slug })}
+				variant="outline"
+				size="sm"
+			>
+				My bids
+			</Button>
+			<Button
 				href={resolve('/tournaments/[slug]/me/balance', { slug: data.tournament.slug })}
 				variant="outline"
 				size="sm"
