@@ -350,6 +350,7 @@ export type Database = {
           buyer_marked_paid_by: string | null;
           created_at: string;
           division: string;
+          field_entry_id: string | null;
           flight: string;
           id: string;
           placement: number | null;
@@ -363,6 +364,7 @@ export type Database = {
           buyer_marked_paid_by?: string | null;
           created_at?: string;
           division?: string;
+          field_entry_id?: string | null;
           flight?: string;
           id?: string;
           placement?: number | null;
@@ -376,6 +378,7 @@ export type Database = {
           buyer_marked_paid_by?: string | null;
           created_at?: string;
           division?: string;
+          field_entry_id?: string | null;
           flight?: string;
           id?: string;
           placement?: number | null;
@@ -390,6 +393,13 @@ export type Database = {
             columns: ["buyer_marked_paid_by"];
             isOneToOne: false;
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_entries_field_entry_id_fkey";
+            columns: ["field_entry_id"];
+            isOneToOne: false;
+            referencedRelation: "player_entries";
             referencedColumns: ["id"];
           },
           {
@@ -422,6 +432,7 @@ export type Database = {
           flight: string;
           handicap_index: number | null;
           id: string;
+          is_field: boolean;
           last_name: string;
           photo_url: string | null;
           preferences: string | null;
@@ -435,6 +446,7 @@ export type Database = {
           flight?: string;
           handicap_index?: number | null;
           id?: string;
+          is_field?: boolean;
           last_name: string;
           photo_url?: string | null;
           preferences?: string | null;
@@ -448,6 +460,7 @@ export type Database = {
           flight?: string;
           handicap_index?: number | null;
           id?: string;
+          is_field?: boolean;
           last_name?: string;
           photo_url?: string | null;
           preferences?: string | null;
@@ -741,7 +754,8 @@ export type Database = {
         | "reserved"
         | "sold_silent"
         | "sold_live"
-        | "no_bid";
+        | "no_bid"
+        | "field";
       user_role: "unassigned" | "participant" | "admin" | "owner";
     };
     CompositeTypes: {
@@ -892,7 +906,14 @@ export const Constants = {
     Enums: {
       auth_provider: ["google", "azure", "email"],
       bid_phase: ["silent", "live"],
-      player_status: ["open", "reserved", "sold_silent", "sold_live", "no_bid"],
+      player_status: [
+        "open",
+        "reserved",
+        "sold_silent",
+        "sold_live",
+        "no_bid",
+        "field",
+      ],
       user_role: ["unassigned", "participant", "admin", "owner"],
     },
   },

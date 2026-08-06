@@ -62,6 +62,13 @@
 	);
 	let high = $derived(currentLot ? currentHighBid(liveBids, currentLot.entry_id) : null);
 
+	// Phase 20: the auctioneer needs to know who's pooled into a field lot
+	// just as much as bidders do, before calling it live — same derivation
+	// the participant board uses, off the same tournament-wide players list.
+	function pooledPlayers(fieldEntryId: string) {
+		return players.filter((p) => p.field_entry_id === fieldEntryId);
+	}
+
 	let nextQueuedLot = $derived(
 		liveLots
 			.filter((lot) => lot.opened_at === null)
@@ -121,7 +128,13 @@
 						{formatPlayerName(currentPlayer)}
 						<DivisionBadge division={currentPlayer.division} />
 					</p>
-					{#if currentPlayer.flight || currentPlayer.handicap_index !== null}
+					{#if currentPlayer.is_field}
+						{@const pooled = pooledPlayers(currentPlayer.id)}
+						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+							{currentPlayer.flight ? `Flight ${currentPlayer.flight} · ` : ''}Pooled players:
+							{pooled.length > 0 ? pooled.map((p) => formatPlayerName(p)).join(', ') : '—'}
+						</span>
+					{:else if currentPlayer.flight || currentPlayer.handicap_index !== null}
 						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
 							{[
 								currentPlayer.flight ? `Flight ${currentPlayer.flight}` : null,
@@ -190,6 +203,14 @@
 				{formatPlayerName(nextQueuedPlayer)}
 				<DivisionBadge division={nextQueuedPlayer.division} />
 			</p>
+			{#if nextQueuedPlayer.is_field}
+				{@const pooled = pooledPlayers(nextQueuedPlayer.id)}
+				<p class="font-data text-xs tracking-wide text-ink/60 uppercase">
+					Pooled players: {pooled.length > 0
+						? pooled.map((p) => formatPlayerName(p)).join(', ')
+						: '—'}
+				</p>
+			{/if}
 			<form
 				method="POST"
 				action="?/advance"

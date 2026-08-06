@@ -14,6 +14,8 @@ export type LiveAdminPlayer = {
 	handicap_index: number | null;
 	status: Enums<'player_status'>;
 	user_id: string | null;
+	is_field: boolean;
+	field_entry_id: string | null;
 };
 
 // No own tournament lookup — inherits it from the [slug] layout's load via
@@ -28,7 +30,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: entries } = await supabase
 		.from('player_entries')
 		.select(
-			'id, division, status, players(slug, first_name, last_name, flight, handicap_index, user_id)'
+			'id, division, status, field_entry_id, players(slug, first_name, last_name, flight, handicap_index, user_id, is_field)'
 		)
 		.eq('tournament_id', tournament.id);
 
@@ -45,7 +47,9 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 							division: entry.division,
 							handicap_index: entry.players.handicap_index,
 							status: entry.status,
-							user_id: entry.players.user_id
+							user_id: entry.players.user_id,
+							is_field: entry.players.is_field,
+							field_entry_id: entry.field_entry_id
 						}
 					]
 				: []

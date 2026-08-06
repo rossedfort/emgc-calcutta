@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
@@ -85,6 +86,21 @@
 									<Table.Cell>
 										{#if player.winning_bid?.bidder}
 											{formatUserName(player.winning_bid.bidder) ?? player.winning_bid.bidder.email}
+										{:else if player.viaField}
+											<span class="text-ink/70">
+												{player.viaField.bidder
+													? (formatUserName(player.viaField.bidder) ?? player.viaField.bidder.email)
+													: '—'}
+											</span>
+											<a
+												href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+													slug: data.tournament.slug,
+													playerSlug: player.viaField.slug
+												})}
+												class="block text-xs text-brass hover:underline"
+											>
+												via {player.viaField.name}
+											</a>
 										{:else}
 											<span class="text-muted-foreground">—</span>
 										{/if}

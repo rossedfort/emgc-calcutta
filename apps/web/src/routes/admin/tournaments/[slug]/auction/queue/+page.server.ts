@@ -13,6 +13,7 @@ export type QueuePlayer = {
 	flight: string;
 	division: string;
 	handicap_index: number | null;
+	is_field: boolean;
 };
 
 export interface QueueLot {
@@ -47,7 +48,9 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		lotEntryIds.length > 0
 			? await supabase
 					.from('player_entries')
-					.select('id, division, players(slug, first_name, last_name, flight, handicap_index)')
+					.select(
+						'id, division, players(slug, first_name, last_name, flight, handicap_index, is_field)'
+					)
 					.in('id', lotEntryIds)
 			: {
 					data: [] as { id: string; division: string; players: QueuePlayer | null }[],
@@ -70,7 +73,8 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 								last_name: entry.players.last_name,
 								flight: entry.players.flight,
 								division: entry.division,
-								handicap_index: entry.players.handicap_index
+								handicap_index: entry.players.handicap_index,
+								is_field: entry.players.is_field
 							}
 						] as const
 					]

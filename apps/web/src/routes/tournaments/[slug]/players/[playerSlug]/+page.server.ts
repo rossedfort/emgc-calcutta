@@ -18,7 +18,27 @@ export type PlayerProfile = Pick<
 	| 'flight'
 	| 'handicap_index'
 	| 'user_id'
+	| 'is_field'
 >;
+
+// Phase 20 ("the field"): shown on a field lot's own profile page — every
+// player pooled into it, since a bidder needs to know who they'd actually
+// be buying before bidding on it, not just "The Field" as a name.
+export interface PooledPlayer {
+	slug: string;
+	first_name: string;
+	last_name: string;
+	flight: string;
+	handicap_index: number | null;
+}
+
+// Shown on a *swept* player's own profile instead — a link back to the
+// field lot they were pooled into, so "In the field" isn't a dead end the
+// way the old no_bid status was.
+export interface FieldLotLink {
+	slug: string;
+	name: string;
+}
 
 export interface BidHistoryRow {
 	id: string;
@@ -36,6 +56,10 @@ export interface PlayerEntryProfile {
 	division: string;
 	status: Enums<'player_status'>;
 	bids: BidHistoryRow[];
+	// Set only for a swept (status = 'field') entry — where to send someone
+	// reading "In the field" to find out who else is pooled with them and
+	// who's bidding on it.
+	fieldEntry: FieldLotLink | null;
 }
 
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
@@ -61,7 +85,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	const { data: player, error: playerError } = await supabase
 		.from('players')
 		.select(
-			'id, slug, first_name, last_name, preferences, photo_url, flight, handicap_index, user_id'
+			'id, slug, first_name, last_name, preferences, photo_url, flight, handicap_index, user_id, is_field'
 		)
 		.eq('tournament_id', tournament.id)
 		.eq('slug', params.playerSlug)
@@ -90,7 +114,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 
 	const { data: playerEntries, error: entriesError } = await supabase
 		.from('player_entries')
-		.select('id, division, status')
+		.select('id, division, status, field_entry_id')
 		.eq('player_id', player.id)
 		.order('division');
 	if (entriesError) {
@@ -98,6 +122,59 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	}
 
 	const entryIds = (playerEntries ?? []).map((entry) => entry.id);
+
+	// Phase 20 ("the field"): two independent lookups, each only run when
+	// actually needed, not embedded in the queries above — a self-
+	// referencing player_entries embed (field_entry_id -> player_entries.id)
+	// was confirmed directly against PostgREST (see set-placement) to only
+	// ever resolve the reverse direction, so both directions here go through
+	// their own explicit follow-up query instead.
+	//
+	// This is a field lot itself: every player pooled into it, so a bidder
+	// can see who they'd actually be buying before bidding.
+	let pooledPlayers: PooledPlayer[] = [];
+	if (player.is_field && entryIds.length > 0) {
+		const { data: pooledEntries, error: pooledError } = await supabase
+			.from('player_entries')
+			.select('players(slug, first_name, last_name, flight, handicap_index)')
+			.in('field_entry_id', entryIds);
+		if (pooledError) {
+			error(500, pooledError.message);
+		}
+		pooledPlayers = (pooledEntries ?? [])
+			.flatMap((entry) => (entry.players ? [entry.players] : []))
+			.sort(
+				(a, b) => a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name)
+			);
+	}
+
+	// This is a swept player: resolve each of their entries' own field lot
+	// (name + slug) to link to, one lookup covering every entry at once.
+	const fieldEntryIds = [
+		...new Set(
+			(playerEntries ?? [])
+				.filter((entry) => entry.status === 'field' && entry.field_entry_id)
+				.map((entry) => entry.field_entry_id as string)
+		)
+	];
+	const fieldLotByEntryId = new Map<string, FieldLotLink>();
+	if (fieldEntryIds.length > 0) {
+		const { data: fieldLots, error: fieldLotsError } = await supabase
+			.from('player_entries')
+			.select('id, players(slug, first_name, last_name)')
+			.in('id', fieldEntryIds);
+		if (fieldLotsError) {
+			error(500, fieldLotsError.message);
+		}
+		for (const lot of fieldLots ?? []) {
+			if (lot.players) {
+				fieldLotByEntryId.set(lot.id, {
+					slug: lot.players.slug,
+					name: formatPlayerName(lot.players)
+				});
+			}
+		}
+	}
 
 	// Deliberately no bidder identity here (confirmed with the user) — the
 	// same anonymity the silent/live auction boards already apply to other
@@ -126,7 +203,8 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		id: entry.id,
 		division: entry.division,
 		status: entry.status,
-		bids: bidsByEntryId.get(entry.id) ?? []
+		bids: bidsByEntryId.get(entry.id) ?? [],
+		fieldEntry: entry.field_entry_id ? (fieldLotByEntryId.get(entry.field_entry_id) ?? null) : null
 	}));
 
 	return {
@@ -134,6 +212,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 		player: player as PlayerProfile,
 		linkedUserName,
 		entries,
+		pooledPlayers,
 		isYou: player.user_id === session.user.id,
 		title: `${formatPlayerName(player)} · ${tournament.name} · EMGC Bet`,
 		description: `Player profile and bidding status for ${formatPlayerName(player)} in ${tournament.name}.`

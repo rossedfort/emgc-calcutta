@@ -29,6 +29,15 @@ export type FieldPlayerRow = {
 	handicap_index: number | null;
 	status: Enums<'player_status'>;
 	user_id: string | null;
+	// Phase 20 ("the field"): is_field flags the synthetic "The Field"
+	// identity itself; field_entry_id (set only on a swept, status = 'field'
+	// entry) points at that group's field entry. Both come along in this
+	// same tournament-wide list rather than a separate query — every board
+	// below derives "who's pooled into this field lot" by filtering this
+	// one list for field_entry_id === the field entry's own id, no extra
+	// round trip needed.
+	is_field: boolean;
+	field_entry_id: string | null;
 };
 
 export const load: PageServerLoad = async ({ params, locals: { session, supabase } }) => {
@@ -59,7 +68,7 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, division, status, players(id, slug, first_name, last_name, flight, handicap_index, user_id)'
+			'id, division, status, field_entry_id, players(id, slug, first_name, last_name, flight, handicap_index, user_id, is_field)'
 		)
 		.eq('tournament_id', tournament.id);
 	if (entriesError) {
@@ -82,7 +91,9 @@ export const load: PageServerLoad = async ({ params, locals: { session, supabase
 							division: entry.division,
 							handicap_index: entry.players.handicap_index,
 							status: entry.status,
-							user_id: entry.players.user_id
+							user_id: entry.players.user_id,
+							is_field: entry.players.is_field,
+							field_entry_id: entry.field_entry_id
 						}
 					]
 				: []

@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
@@ -96,6 +97,9 @@
 							<Table.Cell class="font-medium text-ink">
 								{formatPlayerName(lot.player)}
 								<DivisionBadge division={lot.player.division} />
+								{#if lot.player.is_field}
+									<Badge variant="brass">Field lot</Badge>
+								{/if}
 							</Table.Cell>
 							<Table.Cell>{lot.player.flight || '—'}</Table.Cell>
 							<Table.Cell class="font-data"

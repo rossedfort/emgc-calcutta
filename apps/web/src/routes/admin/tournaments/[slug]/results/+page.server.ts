@@ -7,24 +7,29 @@ import {
 import type { ResultsGroup as SharedResultsGroup } from '$lib/results';
 import type { PageServerLoad } from './$types';
 
+interface ResultsBidder {
+	id: string;
+	first_name: string | null;
+	last_name: string | null;
+	email: string;
+}
+
 export interface ResultsRow {
 	id: string;
 	first_name: string;
 	last_name: string;
 	flight: string;
 	division: string;
-	status: 'sold_silent' | 'sold_live';
+	status: 'sold_silent' | 'sold_live' | 'field';
 	placement: number | null;
-	winning_bid: {
-		amount: number;
-		bidder: {
-			id: string;
-			first_name: string | null;
-			last_name: string | null;
-			email: string;
-		} | null;
-	} | null;
+	winning_bid: { amount: number; bidder: ResultsBidder | null } | null;
 	payout: { pot_share: number; amount: number } | null;
+	// Phase 20 ("the field"): set only for a swept row (status = 'field') —
+	// who bought the field lot this player was pooled into, and a link to
+	// it. winning_bid stays null for these rows rather than showing the
+	// field lot's own sale price as if it were this one player's own
+	// winning bid — the pool sold together, not this player individually.
+	viaField: { slug: string; name: string; bidder: ResultsBidder | null } | null;
 }
 
 export type ResultsGroup = SharedResultsGroup<ResultsRow>;
@@ -62,13 +67,57 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, flight, division, status, placement, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
+			'id, flight, division, status, placement, field_entry_id, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
 		)
 		.eq('tournament_id', tournament.id)
-		.in('status', ['sold_silent', 'sold_live']);
+		.in('status', ['sold_silent', 'sold_live', 'field']);
 	if (entriesError) {
 		error(500, entriesError.message);
 	}
+
+	// Phase 20 ("the field"): resolve each distinct field lot referenced by
+	// a swept row above — its own name/slug (to link to) and its own
+	// winning bid's bidder (who actually bought the pool). A second query
+	// rather than an embed: a self-referencing player_entries embed
+	// (field_entry_id -> player_entries.id) only ever resolves the reverse
+	// direction in PostgREST (confirmed directly against the live REST
+	// endpoint while building set-placement), never the forward direction
+	// this needs.
+	const fieldEntryIds = [
+		...new Set(
+			(entries ?? [])
+				.filter((e) => e.status === 'field' && e.field_entry_id)
+				.map((e) => e.field_entry_id as string)
+		)
+	];
+	const { data: fieldLots, error: fieldLotsError } =
+		fieldEntryIds.length > 0
+			? await supabase
+					.from('player_entries')
+					.select(
+						'id, players(slug, first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(bidder:users(id, first_name, last_name, email))'
+					)
+					.in('id', fieldEntryIds)
+			: { data: [], error: null };
+	if (fieldLotsError) {
+		error(500, fieldLotsError.message);
+	}
+	const fieldLotByEntryId = new Map(
+		(fieldLots ?? []).flatMap((lot) =>
+			lot.players
+				? [
+						[
+							lot.id,
+							{
+								slug: lot.players.slug,
+								name: `${lot.players.first_name} ${lot.players.last_name}`,
+								bidder: lot.winning_bid?.bidder ?? null
+							}
+						] as const
+					]
+				: []
+		)
+	);
 
 	const { data: payouts, error: payoutsError } = await supabase
 		.from('payouts')
@@ -91,12 +140,16 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 							division: entry.division,
 							// The .in('status', [...]) filter above already guarantees this
 							// at runtime — narrowed explicitly since Postgres/PostgREST's
-							// generated type is the full player_status enum, not the two
-							// values this query actually returns.
-							status: entry.status as 'sold_silent' | 'sold_live',
+							// generated type is the full player_status enum, not the
+							// three values this query actually returns.
+							status: entry.status as 'sold_silent' | 'sold_live' | 'field',
 							placement: entry.placement,
-							winning_bid: entry.winning_bid,
-							payout: payoutByEntryId.get(entry.id) ?? null
+							winning_bid: entry.status === 'field' ? null : entry.winning_bid,
+							payout: payoutByEntryId.get(entry.id) ?? null,
+							viaField:
+								entry.status === 'field' && entry.field_entry_id
+									? (fieldLotByEntryId.get(entry.field_entry_id) ?? null)
+									: null
 						}
 					]
 				: []

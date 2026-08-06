@@ -41,6 +41,16 @@
 // backlog's own callout for this task, since a Calcutta's whole premise
 // is those are often different people.
 //
+// Phase 20 ("the field"): a swept (status = 'field') entry has no winning
+// bid of its own — it was pooled into a group's field lot instead of ever
+// being individually sold — so its bidderId is resolved one hop through
+// field_entry_id's own winning bid instead. Multiple swept players placing
+// under the same field lot each still get their own Payout row (keyed on
+// their own entry_id), all crediting the same buyer; no special-casing
+// needed beyond that resolution, same upsert-per-entry shape as always. A
+// field lot itself is never directly placeable (it has no real golf score)
+// and is excluded outright via players.is_field.
+//
 // Pot is the sum of winning_bid_id-referenced bid amounts across every
 // sold_silent/sold_live player *in the same (flight, division) group*
 // (spec 4.8 plus the Phase 7.5 per-group scoping above), not just
@@ -187,7 +197,7 @@ export default {
         .supabaseAdmin
         .from("player_entries")
         .select(
-          "id, player_id, tournament_id, flight, division, status, placement, winning_bid_id, winning_bid:bids!player_entries_winning_bid_id_fkey(bidder_id)",
+          "id, player_id, tournament_id, flight, division, status, placement, winning_bid_id, field_entry_id, players(is_field), winning_bid:bids!player_entries_winning_bid_id_fkey(bidder_id)",
         )
         .in(
           "id",
@@ -256,6 +266,49 @@ export default {
         (acceptedBuybacks ?? []).map((b) => [b.entry_id, b]),
       );
 
+      // Field lots (Phase 20) targeted by any swept entry above, fetched as
+      // a second round trip rather than embedded on targetEntries directly
+      // — confirmed directly against PostgREST that a self-referencing FK
+      // hint (player_entries.field_entry_id -> player_entries.id) only
+      // ever resolves the reverse direction ("rows that point at me") no
+      // matter which embed hint syntax is used, never the forward
+      // direction ("the one row I point at") a swept entry actually needs.
+      const fieldEntryIds = [
+        ...new Set(
+          (targetEntries ?? [])
+            .filter((t) => t.status === "field" && t.field_entry_id)
+            .map((t) => t.field_entry_id as string),
+        ),
+      ];
+      const { data: fieldEntries, error: fieldEntriesError } = await ctx
+        .supabaseAdmin
+        .from("player_entries")
+        .select(
+          "id, winning_bid_id, winning_bid:bids!player_entries_winning_bid_id_fkey(bidder_id)",
+        )
+        .in(
+          "id",
+          fieldEntryIds.length > 0
+            ? fieldEntryIds
+            : ["00000000-0000-0000-0000-000000000000"],
+        );
+      if (fieldEntriesError) {
+        return Response.json({ error: fieldEntriesError.message }, {
+          status: 500,
+        });
+      }
+      const fieldEntryById = new Map(
+        (fieldEntries ?? []).map((fe) => [fe.id, fe]),
+      );
+
+      // Resolved once here, not re-derived inline later — a swept
+      // (status = 'field') entry's payout is credited to its field lot's
+      // winning bidder (Phase 20: "if any pooled player then finishes in a
+      // paid placement, the field's buyer collects that payout, same as
+      // if they'd bought that player outright"), not to any bid of its
+      // own (it never received one).
+      const bidderIdByEntryId = new Map<string, string>();
+
       for (const entry of placements) {
         const target = targetById.get(entry.entryId);
         if (!target || target.tournament_id !== tournamentId) {
@@ -264,20 +317,52 @@ export default {
             { status: 404 },
           );
         }
-        if (target.status !== "sold_silent" && target.status !== "sold_live") {
+        if (target.players?.is_field) {
+          return Response.json(
+            {
+              error:
+                `${entry.entryId} is a field lot and cannot be placed directly — place the individual players pooled into it instead`,
+            },
+            { status: 400 },
+          );
+        }
+        if (
+          target.status !== "sold_silent" && target.status !== "sold_live" &&
+          target.status !== "field"
+        ) {
           return Response.json(
             { error: `${entry.entryId} has not sold and cannot be placed` },
             { status: 400 },
           );
         }
-        if (!target.winning_bid_id || !target.winning_bid) {
-          return Response.json(
-            {
-              error:
-                `${entry.entryId} has no winning bid to compute a payout from`,
-            },
-            { status: 400 },
+        if (target.status === "field") {
+          const fieldEntry = target.field_entry_id
+            ? fieldEntryById.get(target.field_entry_id)
+            : undefined;
+          if (!fieldEntry?.winning_bid_id || !fieldEntry.winning_bid) {
+            return Response.json(
+              {
+                error:
+                  `${entry.entryId}'s field lot has not sold yet, so its players cannot be placed`,
+              },
+              { status: 400 },
+            );
+          }
+          bidderIdByEntryId.set(
+            entry.entryId,
+            fieldEntry.winning_bid.bidder_id,
           );
+        } else {
+          if (!target.winning_bid_id || !target.winning_bid) {
+            return Response.json(
+              {
+                error:
+                  `${entry.entryId} has no winning bid to compute a payout from`,
+              },
+              { status: 400 },
+            );
+          }
+          bidderIdByEntryId.set(entry.entryId, target.winning_bid.bidder_id);
         }
       }
 
@@ -444,7 +529,7 @@ export default {
         const rows = computeEntryPayoutRows({
           tournamentId,
           entryId: entry.entryId,
-          bidderId: target.winning_bid!.bidder_id,
+          bidderId: bidderIdByEntryId.get(entry.entryId)!,
           placement: entry.placement,
           potShare,
           pot,

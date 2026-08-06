@@ -27,11 +27,17 @@ export function playerStatusBadgeVariant(status: Enums<'player_status'>): BadgeV
 			return 'fairway';
 		case 'no_bid':
 			return 'sand';
+		case 'field':
+			return 'brass';
 		default:
 			return 'outline';
 	}
 }
 
+// A swept (Phase 20) entry drew zero silent bids and got pooled into its
+// group's field lot instead of dead-ending at no_bid — "In the field"
+// rather than a bare status name, since the plain enum value reads like
+// jargon without the context every other label already gives for free.
 export function playerStatusLabel(status: Enums<'player_status'>): string {
 	switch (status) {
 		case 'sold_silent':
@@ -40,6 +46,8 @@ export function playerStatusLabel(status: Enums<'player_status'>): string {
 			return 'Sold (live)';
 		case 'no_bid':
 			return 'No bid';
+		case 'field':
+			return 'In the field';
 		default:
 			return status.charAt(0).toUpperCase() + status.slice(1);
 	}
