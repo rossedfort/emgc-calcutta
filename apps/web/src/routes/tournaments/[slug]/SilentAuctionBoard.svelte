@@ -303,9 +303,13 @@
 	<div class="flex flex-col gap-4 md:hidden">
 		{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
 			<div class="flex flex-col gap-2">
-				<h3 class="font-data text-xs tracking-widest text-fairway uppercase">{group.label}</h3>
+				<h3
+					class="font-data sticky top-0 z-10 -mx-4 border-b border-brass/30 bg-background px-4 py-2 text-sm font-semibold tracking-widest text-fairway uppercase sm:-mx-8 sm:px-8"
+				>
+					{group.label}
+				</h3>
 				<div class="flex flex-col gap-3">
-					{#each players as player (player.id)}
+					{#each players as player, index (player.id)}
 						{@const high = currentHighBid(liveBids, player.id)}
 						{@const isYou = player.user_id === currentUserId}
 						<PlayerListCard
@@ -315,6 +319,7 @@
 							division={player.division}
 							{isYou}
 							handicap={formatHandicapIndex(player.handicap_index)}
+							position={index + 1}
 							statusLabel={playerStatusLabel(player.status)}
 							statusVariant={playerStatusBadgeVariant(player.status)}
 							reserved={player.status === 'reserved'}
