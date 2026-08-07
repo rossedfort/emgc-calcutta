@@ -183,7 +183,7 @@ export const actions: Actions = {
 
 		const { data: tournament } = await supabase
 			.from('tournaments')
-			.select('id')
+			.select('id, championship_flight')
 			.eq('slug', params.slug)
 			.maybeSingle();
 		if (!tournament) {
@@ -191,6 +191,134 @@ export const actions: Actions = {
 				errors: { form: 'Tournament not found' },
 				values: Object.fromEntries(formData)
 			});
+		}
+
+		const { data: player } = await supabase
+			.from('players')
+			.select('id, flight')
+			.eq('tournament_id', tournament.id)
+			.eq('slug', params.playerSlug)
+			.maybeSingle();
+		if (!player) {
+			return fail(404, {
+				errors: { form: 'Player not found' },
+				values: Object.fromEntries(formData)
+			});
+		}
+
+		// A flight edit that crosses in or out of the tournament's Championship
+		// flight changes how many player_entries rows this player has (one
+		// 'overall' entry <-> a 'gross'+'net' pair — spec 4.2), not just their
+		// denormalized flight text. players_sync_entries_flight only ever
+		// copies the new flight onto whatever entries already exist; it never
+		// re-derives division or splits/merges rows, so left alone this always
+		// trips player_entries' own division-vs-flight check trigger. Mirrors
+		// the gross/net-split derivation new/+page.server.ts and
+		// import-csv-confirm already use at creation time, just applied to an
+		// existing entry instead of a fresh insert.
+		const wasChampionship =
+			!!tournament.championship_flight && player.flight === tournament.championship_flight;
+		const willBeChampionship =
+			!!tournament.championship_flight && data.flight === tournament.championship_flight;
+
+		if (wasChampionship !== willBeChampionship) {
+			const { data: entries } = await supabase
+				.from('player_entries')
+				.select('id, division, status, placement')
+				.eq('player_id', player.id)
+				.order('division');
+			const entryIds = (entries ?? []).map((e) => e.id);
+
+			const { count: bidCount } = await supabase
+				.from('bids')
+				.select('id', { count: 'exact', head: true })
+				.in('entry_id', entryIds.length > 0 ? entryIds : ['00000000-0000-0000-0000-000000000000']);
+
+			const hasActivity =
+				(entries ?? []).some((e) => e.status !== 'open' || e.placement !== null) ||
+				(bidCount ?? 0) > 0;
+			if (hasActivity) {
+				return fail(400, {
+					errors: {
+						form: willBeChampionship
+							? "Can't move this player into the Championship flight — their entry already has bid activity. Remove any bids first."
+							: "Can't move this player out of the Championship flight — their Gross/Net entries already have bid activity. Remove any bids first."
+					},
+					values: Object.fromEntries(formData)
+				});
+			}
+
+			if (willBeChampionship) {
+				// One 'overall' entry becomes the 'gross' half in place, plus a
+				// new 'net' entry alongside it.
+				const [existing] = entries ?? [];
+				const { error: convertError } = await supabase
+					.from('player_entries')
+					.update({ flight: data.flight, division: 'gross' })
+					.eq('id', existing.id);
+				if (!convertError) {
+					const { error: insertError } = await supabase.from('player_entries').insert({
+						player_id: player.id,
+						tournament_id: tournament.id,
+						flight: data.flight,
+						division: 'net'
+					});
+					if (insertError) {
+						// Compensating rollback — put the entry back the way it was
+						// rather than leave a single 'gross' entry with no 'net' pair.
+						await supabase
+							.from('player_entries')
+							.update({ flight: player.flight, division: 'overall' })
+							.eq('id', existing.id);
+						return fail(400, {
+							errors: { form: insertError.message },
+							values: Object.fromEntries(formData)
+						});
+					}
+				} else {
+					return fail(400, {
+						errors: { form: convertError.message },
+						values: Object.fromEntries(formData)
+					});
+				}
+			} else {
+				// The 'gross' entry becomes the merged 'overall' entry; the 'net'
+				// entry is dropped.
+				const gross = (entries ?? []).find((e) => e.division === 'gross');
+				const net = (entries ?? []).find((e) => e.division === 'net');
+				if (gross && net) {
+					const { error: deleteError } = await supabase
+						.from('player_entries')
+						.delete()
+						.eq('id', net.id);
+					if (deleteError) {
+						return fail(400, {
+							errors: { form: deleteError.message },
+							values: Object.fromEntries(formData)
+						});
+					}
+					const { error: mergeError } = await supabase
+						.from('player_entries')
+						.update({ flight: data.flight, division: 'overall' })
+						.eq('id', gross.id);
+					if (mergeError) {
+						// Compensating rollback — restore the deleted 'net' entry
+						// rather than leave the golfer with only a 'gross' entry.
+						await supabase.from('player_entries').insert({
+							player_id: player.id,
+							tournament_id: tournament.id,
+							flight: player.flight,
+							division: 'net',
+							status: net.status,
+							placement: net.placement
+						});
+						return fail(400, {
+							errors: { form: mergeError.message },
+							values: Object.fromEntries(formData)
+						});
+					}
+				}
+			}
 		}
 
 		// Deliberately doesn't touch slug — like tournaments, a Player's slug
