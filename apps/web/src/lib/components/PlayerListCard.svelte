@@ -23,6 +23,7 @@
 		division,
 		isYou = false,
 		handicap,
+		position,
 		statusLabel,
 		statusVariant,
 		reserved = false,
@@ -34,6 +35,12 @@
 		division: string;
 		isYou?: boolean;
 		handicap: string;
+		// 1-indexed rank within the player's own (flight, division) group —
+		// undefined for a caller that hasn't grouped/sorted its list that way.
+		// The group is already sorted by handicap ascending wherever this is
+		// used, so this is just that sorted array's own index + 1, not a
+		// separate lookup.
+		position?: number;
 		// Undefined for a caller whose table never had a Status column either
 		// (TournamentRoster) — a card view shouldn't surface information the
 		// desktop table it mirrors doesn't already show.
@@ -57,6 +64,10 @@
 				<DivisionBadge {division} />
 				{#if isYou}
 					<Badge variant="brass">This is you</Badge>
+				{/if}
+				{#if position}
+					<span class="font-data text-xs text-ink/60">#{position} in flight</span>
+					<span class="text-ink/30">·</span>
 				{/if}
 				<span class="font-data text-xs text-ink/60">HCP {handicap}</span>
 			</div>

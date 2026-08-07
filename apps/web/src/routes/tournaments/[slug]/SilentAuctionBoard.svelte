@@ -213,99 +213,120 @@
 {#if filteredPlayers.length === 0}
 	<EmptyState title="No players match these filters" />
 {:else}
-	<Table.Root class="hidden md:table">
-		<Table.Header>
-			<Table.Row>
-				<Table.Head>Player</Table.Head>
-				<Table.Head>Handicap</Table.Head>
-				<Table.Head>Status</Table.Head>
-				<Table.Head>Current high</Table.Head>
-				<Table.Head>Bid</Table.Head>
-			</Table.Row>
-		</Table.Header>
-		<Table.Body>
-			{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
-				<Table.Row class="bg-sand/20 hover:bg-sand/20">
-					<Table.Cell colspan={5} class="font-data text-xs tracking-widest text-fairway uppercase">
-						{group.label}
-					</Table.Cell>
+	<!-- Table.Root's own wrapper div is `overflow-x-auto` (for wide-table
+	     safety) which, per the CSS overflow spec, forces its computed
+	     overflow-y to `auto` too even though only overflow-x was set — that
+	     turns the wrapper into a scroll-clipping ancestor of its own,
+	     silently breaking `position: sticky` for anything inside it (it
+	     sticks relative to that never-actually-scrolling wrapper instead of
+	     the page). Confirmed directly in-browser, not assumed: the sticky
+	     header simply didn't stick until this override. This table's columns
+	     are narrow enough not to need horizontal scroll protection at the
+	     md+ widths it's shown at, so overflow-visible here is safe. -->
+	<div class="[&_[data-slot=table-container]]:overflow-visible">
+		<Table.Root class="hidden md:table">
+			<Table.Header>
+				<Table.Row>
+					<Table.Head class="sticky top-0 z-20 w-12 bg-background">#</Table.Head>
+					<Table.Head class="sticky top-0 z-20 bg-background">Player</Table.Head>
+					<Table.Head class="sticky top-0 z-20 bg-background">Handicap</Table.Head>
+					<Table.Head class="sticky top-0 z-20 bg-background">Status</Table.Head>
+					<Table.Head class="sticky top-0 z-20 bg-background">Current high</Table.Head>
+					<Table.Head class="sticky top-0 z-20 bg-background">Bid</Table.Head>
 				</Table.Row>
-				{#each players as player (player.id)}
-					{@const high = currentHighBid(liveBids, player.id)}
-					{@const isYou = player.user_id === currentUserId}
-					<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
-						<Table.Cell class="font-medium text-ink">
-							<a
-								href={resolve('/tournaments/[slug]/players/[playerSlug]', {
-									slug: tournament.slug,
-									playerSlug: player.slug
-								})}
-								class="hover:underline">{formatPlayerName(player)}</a
-							>
-							<DivisionBadge division={player.division} />
-							{#if isYou}
-								<Badge variant="brass">This is you</Badge>
-							{/if}
-						</Table.Cell>
-						<Table.Cell class="font-data whitespace-nowrap"
-							>{formatHandicapIndex(player.handicap_index)}</Table.Cell
+			</Table.Header>
+			<Table.Body>
+				{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
+					<Table.Row class="bg-sand/20 hover:bg-sand/20">
+						<Table.Cell
+							colspan={6}
+							class="sticky top-8.5 z-10 bg-sand font-data text-xs tracking-widest text-fairway uppercase"
 						>
-						<Table.Cell class="whitespace-nowrap">
-							<Badge variant={playerStatusBadgeVariant(player.status)}>
-								{playerStatusLabel(player.status)}
-							</Badge>
-						</Table.Cell>
-						<Table.Cell class="font-data whitespace-nowrap">
-							{@render currentHigh(high)}
-						</Table.Cell>
-						<Table.Cell>
-							{#if player.status === 'open'}
-								<form
-									class="flex flex-col gap-2"
-									onsubmit={(event) => {
-										event.preventDefault();
-										placeBid(player.id);
-									}}
-								>
-									<div class="flex items-center gap-2">
-										<Input
-											type="number"
-											step="0.01"
-											min="0.01"
-											placeholder={suggestedBid(player.id).toFixed(2)}
-											bind:value={bidAmounts[player.id]}
-											disabled={bidPending[player.id]}
-											class="w-32 shrink-0"
-										/>
-										<Button
-											type="submit"
-											variant="brass"
-											disabled={bidPending[player.id]}
-											class="shrink-0"
-										>
-											Bid
-										</Button>
-									</div>
-									{#if bidErrors[player.id]}
-										<p class="text-xs text-flag">{bidErrors[player.id]}</p>
-									{/if}
-								</form>
-							{:else}
-								<p class="text-xs text-ink/60">Not open for bidding.</p>
-							{/if}
+							{group.label}
 						</Table.Cell>
 					</Table.Row>
+					{#each players as player, index (player.id)}
+						{@const high = currentHighBid(liveBids, player.id)}
+						{@const isYou = player.user_id === currentUserId}
+						<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
+							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								<a
+									href={resolve('/tournaments/[slug]/players/[playerSlug]', {
+										slug: tournament.slug,
+										playerSlug: player.slug
+									})}
+									class="hover:underline">{formatPlayerName(player)}</a
+								>
+								<DivisionBadge division={player.division} />
+								{#if isYou}
+									<Badge variant="brass">This is you</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="font-data whitespace-nowrap"
+								>{formatHandicapIndex(player.handicap_index)}</Table.Cell
+							>
+							<Table.Cell class="whitespace-nowrap">
+								<Badge variant={playerStatusBadgeVariant(player.status)}>
+									{playerStatusLabel(player.status)}
+								</Badge>
+							</Table.Cell>
+							<Table.Cell class="font-data whitespace-nowrap">
+								{@render currentHigh(high)}
+							</Table.Cell>
+							<Table.Cell>
+								{#if player.status === 'open'}
+									<form
+										class="flex flex-col gap-2"
+										onsubmit={(event) => {
+											event.preventDefault();
+											placeBid(player.id);
+										}}
+									>
+										<div class="flex items-center gap-2">
+											<Input
+												type="number"
+												step="0.01"
+												min="0.01"
+												placeholder={suggestedBid(player.id).toFixed(2)}
+												bind:value={bidAmounts[player.id]}
+												disabled={bidPending[player.id]}
+												class="w-32 shrink-0"
+											/>
+											<Button
+												type="submit"
+												variant="brass"
+												disabled={bidPending[player.id]}
+												class="shrink-0"
+											>
+												Bid
+											</Button>
+										</div>
+										{#if bidErrors[player.id]}
+											<p class="text-xs text-flag">{bidErrors[player.id]}</p>
+										{/if}
+									</form>
+								{:else}
+									<p class="text-xs text-ink/60">Not open for bidding.</p>
+								{/if}
+							</Table.Cell>
+						</Table.Row>
+					{/each}
 				{/each}
-			{/each}
-		</Table.Body>
-	</Table.Root>
+			</Table.Body>
+		</Table.Root>
+	</div>
 
 	<div class="flex flex-col gap-4 md:hidden">
 		{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
 			<div class="flex flex-col gap-2">
-				<h3 class="font-data text-xs tracking-widest text-fairway uppercase">{group.label}</h3>
+				<h3
+					class="font-data sticky top-0 z-10 -mx-4 border-b border-brass/30 bg-background px-4 py-2 text-sm font-semibold tracking-widest text-fairway uppercase sm:-mx-8 sm:px-8"
+				>
+					{group.label}
+				</h3>
 				<div class="flex flex-col gap-3">
-					{#each players as player (player.id)}
+					{#each players as player, index (player.id)}
 						{@const high = currentHighBid(liveBids, player.id)}
 						{@const isYou = player.user_id === currentUserId}
 						<PlayerListCard
@@ -315,6 +336,7 @@
 							division={player.division}
 							{isYou}
 							handicap={formatHandicapIndex(player.handicap_index)}
+							position={index + 1}
 							statusLabel={playerStatusLabel(player.status)}
 							statusVariant={playerStatusBadgeVariant(player.status)}
 							reserved={player.status === 'reserved'}
