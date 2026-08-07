@@ -47,55 +47,53 @@
 			{/snippet}
 		</EmptyState>
 	{:else}
-		<div class="max-w-3xl">
-			<Table.Root>
-				<Table.Header>
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					<Table.Head>Name</Table.Head>
+					<Table.Head>Kind</Table.Head>
+					<Table.Head>Status</Table.Head>
+					<Table.Head>Window</Table.Head>
+					<Table.Head>Actions</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each tournaments as tournament (tournament.id)}
 					<Table.Row>
-						<Table.Head>Name</Table.Head>
-						<Table.Head>Kind</Table.Head>
-						<Table.Head>Status</Table.Head>
-						<Table.Head>Window</Table.Head>
-						<Table.Head>Actions</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each tournaments as tournament (tournament.id)}
-						<Table.Row>
-							<Table.Cell class="font-medium text-ink">{tournament.name}</Table.Cell>
-							<Table.Cell class="whitespace-nowrap">
-								<Badge variant={kindBadgeVariant(tournament.kind)}>
-									{tournament.kind === 'dry_run' ? 'dry run' : 'production'}
-								</Badge>
-							</Table.Cell>
-							<Table.Cell class="whitespace-nowrap">
-								<Badge variant={statusBadgeVariant(tournament.status)}>{tournament.status}</Badge>
-							</Table.Cell>
-							<Table.Cell class="font-data text-sm whitespace-nowrap">
-								{formatWindow(tournament.silent_auction_start, tournament.silent_auction_end)}
-							</Table.Cell>
-							<Table.Cell class="flex flex-wrap items-center gap-2 whitespace-nowrap">
+						<Table.Cell class="font-medium text-ink">{tournament.name}</Table.Cell>
+						<Table.Cell class="whitespace-nowrap">
+							<Badge variant={kindBadgeVariant(tournament.kind)}>
+								{tournament.kind === 'dry_run' ? 'dry run' : 'production'}
+							</Badge>
+						</Table.Cell>
+						<Table.Cell class="whitespace-nowrap">
+							<Badge variant={statusBadgeVariant(tournament.status)}>{tournament.status}</Badge>
+						</Table.Cell>
+						<Table.Cell class="font-data text-sm whitespace-nowrap">
+							{formatWindow(tournament.silent_auction_start, tournament.silent_auction_end)}
+						</Table.Cell>
+						<Table.Cell class="flex flex-wrap items-center gap-2 whitespace-nowrap">
+							<Button
+								href={resolve('/admin/tournaments/[slug]', { slug: tournament.slug })}
+								variant="brass"
+								size="sm"
+							>
+								Manage
+							</Button>
+							{#if tournament.kind === 'dry_run'}
 								<Button
-									href={resolve('/admin/tournaments/[slug]', { slug: tournament.slug })}
-									variant="brass"
+									variant="destructive"
 									size="sm"
+									onclick={() => openDeleteDialog(tournament)}
 								>
-									Manage
+									Delete
 								</Button>
-								{#if tournament.kind === 'dry_run'}
-									<Button
-										variant="destructive"
-										size="sm"
-										onclick={() => openDeleteDialog(tournament)}
-									>
-										Delete
-									</Button>
-								{/if}
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		</div>
+							{/if}
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
 	{/if}
 </div>
 
