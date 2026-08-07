@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { navigating, page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -39,6 +39,7 @@
 		Boolean(
 			data.filters.participant ||
 			data.filters.player ||
+			data.filters.tournament ||
 			data.filters.action ||
 			data.filters.start ||
 			data.filters.end
@@ -69,16 +70,19 @@
 		liveEvents = [];
 	}
 
+	function startLive() {
+		liveEnabled = true;
+		rt = createAuditRealtime(data.supabase);
+		unsubEvents = rt.events.subscribe((events) => (liveEvents = events));
+		unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
+	}
+
 	function toggleLive() {
 		if (liveEnabled) {
 			stopLive();
 			return;
 		}
-
-		liveEnabled = true;
-		rt = createAuditRealtime(data.supabase);
-		unsubEvents = rt.events.subscribe((events) => (liveEvents = events));
-		unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
+		startLive();
 	}
 
 	// Submitting the filter form is a real navigation, not a client-side
@@ -91,6 +95,20 @@
 		}
 	});
 
+	// Live by default — this page is meant to be left open as a running feed,
+	// not something an Admin has to remember to switch on. Only client-side
+	// (onMount, not module-level state) since it opens a Realtime channel;
+	// skipped when the page loads with filters already applied (e.g. a
+	// bookmarked/shared filtered URL) — same "unfiltered view only" rule the
+	// toggle itself already enforces, checked once against the filters this
+	// page loaded with rather than reactively, so it can't fight a later
+	// filter change the effect above already handles.
+	onMount(() => {
+		if (!filtersActive) {
+			startLive();
+		}
+	});
+
 	onDestroy(() => rt?.destroy());
 
 	// New live events are already most-recent-first (auditRealtime.ts
@@ -99,7 +117,7 @@
 	// landed in the initial query and arrived as a live INSERT.
 	let displayedEvents = $derived.by(() => {
 		const liveIds = new Set(liveEvents.map((e) => e.id));
-		return [...liveEvents, ...data.events.filter((e) => !liveIds.has(e.id))].slice(0, 200);
+		return [...liveEvents, ...data.events.filter((e) => !liveIds.has(e.id))].slice(0, 100);
 	});
 
 	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -163,6 +181,16 @@
 				type="text"
 				name="player"
 				value={data.filters.player}
+				placeholder="Name"
+				disabled={isQuerying}
+			/>
+		</label>
+		<label class="flex flex-col gap-1 text-sm">
+			<span class="text-muted-foreground">Tournament</span>
+			<Input
+				type="text"
+				name="tournament"
+				value={data.filters.tournament}
 				placeholder="Name"
 				disabled={isQuerying}
 			/>
@@ -257,9 +285,9 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
-		{#if displayedEvents.length === 200}
+		{#if displayedEvents.length === 100}
 			<p class="text-xs text-muted-foreground">
-				Showing the 200 most recent matching events — narrow the filters to see older ones.
+				Showing the 100 most recent matching events — narrow the filters to see older ones.
 			</p>
 		{/if}
 	{/if}

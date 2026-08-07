@@ -11,7 +11,7 @@ import { parseAuditFilters, queryAuditEvents, type AuditFilters } from './shared
 export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 	const filters = parseAuditFilters(url);
 
-	const { data, error: queryError } = await queryAuditEvents(supabase, filters, { limit: 200 });
+	const { data, error: queryError } = await queryAuditEvents(supabase, filters, { limit: 100 });
 	if (queryError) {
 		error(500, queryError.message);
 	}
