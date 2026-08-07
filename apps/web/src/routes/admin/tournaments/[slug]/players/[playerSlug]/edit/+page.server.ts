@@ -234,9 +234,19 @@ export const actions: Actions = {
 				.select('id', { count: 'exact', head: true })
 				.in('entry_id', entryIds.length > 0 ? entryIds : ['00000000-0000-0000-0000-000000000000']);
 
+			// 'open', 'no_bid', and 'field' all mean zero bids were ever placed
+			// (a 'field' entry was auto-swept there by the silent-auction close
+			// job purely for having no bids at closing time, per the field-lot
+			// migration's own comment) — only 'reserved'/'sold_silent'/'sold_live'
+			// (or a set placement) reflect real bid activity worth protecting.
 			const hasActivity =
-				(entries ?? []).some((e) => e.status !== 'open' || e.placement !== null) ||
-				(bidCount ?? 0) > 0;
+				(entries ?? []).some(
+					(e) =>
+						e.status === 'reserved' ||
+						e.status === 'sold_silent' ||
+						e.status === 'sold_live' ||
+						e.placement !== null
+				) || (bidCount ?? 0) > 0;
 			if (hasActivity) {
 				return fail(400, {
 					errors: {
