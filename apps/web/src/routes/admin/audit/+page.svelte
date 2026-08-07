@@ -187,13 +187,17 @@
 		</label>
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-muted-foreground">Tournament</span>
-			<Input
-				type="text"
+			<select
 				name="tournament"
 				value={data.filters.tournament}
-				placeholder="Name"
 				disabled={isQuerying}
-			/>
+				class="rounded-md border border-input bg-background px-2 py-1.5 text-sm disabled:opacity-50"
+			>
+				<option value="">All</option>
+				{#each data.tournaments as tournament (tournament.id)}
+					<option value={tournament.id}>{tournament.name}</option>
+				{/each}
+			</select>
 		</label>
 		<label class="flex flex-col gap-1 text-sm">
 			<span class="text-muted-foreground">Action</span>

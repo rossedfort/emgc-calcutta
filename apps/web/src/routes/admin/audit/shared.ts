@@ -87,22 +87,9 @@ export async function queryAuditEvents(
 	}
 
 	if (filters.tournament) {
-		const { data: matchingTournaments, error: tournamentsError } = await supabase
-			.from('tournaments')
-			.select('id')
-			.ilike('name', `%${filters.tournament}%`);
-		if (tournamentsError) {
-			throw tournamentsError;
-		}
-		const ids = (matchingTournaments ?? []).map((t) => t.id);
-		// Same "filter down to an impossible id" reasoning as the player
-		// filter above — a tournament_id column also exists on plenty of
-		// non-tournament-scoped events (role_change, etc.), so an empty
-		// match set must exclude everything, not silently skip the filter.
-		query = query.in(
-			'tournament_id',
-			ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000']
-		);
+		// A select of known tournaments, not free text — exact id match, same
+		// reasoning as the Action dropdown above, no name lookup needed.
+		query = query.eq('tournament_id', filters.tournament);
 	}
 
 	return query;
