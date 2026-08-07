@@ -43,6 +43,7 @@
 			championship_flight: string | null;
 			threshold_amount: number;
 			min_increment: number;
+			minimum_bid: number;
 			bid_anonymity_enabled: boolean;
 		};
 		players: FieldPlayerRow[];
@@ -122,9 +123,12 @@
 		}));
 	}
 
+	// No bid yet on this entry: the floor is the tournament's minimum opening
+	// bid (place-bid's own `!highBid` branch, Phase 21), not min_increment —
+	// increment only governs beating an *existing* high bid.
 	function suggestedBid(entryId: string): number {
 		const high = currentHighBid(liveBids, entryId);
-		return high ? high.amount + tournament.min_increment : tournament.min_increment;
+		return high ? high.amount + tournament.min_increment : tournament.minimum_bid;
 	}
 
 	// The underlying <input type="number"> binds its value as a number (or
@@ -170,8 +174,10 @@
 </script>
 
 <p class="text-sm text-ink/70">
-	Bids of {formatCurrency(tournament.threshold_amount)} or more reserve a player for the live auction
-	— each new bid must beat the current high by at least {formatCurrency(tournament.min_increment)}.
+	The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
+		tournament.threshold_amount
+	)} or more reserve a player for the live auction — each new bid must beat the current high by at least
+	{formatCurrency(tournament.min_increment)}.
 </p>
 
 <div class="flex flex-wrap items-center gap-4 text-sm">

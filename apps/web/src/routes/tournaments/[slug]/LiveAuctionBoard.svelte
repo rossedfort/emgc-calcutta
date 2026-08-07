@@ -28,7 +28,7 @@
 		supabase,
 		now
 	}: {
-		tournament: { slug: string; min_increment: number };
+		tournament: { slug: string; min_increment: number; minimum_bid: number };
 		players: FieldPlayerRow[];
 		liveBids: RealtimeBid[];
 		liveLots: RealtimeLiveLot[];
@@ -82,10 +82,14 @@
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
 
+	// No bid yet on this lot (e.g. a field lot's very first bid): the floor
+	// is the tournament's minimum opening bid (place-bid's own `!highBid`
+	// branch, Phase 21), not min_increment — increment only governs beating
+	// an *existing* high bid.
 	function suggestedBid(): number {
 		return currentLotHigh
 			? currentLotHigh.amount + tournament.min_increment
-			: tournament.min_increment;
+			: tournament.minimum_bid;
 	}
 
 	// The underlying <input type="number"> binds its value as a number (or
