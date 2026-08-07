@@ -227,6 +227,7 @@
 		<Table.Root class="hidden md:table">
 			<Table.Header>
 				<Table.Row>
+					<Table.Head class="sticky top-0 z-20 w-12 bg-background">#</Table.Head>
 					<Table.Head class="sticky top-0 z-20 bg-background">Player</Table.Head>
 					<Table.Head class="sticky top-0 z-20 bg-background">Handicap</Table.Head>
 					<Table.Head class="sticky top-0 z-20 bg-background">Status</Table.Head>
@@ -238,16 +239,17 @@
 				{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
 					<Table.Row class="bg-sand/20 hover:bg-sand/20">
 						<Table.Cell
-							colspan={5}
+							colspan={6}
 							class="sticky top-8.5 z-10 bg-sand font-data text-xs tracking-widest text-fairway uppercase"
 						>
 							{group.label}
 						</Table.Cell>
 					</Table.Row>
-					{#each players as player (player.id)}
+					{#each players as player, index (player.id)}
 						{@const high = currentHighBid(liveBids, player.id)}
 						{@const isYou = player.user_id === currentUserId}
 						<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
+							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
 								<a
 									href={resolve('/tournaments/[slug]/players/[playerSlug]', {
