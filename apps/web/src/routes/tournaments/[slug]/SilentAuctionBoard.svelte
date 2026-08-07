@@ -239,7 +239,7 @@
 					<Table.Row class="bg-sand/20 hover:bg-sand/20">
 						<Table.Cell
 							colspan={5}
-							class="sticky top-[38px] z-10 bg-sand font-data text-xs tracking-widest text-fairway uppercase"
+							class="sticky top-8.5 z-10 bg-sand font-data text-xs tracking-widest text-fairway uppercase"
 						>
 							{group.label}
 						</Table.Cell>
