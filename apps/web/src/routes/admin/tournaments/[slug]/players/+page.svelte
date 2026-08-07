@@ -76,6 +76,13 @@
 			>
 				Import players
 			</Button>
+			<Button
+				href={resolve('/admin/tournaments/[slug]/players/export', { slug: data.tournament.slug })}
+				variant="outline"
+				size="sm"
+			>
+				Export CSV
+			</Button>
 		</div>
 	</div>
 
