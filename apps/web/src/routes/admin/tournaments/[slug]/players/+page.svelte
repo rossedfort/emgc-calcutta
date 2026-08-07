@@ -36,11 +36,25 @@
 	);
 
 	let groupedPlayers = $derived(groupPlayersByFlight(filteredPlayers, data.tournament.flights));
+
+	// Counts distinct golfers, not player_entries rows — a Championship-flight
+	// golfer has two entries (Gross + Net, see DivisionBadge) that would
+	// otherwise double-count them here. Reflects the current filters, same as
+	// the table itself, so the counts never disagree with what's on screen.
+	function distinctPlayerCount(players: { slug: string }[]): number {
+		return new Set(players.map((p) => p.slug)).size;
+	}
+
+	let totalPlayerCount = $derived(distinctPlayerCount(filteredPlayers));
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<div class="flex flex-wrap items-center gap-4 text-sm">
+			<p class="font-data text-ink/70">
+				{totalPlayerCount}
+				{totalPlayerCount === 1 ? 'player' : 'players'}
+			</p>
 			<MultiSelectFilter label="Status" options={statusOptions} bind:selected={statusFilters} />
 			{#if flightOptions.length > 0}
 				<MultiSelectFilter label="Flight" options={flightOptions} bind:selected={flightFilters} />
@@ -86,6 +100,7 @@
 							class="font-data text-xs tracking-widest text-fairway uppercase"
 						>
 							{group.label}
+							<span class="text-ink/50 normal-case">· {distinctPlayerCount(players)}</span>
 						</Table.Cell>
 					</Table.Row>
 					{#each players as player (player.id)}
