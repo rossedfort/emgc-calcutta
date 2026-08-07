@@ -11,9 +11,16 @@ import { parseAuditFilters, queryAuditEvents, type AuditFilters } from './shared
 export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 	const filters = parseAuditFilters(url);
 
-	const { data, error: queryError } = await queryAuditEvents(supabase, filters, { limit: 200 });
+	const [{ data, error: queryError }, { data: tournaments, error: tournamentsError }] =
+		await Promise.all([
+			queryAuditEvents(supabase, filters, { limit: 100 }),
+			supabase.from('tournaments').select('id, name').order('created_at', { ascending: false })
+		]);
 	if (queryError) {
 		error(500, queryError.message);
+	}
+	if (tournamentsError) {
+		error(500, tournamentsError.message);
 	}
 
 	const events: AuditEventRow[] = (data ?? []).map((row) => ({
@@ -31,6 +38,7 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 
 	return {
 		events,
+		tournaments: tournaments ?? [],
 		filters: filters satisfies AuditFilters,
 		title: 'Audit log · EMGC Bet',
 		description: 'Search and export the EMGC Bet admin audit trail.'

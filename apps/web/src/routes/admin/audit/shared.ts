@@ -5,6 +5,7 @@ import { localDateTimeToUtcIso } from '$lib/time';
 export interface AuditFilters {
 	participant: string;
 	player: string;
+	tournament: string;
 	action: string;
 	start: string;
 	end: string;
@@ -20,6 +21,7 @@ export function parseAuditFilters(url: URL): AuditFilters {
 	return {
 		participant: url.searchParams.get('participant')?.trim() ?? '',
 		player: url.searchParams.get('player')?.trim() ?? '',
+		tournament: url.searchParams.get('tournament')?.trim() ?? '',
 		action: url.searchParams.get('action')?.trim() ?? '',
 		start: url.searchParams.get('start') ?? '',
 		end: url.searchParams.get('end') ?? '',
@@ -82,6 +84,12 @@ export async function queryAuditEvents(
 		// No matches: filter down to an id that can never exist, rather than
 		// skipping the filter entirely (which would silently show everyone).
 		query = query.in('player_id', ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000']);
+	}
+
+	if (filters.tournament) {
+		// A select of known tournaments, not free text — exact id match, same
+		// reasoning as the Action dropdown above, no name lookup needed.
+		query = query.eq('tournament_id', filters.tournament);
 	}
 
 	return query;
