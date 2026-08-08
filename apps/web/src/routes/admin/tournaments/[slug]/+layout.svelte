@@ -1,23 +1,14 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { invalidateAll } from '$app/navigation';
 	import PageHeader from '$lib/components/PageHeader.svelte';
+	import TabNav from '$lib/components/TabNav.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import EnterResultsModal from '$lib/components/EnterResultsModal.svelte';
 
 	let { data, children } = $props();
 
 	let resultsModalOpen = $state(false);
-
-	function tabClass(href: string, exact: boolean): string {
-		const current = exact
-			? page.url.pathname === href
-			: page.url.pathname === href || page.url.pathname.startsWith(`${href}/`);
-		return current
-			? 'shrink-0 whitespace-nowrap border-b-2 border-brass px-1 pb-2 text-sm font-medium text-ink'
-			: 'shrink-0 whitespace-nowrap border-b-2 border-transparent px-1 pb-2 text-sm text-muted-foreground hover:text-ink';
-	}
 </script>
 
 <div class="flex flex-col gap-4">
@@ -42,48 +33,32 @@
 		onSuccess={() => invalidateAll()}
 	/>
 
-	<nav class="flex gap-4 overflow-x-auto border-b border-brass/30">
-		<a
-			href={resolve('/admin/tournaments/[slug]', { slug: data.tournament.slug })}
-			class={tabClass(resolve('/admin/tournaments/[slug]', { slug: data.tournament.slug }), true)}
-			>Settings</a
-		>
-		<a
-			href={resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug })}
-			class={tabClass(
-				resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug }),
-				false
-			)}>Players</a
-		>
-		<a
-			href={resolve('/admin/tournaments/[slug]/auction/queue', { slug: data.tournament.slug })}
-			class={tabClass(
-				resolve('/admin/tournaments/[slug]/auction/queue', { slug: data.tournament.slug }),
-				false
-			)}>Live auction queue</a
-		>
-		<a
-			href={resolve('/admin/tournaments/[slug]/auction/live', { slug: data.tournament.slug })}
-			class={tabClass(
-				resolve('/admin/tournaments/[slug]/auction/live', { slug: data.tournament.slug }),
-				false
-			)}>Live auction</a
-		>
-		<a
-			href={resolve('/admin/tournaments/[slug]/results', { slug: data.tournament.slug })}
-			class={tabClass(
-				resolve('/admin/tournaments/[slug]/results', { slug: data.tournament.slug }),
-				false
-			)}>Results</a
-		>
-		<a
-			href={resolve('/admin/tournaments/[slug]/bookkeeping', { slug: data.tournament.slug })}
-			class={tabClass(
-				resolve('/admin/tournaments/[slug]/bookkeeping', { slug: data.tournament.slug }),
-				false
-			)}>Bookkeeping</a
-		>
-	</nav>
+	<TabNav
+		tabs={[
+			{
+				href: resolve('/admin/tournaments/[slug]', { slug: data.tournament.slug }),
+				label: 'Settings',
+				exact: true
+			},
+			{
+				href: resolve('/admin/tournaments/[slug]/players', { slug: data.tournament.slug }),
+				label: 'Players'
+			},
+			{
+				href: resolve('/admin/tournaments/[slug]/auction/queue', { slug: data.tournament.slug }),
+				label: 'Auction',
+				match: `/admin/tournaments/${data.tournament.slug}/auction`
+			},
+			{
+				href: resolve('/admin/tournaments/[slug]/results', { slug: data.tournament.slug }),
+				label: 'Results'
+			},
+			{
+				href: resolve('/admin/tournaments/[slug]/bookkeeping', { slug: data.tournament.slug }),
+				label: 'Bookkeeping'
+			}
+		]}
+	/>
 
 	{@render children()}
 </div>
