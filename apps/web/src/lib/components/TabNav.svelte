@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 
 	// Route-navigation tab bar (plain <a> links, not a client-side panel
@@ -14,8 +13,7 @@
 	// exactly one sub-route (edit) it should stay highlighted for.
 	let {
 		tabs,
-		size = 'default',
-		trailing
+		size = 'default'
 	}: {
 		tabs: {
 			href: string;
@@ -25,11 +23,6 @@
 			matchPrefix?: string;
 		}[];
 		size?: 'default' | 'sub';
-		// Non-navigation content pinned to the end of the same row as the
-		// tabs — the tournament status banner on the primary bar, so it's
-		// visible regardless of which tab is active rather than living on
-		// just one of the pages underneath.
-		trailing?: Snippet;
 	} = $props();
 
 	function isActive(tab: (typeof tabs)[number]): boolean {
@@ -59,19 +52,12 @@
 </script>
 
 <nav
-	class="flex items-end justify-between gap-4 border-b {size === 'sub'
+	class="flex gap-4 overflow-x-auto border-b {size === 'sub'
 		? 'border-brass/20'
 		: 'border-brass/30'}"
 >
-	<div class="flex gap-4 overflow-x-auto">
-		{#each tabs as tab (tab.href)}
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- callers already build tab.href via resolve(); this component only ever receives typed routes, it just can't call resolve() itself since that needs a literal route id -->
-			<a href={tab.href} class={tabClass(tab)}>{tab.label}</a>
-		{/each}
-	</div>
-	{#if trailing}
-		<div class="flex shrink-0 items-center gap-2 {size === 'sub' ? 'pb-1.5' : 'pb-2'}">
-			{@render trailing()}
-		</div>
-	{/if}
+	{#each tabs as tab (tab.href)}
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- callers already build tab.href via resolve(); this component only ever receives typed routes, it just can't call resolve() itself since that needs a literal route id -->
+		<a href={tab.href} class={tabClass(tab)}>{tab.label}</a>
+	{/each}
 </nav>
