@@ -204,6 +204,8 @@
 		</span>
 		{#if high.bidder_name && !tournament.bid_anonymity_enabled}
 			<span class="ml-1 font-sans text-xs text-ink/60">({high.bidder_name})</span>
+		{:else if high.bidder_id === currentUserId}
+			<span class="ml-1 font-sans text-xs text-ink/60">(Your bid)</span>
 		{/if}
 	{:else}
 		-
