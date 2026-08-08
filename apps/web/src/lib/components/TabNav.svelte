@@ -59,7 +59,7 @@
 </script>
 
 <nav
-	class="flex items-center justify-between gap-4 border-b {size === 'sub'
+	class="flex items-end justify-between gap-4 border-b {size === 'sub'
 		? 'border-brass/20'
 		: 'border-brass/30'}"
 >
@@ -70,7 +70,7 @@
 		{/each}
 	</div>
 	{#if trailing}
-		<div class="flex shrink-0 items-center gap-2">
+		<div class="flex shrink-0 items-center gap-2 {size === 'sub' ? 'pb-1.5' : 'pb-2'}">
 			{@render trailing()}
 		</div>
 	{/if}
