@@ -59,9 +59,9 @@
 </script>
 
 <nav
-	class="flex items-end justify-between gap-4 border-b {size === 'sub'
+	class="flex flex-col gap-2 border-b {size === 'sub'
 		? 'border-brass/20'
-		: 'border-brass/30'}"
+		: 'border-brass/30'} sm:flex-row sm:items-end sm:justify-between sm:gap-4"
 >
 	<div class="flex gap-4 overflow-x-auto">
 		{#each tabs as tab (tab.href)}
@@ -70,7 +70,15 @@
 		{/each}
 	</div>
 	{#if trailing}
-		<div class="flex shrink-0 items-center gap-2 {size === 'sub' ? 'pb-1.5' : 'pb-2'}">
+		<!-- order-first: stacks above the tabs on narrow screens, so the
+		trailing content (e.g. the Live auction control) doesn't squeeze
+		the tabs' own horizontal scroll area for room; sm:order-none
+		restores DOM order (tabs first) once there's room to sit inline. -->
+		<div
+			class="order-first flex shrink-0 flex-wrap items-center gap-2 sm:order-none {size === 'sub'
+				? 'sm:pb-1.5'
+				: 'sm:pb-2'}"
+		>
 			{@render trailing()}
 		</div>
 	{/if}

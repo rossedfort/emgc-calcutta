@@ -88,19 +88,19 @@
 						Start live auction
 					</Button>
 				</form>
+				{#if !silentAuctionEnded}
+					<span class="text-xs text-ink/60">
+						Available once the silent auction ends ({new Date(
+							data.tournament.silent_auction_end
+						).toLocaleString()})
+					</span>
+				{/if}
+			{/if}
+			{#if page.form?.liveAuctionError}
+				<span class="text-xs text-destructive">{page.form.liveAuctionError}</span>
 			{/if}
 		{/snippet}
 	</TabNav>
-	{#if !data.tournament.live_auction_started_at && !silentAuctionEnded}
-		<p class="-mt-2 text-xs text-ink/60">
-			Live auction available once the silent auction ends ({new Date(
-				data.tournament.silent_auction_end
-			).toLocaleString()})
-		</p>
-	{/if}
-	{#if page.form?.liveAuctionError}
-		<p class="text-sm text-destructive">{page.form.liveAuctionError}</p>
-	{/if}
 
 	{@render children()}
 </div>
