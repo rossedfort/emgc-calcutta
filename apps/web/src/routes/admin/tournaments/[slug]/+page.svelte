@@ -1,58 +1,30 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import TournamentForm from '../TournamentForm.svelte';
-	import {
-		statusBadgeVariant,
-		type PayoutRow,
-		type Tournament,
-		type TournamentFormValues
-	} from '../shared';
+	import { statusBadgeVariant, type Tournament } from '../shared';
 
 	let { data, form } = $props();
 
 	const statuses: Tournament['status'][] = ['setup', 'active', 'complete'];
 
-	// datetime-local inputs want "YYYY-MM-DDTHH:mm" in the browser's local
-	// time, not toISOString()'s UTC — this app doesn't otherwise deal with
-	// multi-timezone concerns (spec assumes a single in-person league), so a
-	// straightforward local-time round-trip is enough for now.
-	function toLocalInput(iso: string) {
-		const d = new Date(iso);
-		const pad = (n: number) => String(n).padStart(2, '0');
-		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	function formatCurrency(amount: number): string {
+		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
 
-	let defaultValues = $derived<TournamentFormValues>({
-		name: data.tournament.name,
-		kind: data.tournament.kind,
-		silent_auction_start: toLocalInput(data.tournament.silent_auction_start),
-		silent_auction_end: toLocalInput(data.tournament.silent_auction_end),
-		threshold_amount: String(data.tournament.threshold_amount),
-		min_increment: String(data.tournament.min_increment),
-		minimum_bid: String(data.tournament.minimum_bid),
-		anti_snipe_seconds: String(data.tournament.anti_snipe_seconds),
-		championship_flight: data.tournament.championship_flight ?? '',
-		// Stored as a 0-1 fraction, shown as a whole-number percentage —
-		// same convention payout_structure's own rows already use.
-		buy_back_percentage:
-			data.tournament.buy_back_percentage !== null
-				? String(data.tournament.buy_back_percentage * 100)
-				: '',
-		event_start_at: data.tournament.event_start_at
-			? toLocalInput(data.tournament.event_start_at)
-			: '',
-		bid_anonymity_enabled: data.tournament.bid_anonymity_enabled
-	});
+	function formatPercent(fraction: number): string {
+		return `${Math.round(fraction * 100)}%`;
+	}
 
-	let defaultPayoutRows = $derived<PayoutRow[]>(
-		Object.entries(data.tournament.payout_structure).map(([place, percent]) => ({
-			place,
-			percent: String(percent * 100)
-		}))
+	let payoutPlaces = $derived(
+		Object.entries(data.tournament.payout_structure).sort(([a], [b]) => Number(a) - Number(b))
 	);
 </script>
+
+{#snippet sectionHeading(text: string)}
+	<h3 class="font-data text-xs tracking-widest text-fairway uppercase">{text}</h3>
+{/snippet}
 
 <div class="flex max-w-3xl flex-col gap-4 pt-4">
 	<div class="flex flex-col gap-2">
@@ -74,48 +46,102 @@
 		{/if}
 	</div>
 
-	<div class="flex flex-col gap-2 rounded-lg border border-brass/30 bg-scorecard p-4">
-		<span class="text-sm text-muted-foreground">Live auction</span>
-		{#if data.tournament.live_auction_started_at}
-			<div class="flex items-center gap-2">
-				<Badge variant="fairway">Started</Badge>
-				<span class="text-sm text-ink/70">
-					{new Date(data.tournament.live_auction_started_at).toLocaleString()}
-				</span>
-			</div>
-		{:else}
-			<div class="flex items-center gap-2">
-				<form method="POST" action="?/startLiveAuction" use:enhance>
-					<Button
-						type="submit"
-						variant="brass"
-						size="sm"
-						disabled={new Date(data.tournament.silent_auction_end) > new Date()}
-					>
-						Start live auction
-					</Button>
-				</form>
-				{#if new Date(data.tournament.silent_auction_end) > new Date()}
-					<span class="text-xs text-ink/60">
-						Available once the silent auction ends ({new Date(
-							data.tournament.silent_auction_end
-						).toLocaleString()})
-					</span>
-				{/if}
-			</div>
-		{/if}
-		{#if form?.liveAuctionError}
-			<p class="text-sm text-destructive">{form.liveAuctionError}</p>
-		{/if}
-	</div>
+	<div class="flex flex-col gap-8 border-t border-brass/20 pt-6">
+		<div class="flex items-center justify-between">
+			<h2 class="font-display text-lg font-semibold text-ink">Tournament configuration</h2>
+			<Button
+				href={resolve('/admin/tournaments/[slug]/edit', { slug: data.tournament.slug })}
+				variant="brass"
+				size="sm"
+			>
+				Edit
+			</Button>
+		</div>
 
-	<form method="POST" action="?/updateSettings" use:enhance>
-		<TournamentForm
-			values={(form?.values as TournamentFormValues | undefined) ?? defaultValues}
-			payoutRows={defaultPayoutRows}
-			flights={data.tournament.flights}
-			errors={form?.errors ?? {}}
-			submitLabel="Save changes"
-		/>
-	</form>
+		<div class="flex flex-col gap-4">
+			{@render sectionHeading('Basics')}
+			<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+				<dt class="text-ink/60">Name</dt>
+				<dd>{data.tournament.name}</dd>
+				<dt class="text-ink/60">Type</dt>
+				<dd>{data.tournament.kind === 'dry_run' ? 'Dry run' : 'Production'}</dd>
+			</dl>
+		</div>
+
+		<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+			{@render sectionHeading('Auction settings')}
+			<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+				<dt class="text-ink/60">Silent auction start</dt>
+				<dd class="font-data">
+					{new Date(data.tournament.silent_auction_start).toLocaleString()}
+				</dd>
+				<dt class="text-ink/60">Silent auction end</dt>
+				<dd class="font-data">{new Date(data.tournament.silent_auction_end).toLocaleString()}</dd>
+				<dt class="text-ink/60">Reservation threshold</dt>
+				<dd class="font-data">{formatCurrency(data.tournament.threshold_amount)}</dd>
+				<dt class="text-ink/60">Minimum bid increment</dt>
+				<dd class="font-data">{formatCurrency(data.tournament.min_increment)}</dd>
+				<dt class="text-ink/60">Minimum opening bid</dt>
+				<dd class="font-data">{formatCurrency(data.tournament.minimum_bid)}</dd>
+				<dt class="text-ink/60">Anti-snipe window</dt>
+				<dd class="font-data">{data.tournament.anti_snipe_seconds}s</dd>
+				<dt class="text-ink/60">Hide bidder names</dt>
+				<dd>{data.tournament.bid_anonymity_enabled ? 'Yes' : 'No'}</dd>
+			</dl>
+		</div>
+
+		<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+			{@render sectionHeading('Buy-back')}
+			<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+				<dt class="text-ink/60">Buy-back percentage</dt>
+				<dd>
+					{data.tournament.buy_back_percentage !== null
+						? formatPercent(data.tournament.buy_back_percentage)
+						: 'Not enabled'}
+				</dd>
+				<dt class="text-ink/60">Tournament start</dt>
+				<dd class="font-data">
+					{data.tournament.event_start_at
+						? new Date(data.tournament.event_start_at).toLocaleString()
+						: 'No cutoff'}
+				</dd>
+			</dl>
+		</div>
+
+		<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+			{@render sectionHeading('Flights')}
+			{#if data.tournament.flights.length > 0}
+				<ol class="flex flex-col gap-1 text-sm">
+					{#each data.tournament.flights as flight (flight)}
+						<li>
+							{flight}
+							{#if flight === data.tournament.championship_flight}
+								<Badge variant="brass" class="ml-2">Championship</Badge>
+							{/if}
+						</li>
+					{/each}
+				</ol>
+			{:else}
+				<p class="text-sm text-muted-foreground">
+					No flights configured — every player is in one group.
+				</p>
+			{/if}
+		</div>
+
+		<div class="flex flex-col gap-4 border-t border-brass/20 pt-6">
+			{@render sectionHeading('Payout structure')}
+			{#if payoutPlaces.length > 0}
+				<dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+					{#each payoutPlaces as [place, percent] (place)}
+						<dt class="text-ink/60">Place {place}</dt>
+						<dd class="font-data">{formatPercent(percent)}</dd>
+					{/each}
+				</dl>
+			{:else}
+				<p class="text-sm text-muted-foreground">
+					Not configured yet — can be finalized before results are entered.
+				</p>
+			{/if}
+		</div>
+	</div>
 </div>
