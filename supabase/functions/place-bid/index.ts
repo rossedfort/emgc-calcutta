@@ -241,13 +241,49 @@ export default {
         });
       }
 
-      if (highBid && body.amount < highBid.amount + tournament.min_increment) {
-        const minimum = highBid.amount + tournament.min_increment;
-        return Response.json({
-          error: `Bid must be at least $${minimum.toFixed(2)} (current high $${
-            highBid.amount.toFixed(2)
-          } + $${tournament.min_increment.toFixed(2)} minimum increment)`,
-        }, { status: 400 });
+      if (highBid) {
+        const standardMinimum = highBid.amount + tournament.min_increment;
+
+        // Dead-zone fix (reported directly against production): the
+        // threshold cap below rejects any silent bid over
+        // threshold_amount, but the increment floor here normally
+        // requires current high + min_increment — whenever that sum
+        // exceeds the threshold (e.g. current high $95, increment $10,
+        // threshold $100 -> $105 required but $100 is the most a silent
+        // bid can ever be), no legal bid amount exists and the entry gets
+        // stuck below threshold forever. Relax the increment specifically
+        // in that zone: any amount strictly above the current high is
+        // accepted (still capped at the threshold by the check below),
+        // rather than requiring the full increment. This re-evaluates on
+        // every bid, so it keeps relaxing for as long as the entry stays
+        // in the dead zone and reverts to the normal full-increment rule
+        // the moment a bid reaches the threshold (crossing it, per the
+        // check below) or the standard minimum no longer overshoots it.
+        // Live bids have no ceiling, so this dead zone can't occur there.
+        const nearThreshold = phase === "silent" &&
+          standardMinimum > tournament.threshold_amount;
+
+        if (
+          nearThreshold
+            ? body.amount <= highBid.amount
+            : body.amount < standardMinimum
+        ) {
+          return Response.json({
+            error: nearThreshold
+              ? `Bid must be more than the current high of $${
+                highBid.amount.toFixed(2)
+              } (the usual $${
+                tournament.min_increment.toFixed(2)
+              } minimum increment is relaxed this close to the $${
+                tournament.threshold_amount.toFixed(2)
+              } reservation threshold)`
+              : `Bid must be at least $${
+                standardMinimum.toFixed(2)
+              } (current high $${highBid.amount.toFixed(2)} + $${
+                tournament.min_increment.toFixed(2)
+              } minimum increment)`,
+          }, { status: 400 });
+        }
       }
 
       // Phase 21: a floor on the very first bid an entry ever receives —
