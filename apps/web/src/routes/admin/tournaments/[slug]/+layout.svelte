@@ -74,33 +74,33 @@
 				label: 'Bookkeeping'
 			}
 		]}
-	>
-		{#snippet trailing()}
-			<span class="text-sm text-muted-foreground">Live auction</span>
-			{#if data.tournament.live_auction_started_at}
-				<Badge variant="fairway">Started</Badge>
-				<span class="text-sm text-ink/70">
-					{new Date(data.tournament.live_auction_started_at).toLocaleString()}
+	/>
+
+	<div class="flex flex-wrap items-center gap-2">
+		<span class="text-sm text-muted-foreground">Live auction</span>
+		{#if data.tournament.live_auction_started_at}
+			<Badge variant="fairway">Started</Badge>
+			<span class="text-sm text-ink/70">
+				{new Date(data.tournament.live_auction_started_at).toLocaleString()}
+			</span>
+		{:else}
+			<form method="POST" action="{settingsPath}?/startLiveAuction" use:enhance>
+				<Button type="submit" variant="brass" size="sm" disabled={!silentAuctionEnded}>
+					Start live auction
+				</Button>
+			</form>
+			{#if !silentAuctionEnded}
+				<span class="text-xs text-ink/60">
+					Available once the silent auction ends ({new Date(
+						data.tournament.silent_auction_end
+					).toLocaleString()})
 				</span>
-			{:else}
-				<form method="POST" action="{settingsPath}?/startLiveAuction" use:enhance>
-					<Button type="submit" variant="brass" size="sm" disabled={!silentAuctionEnded}>
-						Start live auction
-					</Button>
-				</form>
-				{#if !silentAuctionEnded}
-					<span class="text-xs text-ink/60">
-						Available once the silent auction ends ({new Date(
-							data.tournament.silent_auction_end
-						).toLocaleString()})
-					</span>
-				{/if}
 			{/if}
-			{#if page.form?.liveAuctionError}
-				<span class="text-xs text-destructive">{page.form.liveAuctionError}</span>
-			{/if}
-		{/snippet}
-	</TabNav>
+		{/if}
+		{#if page.form?.liveAuctionError}
+			<span class="text-sm text-destructive">{page.form.liveAuctionError}</span>
+		{/if}
+	</div>
 
 	{@render children()}
 </div>

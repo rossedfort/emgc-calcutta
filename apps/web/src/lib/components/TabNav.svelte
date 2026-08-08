@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 
 	// Route-navigation tab bar (plain <a> links, not a client-side panel
@@ -14,8 +13,7 @@
 	// exactly one sub-route (edit) it should stay highlighted for.
 	let {
 		tabs,
-		size = 'default',
-		trailing
+		size = 'default'
 	}: {
 		tabs: {
 			href: string;
@@ -25,11 +23,6 @@
 			matchPrefix?: string;
 		}[];
 		size?: 'default' | 'sub';
-		// Non-navigation content pinned to the end of the same row as the
-		// tabs — the tournament status banner on the primary bar, so it's
-		// visible regardless of which tab is active rather than living on
-		// just one of the pages underneath.
-		trailing?: Snippet;
 	} = $props();
 
 	function isActive(tab: (typeof tabs)[number]): boolean {
@@ -59,27 +52,12 @@
 </script>
 
 <nav
-	class="flex flex-col gap-2 border-b {size === 'sub'
+	class="flex gap-4 overflow-x-auto border-b {size === 'sub'
 		? 'border-brass/20'
-		: 'border-brass/30'} sm:flex-row sm:items-end sm:justify-between sm:gap-4"
+		: 'border-brass/30'}"
 >
-	<div class="flex gap-4 overflow-x-auto">
-		{#each tabs as tab (tab.href)}
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- callers already build tab.href via resolve(); this component only ever receives typed routes, it just can't call resolve() itself since that needs a literal route id -->
-			<a href={tab.href} class={tabClass(tab)}>{tab.label}</a>
-		{/each}
-	</div>
-	{#if trailing}
-		<!-- order-first: stacks above the tabs on narrow screens, so the
-		trailing content (e.g. the Live auction control) doesn't squeeze
-		the tabs' own horizontal scroll area for room; sm:order-none
-		restores DOM order (tabs first) once there's room to sit inline. -->
-		<div
-			class="order-first flex shrink-0 flex-wrap items-center gap-2 sm:order-none {size === 'sub'
-				? 'sm:pb-1.5'
-				: 'sm:pb-2'}"
-		>
-			{@render trailing()}
-		</div>
-	{/if}
+	{#each tabs as tab (tab.href)}
+		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- callers already build tab.href via resolve(); this component only ever receives typed routes, it just can't call resolve() itself since that needs a literal route id -->
+		<a href={tab.href} class={tabClass(tab)}>{tab.label}</a>
+	{/each}
 </nav>
