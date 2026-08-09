@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
-	import { onMount } from 'svelte';
 	import type {
 		Database,
 		ErrorResponse,
@@ -63,15 +62,23 @@
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
 
-	// Stays false through this component's first render, then flips once and
-	// for all — used so a player's reels only spin in from zero when their
-	// first-ever bid arrives live (a real "no bid" -> "has a bid" transition
-	// witnessed on an already-open board), not when the page simply loads on
-	// a player who already had a bid (that should snap straight to the
-	// current value, no animation).
+	// Stays false until bidsReady's *first* true render has actually
+	// committed, then flips once and for all — used so a player's reels
+	// only spin in from zero when their first-ever bid arrives live (a real
+	// "no bid" -> "has a bid" transition witnessed on an already-open
+	// board), not when the page simply loads on a player who already had a
+	// bid (that should snap straight to the current value, no animation).
+	// Previously this flipped on onMount instead, which fires long before
+	// bidsReady ever does — every cell's very first population of an
+	// existing bid was therefore (mis)treated as a live "just placed"
+	// event and spun in, all at once, right as the loading skeletons
+	// cleared (reported directly as page "jitter"). A $effect fixes this
+	// because Svelte always runs it *after* the render it reacts to has
+	// committed — so the same render that first shows real digits for
+	// bidsReady=true still sees the old (false) value here.
 	let pastInitialLoad = $state(false);
-	onMount(() => {
-		pastInitialLoad = true;
+	$effect(() => {
+		if (bidsReady) pastInitialLoad = true;
 	});
 
 	let searchQuery = $state('');
