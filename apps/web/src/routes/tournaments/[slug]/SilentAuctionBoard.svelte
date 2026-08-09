@@ -148,33 +148,6 @@
 
 	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
 
-	// Collapses a Championship flight's separate Gross/Net pot groups back
-	// into a single box (rendered below as one row, with two labeled
-	// amounts, rather than two separate rows) — Championship should read as
-	// one flight in this summary, same as every other flight. The
-	// player-list sections above intentionally keep Gross/Net as fully
-	// separate sections (own bids, own "current high" — see groupedPlayers'
-	// own comment); this merge is purely cosmetic, for this summary table
-	// only. Relies on deriveFlightDivisionGroups always emitting a flight's
-	// 'gross' group immediately before its 'net' group.
-	let potBoxes = $derived.by(() => {
-		const boxes: { flight: string; label: string; lines: { label: string; total: number }[] }[] =
-			[];
-		for (const { group, total } of potGroups) {
-			const prev = boxes[boxes.length - 1];
-			if (group.division === 'net' && prev && prev.flight === group.flight) {
-				prev.lines.push({ label: 'Net', total });
-				continue;
-			}
-			boxes.push({
-				flight: group.flight,
-				label: group.division === 'gross' ? group.flight : group.label,
-				lines: [{ label: group.division === 'gross' ? 'Gross' : '', total }]
-			});
-		}
-		return boxes;
-	});
-
 	// Splits a formatted amount ("$1,850.00") into characters for the
 	// slot-machine effect, each keyed by distance from the *end* of the
 	// string rather than the start — bid amounts only ever grow (a bid must
@@ -250,10 +223,15 @@
 		{formatCurrency(tournament.min_increment)}.
 	</p>
 
-	{#if potBoxes.length > 1}
-		<!-- One row per flight (Championship — its Gross/Net already merged
-		     into a single box, see potBoxes' own comment — stays one row too,
-		     not two) rather than one column per flight: with enough flights
+	{#if potGroups.length > 1}
+		<!-- One row per (flight, division) group — the Championship flight's
+		     Gross and Net stay two fully separate rows here too (own label,
+		     own amount), not merged into one shared row, matching how the
+		     player-list sections below already keep them as two independent
+		     auction pools rather than one flight with an inline badge (user
+		     feedback: an earlier version of this table merged them into a
+		     single two-line row, which read as one pot when they're actually
+		     two). Rather than one column per flight: with enough flights
 		     configured, a wide column-per-flight grid ran off the side of
 		     narrower screens instead of just growing taller. The total (shown
 		     as its own line above when there's no breakdown table to anchor
@@ -270,40 +248,21 @@
 		<Table.Root class="table-fixed">
 			<Table.Header>
 				<Table.Row>
-					<Table.Head class="w-48">Flight</Table.Head>
+					<Table.Head class="w-1/2">Flight</Table.Head>
 					<Table.Head>Pot</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each potBoxes as box (box.flight)}
+				{#each potGroups as { group, total } (`${group.flight}::${group.division}`)}
 					<Table.Row>
 						<Table.Cell
 							class="font-data text-xs tracking-widest text-fairway uppercase whitespace-nowrap"
 						>
-							{box.label}
+							{group.label}
 						</Table.Cell>
 						<Table.Cell class="font-data whitespace-nowrap">
-							{#if box.lines.length > 1}
-								<!-- Same wrapper/label markup whether or not bidsReady — only the
-								     amount itself swaps for a skeleton — so a box's line count
-								     (known up front from tournament.flights, independent of bids)
-								     keeps this cell's height identical across the transition. -->
-								<div class="flex flex-col gap-0.5">
-									{#each box.lines as line (line.label)}
-										<div class="flex items-baseline gap-2">
-											<span class="text-[0.6rem] tracking-wider text-ink/50 uppercase"
-												>{line.label}</span
-											>
-											{#if bidsReady}
-												<span>{formatCurrency(line.total)}</span>
-											{:else}
-												<Skeleton class="h-5 w-14" />
-											{/if}
-										</div>
-									{/each}
-								</div>
-							{:else if bidsReady}
-								{formatCurrency(box.lines[0].total)}
+							{#if bidsReady}
+								{formatCurrency(total)}
 							{:else}
 								<Skeleton class="h-5 w-16" />
 							{/if}
