@@ -134,16 +134,33 @@
 
 	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
 
-	// Caps at 4 per row (matching the homepage's own stat-grid precedent)
-	// but never wider than the actual number of groups, so e.g. exactly 3
-	// flights doesn't leave an empty tinted cell trailing in a 4-wide row.
-	let potGridColsClass = $derived(
-		potGroups.length >= 4
-			? 'sm:grid-cols-4'
-			: potGroups.length === 3
-				? 'sm:grid-cols-3'
-				: 'sm:grid-cols-2'
-	);
+	// Collapses a Championship flight's separate Gross/Net pot groups back
+	// into a single box (two labeled lines instead of two boxes) — with 4
+	// regular flights already filling a 4-wide row, Championship's extra
+	// division split pushed the box count to 5 and stranded one lonely box
+	// on its own second row (reported directly, screenshot of a 5-flight
+	// tournament). The player-list sections above intentionally keep
+	// Gross/Net as fully separate sections (own bids, own "current high" —
+	// see groupedPlayers' own comment); this merge is purely cosmetic, for
+	// this summary grid only. Relies on deriveFlightDivisionGroups always
+	// emitting a flight's 'gross' group immediately before its 'net' group.
+	let potBoxes = $derived.by(() => {
+		const boxes: { flight: string; label: string; lines: { label: string; total: number }[] }[] =
+			[];
+		for (const { group, total } of potGroups) {
+			const prev = boxes[boxes.length - 1];
+			if (group.division === 'net' && prev && prev.flight === group.flight) {
+				prev.lines.push({ label: 'Net', total });
+				continue;
+			}
+			boxes.push({
+				flight: group.flight,
+				label: group.division === 'gross' ? group.flight : group.label,
+				lines: [{ label: group.division === 'gross' ? 'Gross' : '', total }]
+			});
+		}
+		return boxes;
+	});
 
 	// Splits a formatted amount ("$1,850.00") into characters for the
 	// slot-machine effect, each keyed by distance from the *end* of the
@@ -217,19 +234,38 @@
 		<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Total pot</span>
 		<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
 	</div>
-	{#if potGroups.length > 1}
-		<div
-			class="grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40 {potGridColsClass}"
-		>
-			{#each potGroups as { group, total } (`${group.flight}::${group.division}`)}
-				<div class="flex flex-col gap-1 bg-scorecard p-3">
-					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase"
-						>{group.label}</span
-					>
-					<span class="font-data text-sm text-ink">{formatCurrency(total)}</span>
-				</div>
-			{/each}
-		</div>
+	{#if potBoxes.length > 1}
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					{#each potBoxes as box, i (i)}
+						<Table.Head>{box.label}</Table.Head>
+					{/each}
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				<Table.Row>
+					{#each potBoxes as box, i (i)}
+						<Table.Cell class="font-data">
+							{#if box.lines.length > 1}
+								<div class="flex flex-col gap-0.5">
+									{#each box.lines as line (line.label)}
+										<div class="flex items-baseline gap-2">
+											<span class="text-[0.6rem] tracking-wider text-ink/50 uppercase"
+												>{line.label}</span
+											>
+											<span>{formatCurrency(line.total)}</span>
+										</div>
+									{/each}
+								</div>
+							{:else}
+								{formatCurrency(box.lines[0].total)}
+							{/if}
+						</Table.Cell>
+					{/each}
+				</Table.Row>
+			</Table.Body>
+		</Table.Root>
 	{/if}
 </div>
 
