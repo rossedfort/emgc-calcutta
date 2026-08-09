@@ -149,15 +149,14 @@
 	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
 
 	// Collapses a Championship flight's separate Gross/Net pot groups back
-	// into a single box (two labeled lines instead of two boxes) — with 4
-	// regular flights already filling a 4-wide row, Championship's extra
-	// division split pushed the box count to 5 and stranded one lonely box
-	// on its own second row (reported directly, screenshot of a 5-flight
-	// tournament). The player-list sections above intentionally keep
-	// Gross/Net as fully separate sections (own bids, own "current high" —
-	// see groupedPlayers' own comment); this merge is purely cosmetic, for
-	// this summary grid only. Relies on deriveFlightDivisionGroups always
-	// emitting a flight's 'gross' group immediately before its 'net' group.
+	// into a single box (rendered below as one row, with two labeled
+	// amounts, rather than two separate rows) — Championship should read as
+	// one flight in this summary, same as every other flight. The
+	// player-list sections above intentionally keep Gross/Net as fully
+	// separate sections (own bids, own "current high" — see groupedPlayers'
+	// own comment); this merge is purely cosmetic, for this summary table
+	// only. Relies on deriveFlightDivisionGroups always emitting a flight's
+	// 'gross' group immediately before its 'net' group.
 	let potBoxes = $derived.by(() => {
 		const boxes: { flight: string; label: string; lines: { label: string; total: number }[] }[] =
 			[];
@@ -244,28 +243,28 @@
 </script>
 
 <div class="flex flex-col gap-2">
-	<div class="flex items-baseline justify-between">
-		<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Total pot</span>
-		{#if bidsReady}
-			<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
-		{:else}
-			<!-- h-7 matches text-lg's own line-height (1.75rem) so this doesn't
-			     change the row's height once the real value swaps in. -->
-			<Skeleton class="h-7 w-24" />
-		{/if}
-	</div>
 	{#if potBoxes.length > 1}
+		<!-- One row per flight (Championship — its Gross/Net already merged
+		     into a single box, see potBoxes' own comment — stays one row too,
+		     not two) rather than one column per flight: with enough flights
+		     configured, a wide column-per-flight grid ran off the side of
+		     narrower screens instead of just growing taller. The total (shown
+		     as its own line above when there's no breakdown table to anchor
+		     it to — see the else branch below) lives in this table's own
+		     footer row instead, once there's a breakdown to total up. -->
 		<Table.Root>
 			<Table.Header>
 				<Table.Row>
-					{#each potBoxes as box, i (i)}
-						<Table.Head>{box.label}</Table.Head>
-					{/each}
+					<Table.Head>Flight</Table.Head>
+					<Table.Head>Pot</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				<Table.Row>
-					{#each potBoxes as box, i (i)}
+				{#each potBoxes as box (box.flight)}
+					<Table.Row>
+						<Table.Cell class="font-data text-xs tracking-widest text-fairway uppercase">
+							{box.label}
+						</Table.Cell>
 						<Table.Cell class="font-data">
 							{#if box.lines.length > 1}
 								<!-- Same wrapper/label markup whether or not bidsReady — only the
@@ -292,10 +291,37 @@
 								<Skeleton class="h-5 w-16" />
 							{/if}
 						</Table.Cell>
-					{/each}
-				</Table.Row>
+					</Table.Row>
+				{/each}
 			</Table.Body>
+			<Table.Footer>
+				<Table.Row class="bg-sand/60">
+					<Table.Cell
+						class="font-data text-xs font-semibold tracking-widest text-fairway uppercase"
+					>
+						Total
+					</Table.Cell>
+					<Table.Cell class="font-data font-semibold text-ink">
+						{#if bidsReady}
+							{formatCurrency(totalPot)}
+						{:else}
+							<Skeleton class="h-5 w-24" />
+						{/if}
+					</Table.Cell>
+				</Table.Row>
+			</Table.Footer>
 		</Table.Root>
+	{:else}
+		<div class="flex items-baseline justify-between">
+			<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Total pot</span>
+			{#if bidsReady}
+				<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
+			{:else}
+				<!-- h-7 matches text-lg's own line-height (1.75rem) so this doesn't
+				     change the row's height once the real value swaps in. -->
+				<Skeleton class="h-7 w-24" />
+			{/if}
+		</div>
 	{/if}
 </div>
 
