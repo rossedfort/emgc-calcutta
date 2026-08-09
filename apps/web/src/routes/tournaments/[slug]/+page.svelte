@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 	import type {
 		RealtimeBid,
 		RealtimeLiveLot,
@@ -7,7 +7,6 @@
 	} from '@emgc-calcutta/shared-types';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
-	import { formatCountdown } from '$lib/time';
 	import { tournamentPhase } from '$lib/tournamentPhase';
 	import LiveAuctionBoard from './LiveAuctionBoard.svelte';
 	import SelfLinkModal from './SelfLinkModal.svelte';
@@ -20,11 +19,14 @@
 	let liveEntries = $state<RealtimePlayerEntry[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
 	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
-	// Ticks every second so the phase banner/countdown and whichever child
-	// board is active (the silent board's bid forms, the live board's
-	// anti-snipe countdown, the roster's "time since last bid") all stay
-	// live — none of those are otherwise a tracked reactive dependency.
-	let now = $state(new Date());
+
+	// The root tournament layout owns the single ticking interval (see its
+	// own comment) and shares it via context, rather than this page
+	// keeping a second, redundant one-second timer computing the same
+	// thing — reading `.now` off the same reactive object the layout
+	// mutates keeps this derivation live.
+	const clock = getContext<{ now: Date }>('tournament-clock');
+	let now = $derived(clock.now);
 
 	onMount(() => {
 		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
@@ -32,14 +34,12 @@
 		const unsubEntries = rt.entries.subscribe((entries) => (liveEntries = entries));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
 		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
-		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubEntries();
 			unsubLots();
 			unsubConnection();
 			rt.destroy();
-			clearInterval(tick);
 		};
 	});
 
@@ -53,33 +53,12 @@
 	);
 
 	let phase = $derived(tournamentPhase(data.tournament, now));
-	let countdownText = $derived(phase.countdownTo ? formatCountdown(phase.countdownTo, now) : null);
 
 	let isLinkedToYou = $derived(players.some((p) => p.user_id === data.currentUserId));
 </script>
 
-<div class="flex flex-col gap-4 pt-4">
+<div class="flex flex-col gap-4">
 	<RealtimeStatusBanner status={connectionStatus} />
-
-	<div
-		class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brass/30 bg-scorecard/40 p-4"
-	>
-		<div class="flex items-center gap-2 text-sm">
-			<span
-				class={[
-					'inline-block size-2 rounded-full',
-					phase.phase === 'silent' || phase.phase === 'live' ? 'bg-fairway' : 'bg-brass/60'
-				]}
-			></span>
-			<span class="font-medium text-ink">{phase.label}</span>
-			{#if countdownText}
-				<span class="font-data rounded border border-brass/50 px-2 py-0.5 text-xs text-brass">
-					{phase.countdownLabel}
-					{countdownText}
-				</span>
-			{/if}
-		</div>
-	</div>
 
 	{#if !isLinkedToYou}
 		<SelfLinkModal unlinkedPlayers={data.unlinkedPlayers} />
