@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
-	import { onMount } from 'svelte';
 	import type {
 		Database,
 		ErrorResponse,
@@ -18,6 +17,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Table from '$lib/components/ui/table';
 	import { currentHighBid } from '$lib/bids';
 	import {
@@ -34,6 +34,7 @@
 		tournament,
 		players,
 		liveBids,
+		bidsReady,
 		currentUserId,
 		supabase
 	}: {
@@ -48,6 +49,11 @@
 		};
 		players: FieldPlayerRow[];
 		liveBids: RealtimeBid[];
+		// False for the brief window before the Realtime store's first
+		// reconcile() resolves (see $lib/stores/realtime.ts) — bid-derived UI
+		// (current-high column, pot totals) renders a skeleton instead of a
+		// misleading "no bids yet"/$0.00 during that gap.
+		bidsReady: boolean;
 		currentUserId: string;
 		supabase: SupabaseClient<Database>;
 	} = $props();
@@ -56,15 +62,23 @@
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
 
-	// Stays false through this component's first render, then flips once and
-	// for all — used so a player's reels only spin in from zero when their
-	// first-ever bid arrives live (a real "no bid" -> "has a bid" transition
-	// witnessed on an already-open board), not when the page simply loads on
-	// a player who already had a bid (that should snap straight to the
-	// current value, no animation).
+	// Stays false until bidsReady's *first* true render has actually
+	// committed, then flips once and for all — used so a player's reels
+	// only spin in from zero when their first-ever bid arrives live (a real
+	// "no bid" -> "has a bid" transition witnessed on an already-open
+	// board), not when the page simply loads on a player who already had a
+	// bid (that should snap straight to the current value, no animation).
+	// Previously this flipped on onMount instead, which fires long before
+	// bidsReady ever does — every cell's very first population of an
+	// existing bid was therefore (mis)treated as a live "just placed"
+	// event and spun in, all at once, right as the loading skeletons
+	// cleared (reported directly as page "jitter"). A $effect fixes this
+	// because Svelte always runs it *after* the render it reacts to has
+	// committed — so the same render that first shows real digits for
+	// bidsReady=true still sees the old (false) value here.
 	let pastInitialLoad = $state(false);
-	onMount(() => {
-		pastInitialLoad = true;
+	$effect(() => {
+		if (bidsReady) pastInitialLoad = true;
 	});
 
 	let searchQuery = $state('');
@@ -134,34 +148,6 @@
 
 	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
 
-	// Collapses a Championship flight's separate Gross/Net pot groups back
-	// into a single box (two labeled lines instead of two boxes) — with 4
-	// regular flights already filling a 4-wide row, Championship's extra
-	// division split pushed the box count to 5 and stranded one lonely box
-	// on its own second row (reported directly, screenshot of a 5-flight
-	// tournament). The player-list sections above intentionally keep
-	// Gross/Net as fully separate sections (own bids, own "current high" —
-	// see groupedPlayers' own comment); this merge is purely cosmetic, for
-	// this summary grid only. Relies on deriveFlightDivisionGroups always
-	// emitting a flight's 'gross' group immediately before its 'net' group.
-	let potBoxes = $derived.by(() => {
-		const boxes: { flight: string; label: string; lines: { label: string; total: number }[] }[] =
-			[];
-		for (const { group, total } of potGroups) {
-			const prev = boxes[boxes.length - 1];
-			if (group.division === 'net' && prev && prev.flight === group.flight) {
-				prev.lines.push({ label: 'Net', total });
-				continue;
-			}
-			boxes.push({
-				flight: group.flight,
-				label: group.division === 'gross' ? group.flight : group.label,
-				lines: [{ label: group.division === 'gross' ? 'Gross' : '', total }]
-			});
-		}
-		return boxes;
-	});
-
 	// Splits a formatted amount ("$1,850.00") into characters for the
 	// slot-machine effect, each keyed by distance from the *end* of the
 	// string rather than the start — bid amounts only ever grow (a bid must
@@ -230,51 +216,90 @@
 </script>
 
 <div class="flex flex-col gap-2">
-	<div class="flex items-baseline justify-between">
-		<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Total pot</span>
-		<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
-	</div>
-	{#if potBoxes.length > 1}
-		<Table.Root>
+	<p class="text-sm text-ink/70">
+		The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
+			tournament.threshold_amount
+		)} or more reserve a player for the live auction — each new bid must beat the current high by at least
+		{formatCurrency(tournament.min_increment)}.
+	</p>
+
+	{#if potGroups.length > 1}
+		<!-- One row per (flight, division) group — the Championship flight's
+		     Gross and Net stay two fully separate rows here too (own label,
+		     own amount), not merged into one shared row, matching how the
+		     player-list sections below already keep them as two independent
+		     auction pools rather than one flight with an inline badge (user
+		     feedback: an earlier version of this table merged them into a
+		     single two-line row, which read as one pot when they're actually
+		     two). Rather than one column per flight: with enough flights
+		     configured, a wide column-per-flight grid ran off the side of
+		     narrower screens instead of just growing taller. The total (shown
+		     as its own line above when there's no breakdown table to anchor
+		     it to — see the else branch below) lives in this table's own
+		     footer row instead, once there's a breakdown to total up. -->
+		<!-- table-fixed + an explicit width on the Flight column pins both
+		     columns' widths regardless of content — otherwise the browser's
+		     default auto table layout re-measures column widths from
+		     whatever's actually in the Pot cells, and skeleton placeholders
+		     are never exactly as wide as the real dollar amounts that
+		     replace them, so the Flight/Pot boundary (and everything in the
+		     Pot column) visibly shifted sideways right as bids landed
+		     (reported directly, screen recording of the pot table). -->
+		<Table.Root class="table-fixed">
 			<Table.Header>
 				<Table.Row>
-					{#each potBoxes as box, i (i)}
-						<Table.Head>{box.label}</Table.Head>
-					{/each}
+					<Table.Head class="w-1/2">Flight</Table.Head>
+					<Table.Head>Pot</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				<Table.Row>
-					{#each potBoxes as box, i (i)}
-						<Table.Cell class="font-data">
-							{#if box.lines.length > 1}
-								<div class="flex flex-col gap-0.5">
-									{#each box.lines as line (line.label)}
-										<div class="flex items-baseline gap-2">
-											<span class="text-[0.6rem] tracking-wider text-ink/50 uppercase"
-												>{line.label}</span
-											>
-											<span>{formatCurrency(line.total)}</span>
-										</div>
-									{/each}
-								</div>
+				{#each potGroups as { group, total } (`${group.flight}::${group.division}`)}
+					<Table.Row>
+						<Table.Cell
+							class="font-data text-xs tracking-widest text-fairway uppercase whitespace-nowrap"
+						>
+							{group.label}
+						</Table.Cell>
+						<Table.Cell class="font-data whitespace-nowrap">
+							{#if bidsReady}
+								{formatCurrency(total)}
 							{:else}
-								{formatCurrency(box.lines[0].total)}
+								<Skeleton class="h-5 w-16" />
 							{/if}
 						</Table.Cell>
-					{/each}
-				</Table.Row>
+					</Table.Row>
+				{/each}
 			</Table.Body>
+			<Table.Footer>
+				<Table.Row>
+					<Table.Cell
+						class="font-data text-xs font-semibold tracking-widest text-fairway uppercase whitespace-nowrap"
+					>
+						Total
+					</Table.Cell>
+					<Table.Cell class="font-data font-semibold text-ink whitespace-nowrap">
+						{#if bidsReady}
+							{formatCurrency(totalPot)}
+						{:else}
+							<Skeleton class="h-5 w-24" />
+						{/if}
+					</Table.Cell>
+				</Table.Row>
+			</Table.Footer>
 		</Table.Root>
+	{:else}
+		<div class="flex items-baseline justify-between">
+			<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Total pot</span>
+			{#if bidsReady}
+				<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
+			{:else}
+				<!-- h-7 matches text-lg's own line-height (1.75rem) so this doesn't
+				     change the row's height once the real value swaps in. -->
+				<Skeleton class="h-7 w-24" />
+			{/if}
+		</div>
 	{/if}
 </div>
-
-<p class="text-sm text-ink/70">
-	The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
-		tournament.threshold_amount
-	)} or more reserve a player for the live auction — each new bid must beat the current high by at least
-	{formatCurrency(tournament.min_increment)}.
-</p>
 
 <div class="flex flex-wrap items-center gap-4 text-sm">
 	<Input type="search" placeholder="Search players…" bind:value={searchQuery} class="max-w-56" />
@@ -284,8 +309,14 @@
 	{/if}
 </div>
 
-{#snippet currentHigh(high: RealtimeBid | null)}
-	{#if high}
+{#snippet currentHigh(high: RealtimeBid | null, size: 'sm' | 'lg' = 'sm')}
+	{#if !bidsReady}
+		<!-- Matches the line-height of whichever text size the caller renders
+		     the real value at (desktop table's inherited text-sm vs the
+		     mobile card's text-lg) so swapping in real data doesn't reflow
+		     the row/card around it. -->
+		<Skeleton class={size === 'lg' ? 'h-7 w-20' : 'h-5 w-16'} />
+	{:else if high}
 		<span class="inline-flex">
 			{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}
 				{#if isDigit}
@@ -444,7 +475,7 @@
 									<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
 										Current high
 									</p>
-									<p class="font-data text-lg">{@render currentHigh(high)}</p>
+									<p class="font-data text-lg">{@render currentHigh(high, 'lg')}</p>
 								</div>
 								{#if player.status === 'open'}
 									<form

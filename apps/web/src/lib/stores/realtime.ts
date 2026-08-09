@@ -24,6 +24,10 @@ export interface TournamentRealtime {
 	entries: Readable<RealtimePlayerEntry[]>;
 	liveLots: Readable<RealtimeLiveLot[]>;
 	connectionStatus: Readable<RealtimeConnectionStatus>;
+	/** True once the first reconcile() has resolved — lets callers show a
+	 *  skeleton for bid-derived UI (current-high column, pot totals) instead
+	 *  of a misleading "no bids yet" during the gap before real data lands. */
+	ready: Readable<boolean>;
 	/** Unsubscribes and tears down the channel — call on component unmount. */
 	destroy: () => void;
 }
@@ -39,38 +43,51 @@ export interface TournamentRealtime {
 // with it.
 export function createTournamentRealtime(
 	supabase: SupabaseClient<Database>,
-	tournamentId: string
+	tournamentId: string,
+	// Entry ids already known from the page's own SSR load (player_entries.id
+	// — see FieldPlayerRow), if the caller has them. Lets the very first bids
+	// query fire in parallel with the entries query instead of waiting on it
+	// just to learn ids the caller already had.
+	knownEntryIds: string[] = []
 ): TournamentRealtime {
 	const bids = writable<RealtimeBid[]>([]);
 	const entries = writable<RealtimePlayerEntry[]>([]);
 	const liveLots = writable<RealtimeLiveLot[]>([]);
 	const connectionStatus = writable<RealtimeConnectionStatus>('connecting');
+	const ready = writable(false);
 
 	async function reconcile() {
-		const { data: entryRows } = await supabase
-			.from('player_entries')
-			.select('id, status')
-			.eq('tournament_id', tournamentId);
+		const entryIdsForBids = get(entries).length > 0 ? get(entries).map((e) => e.id) : knownEntryIds;
+
+		// Run all three reconcile queries together rather than serially —
+		// entries and live_lots are already independent of each other, and
+		// bids can now start immediately too by trusting the caller-supplied
+		// (or previously-reconciled) entry ids instead of waiting on this
+		// round's entries query just to re-derive ids for the .in() filter.
+		const [{ data: entryRows }, { data: liveLotRows }, { data: bidRows }] = await Promise.all([
+			supabase.from('player_entries').select('id, status').eq('tournament_id', tournamentId),
+			supabase
+				.from('live_lots')
+				.select('id, entry_id, queue_position, opened_at, closed_at, closes_at, winning_bid_id')
+				.eq('tournament_id', tournamentId),
+			entryIdsForBids.length > 0
+				? supabase
+						.from('bids')
+						.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at, bidder_name')
+						.in('entry_id', entryIdsForBids)
+						.order('placed_at', { ascending: true })
+				: Promise.resolve({ data: [] as RealtimeBid[] })
+		]);
+
 		entries.set(entryRows ?? []);
-
-		const { data: liveLotRows } = await supabase
-			.from('live_lots')
-			.select('id, entry_id, queue_position, opened_at, closed_at, closes_at, winning_bid_id')
-			.eq('tournament_id', tournamentId);
 		liveLots.set(liveLotRows ?? []);
-
-		const entryIds = (entryRows ?? []).map((e) => e.id);
-		if (entryIds.length === 0) {
-			bids.set([]);
-			return;
-		}
-
-		const { data: bidRows } = await supabase
-			.from('bids')
-			.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at, bidder_name')
-			.in('entry_id', entryIds)
-			.order('placed_at', { ascending: true });
-		bids.set(bidRows ?? []);
+		// Re-filter against this round's authoritative entry ids, not
+		// entryIdsForBids — a caller-supplied snapshot could in principle be
+		// stale, and this keeps a bid for an id outside the real entry list
+		// from ever slipping onto the board.
+		const authoritativeEntryIds = new Set((entryRows ?? []).map((e) => e.id));
+		bids.set((bidRows ?? []).filter((b) => authoritativeEntryIds.has(b.entry_id)));
+		ready.set(true);
 	}
 
 	const channel = supabase
@@ -131,21 +148,32 @@ export function createTournamentRealtime(
 		.subscribe((status) => {
 			if (status === 'SUBSCRIBED') {
 				connectionStatus.set('connected');
-				// Runs on the initial join *and* every rejoin after a dropped
-				// connection — both land on this same callback, so a reconnect
-				// re-syncs from a fresh query rather than trusting whatever
-				// events did or didn't arrive while disconnected.
+				// Runs on every rejoin after a dropped connection — re-syncs from
+				// a fresh query rather than trusting whatever events did or
+				// didn't arrive while disconnected. (The very first reconcile is
+				// fired below, independently of this callback — see its comment.)
 				reconcile();
 			} else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
 				connectionStatus.set('reconnecting');
 			}
 		});
 
+	// Fired immediately rather than waiting for the channel's WebSocket
+	// handshake to reach SUBSCRIBED: that join round-trip has nothing to do
+	// with these plain REST queries, and gating the first fetch behind it was
+	// serializing two independent network operations that should overlap —
+	// the visible "players render, bids pop in ~500ms later" delay this
+	// fixes. subscribe()'s own SUBSCRIBED-triggered reconcile() above still
+	// runs shortly after as normal; any bid placed in between is caught by
+	// this second pass.
+	reconcile();
+
 	return {
 		bids,
 		entries,
 		liveLots,
 		connectionStatus,
+		ready,
 		destroy: () => {
 			supabase.removeChannel(channel);
 		}
