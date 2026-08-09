@@ -243,6 +243,13 @@
 </script>
 
 <div class="flex flex-col gap-2">
+	<p class="text-sm text-ink/70">
+		The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
+			tournament.threshold_amount
+		)} or more reserve a player for the live auction — each new bid must beat the current high by at least
+		{formatCurrency(tournament.min_increment)}.
+	</p>
+
 	{#if potBoxes.length > 1}
 		<!-- One row per flight (Championship — its Gross/Net already merged
 		     into a single box, see potBoxes' own comment — stays one row too,
@@ -252,20 +259,30 @@
 		     as its own line above when there's no breakdown table to anchor
 		     it to — see the else branch below) lives in this table's own
 		     footer row instead, once there's a breakdown to total up. -->
-		<Table.Root>
+		<!-- table-fixed + an explicit width on the Flight column pins both
+		     columns' widths regardless of content — otherwise the browser's
+		     default auto table layout re-measures column widths from
+		     whatever's actually in the Pot cells, and skeleton placeholders
+		     are never exactly as wide as the real dollar amounts that
+		     replace them, so the Flight/Pot boundary (and everything in the
+		     Pot column) visibly shifted sideways right as bids landed
+		     (reported directly, screen recording of the pot table). -->
+		<Table.Root class="table-fixed">
 			<Table.Header>
 				<Table.Row>
-					<Table.Head>Flight</Table.Head>
+					<Table.Head class="w-48">Flight</Table.Head>
 					<Table.Head>Pot</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
 				{#each potBoxes as box (box.flight)}
 					<Table.Row>
-						<Table.Cell class="font-data text-xs tracking-widest text-fairway uppercase">
+						<Table.Cell
+							class="font-data text-xs tracking-widest text-fairway uppercase whitespace-nowrap"
+						>
 							{box.label}
 						</Table.Cell>
-						<Table.Cell class="font-data">
+						<Table.Cell class="font-data whitespace-nowrap">
 							{#if box.lines.length > 1}
 								<!-- Same wrapper/label markup whether or not bidsReady — only the
 								     amount itself swaps for a skeleton — so a box's line count
@@ -295,13 +312,13 @@
 				{/each}
 			</Table.Body>
 			<Table.Footer>
-				<Table.Row class="bg-sand/60">
+				<Table.Row>
 					<Table.Cell
-						class="font-data text-xs font-semibold tracking-widest text-fairway uppercase"
+						class="font-data text-xs font-semibold tracking-widest text-fairway uppercase whitespace-nowrap"
 					>
 						Total
 					</Table.Cell>
-					<Table.Cell class="font-data font-semibold text-ink">
+					<Table.Cell class="font-data font-semibold text-ink whitespace-nowrap">
 						{#if bidsReady}
 							{formatCurrency(totalPot)}
 						{:else}
@@ -324,13 +341,6 @@
 		</div>
 	{/if}
 </div>
-
-<p class="text-sm text-ink/70">
-	The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
-		tournament.threshold_amount
-	)} or more reserve a player for the live auction — each new bid must beat the current high by at least
-	{formatCurrency(tournament.min_increment)}.
-</p>
 
 <div class="flex flex-wrap items-center gap-4 text-sm">
 	<Input type="search" placeholder="Search players…" bind:value={searchQuery} class="max-w-56" />
