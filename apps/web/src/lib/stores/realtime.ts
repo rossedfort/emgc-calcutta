@@ -56,37 +56,61 @@ export function createTournamentRealtime(
 	const connectionStatus = writable<RealtimeConnectionStatus>('connecting');
 	const ready = writable(false);
 
+	const entriesQuery = () =>
+		supabase.from('player_entries').select('id, status').eq('tournament_id', tournamentId);
+	const liveLotsQuery = () =>
+		supabase
+			.from('live_lots')
+			.select('id, entry_id, queue_position, opened_at, closed_at, closes_at, winning_bid_id')
+			.eq('tournament_id', tournamentId);
+	const bidsQuery = (ids: string[]) =>
+		ids.length > 0
+			? supabase
+					.from('bids')
+					.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at, bidder_name')
+					.in('entry_id', ids)
+					.order('placed_at', { ascending: true })
+			: Promise.resolve({ data: [] as RealtimeBid[] });
+
 	async function reconcile() {
-		const entryIdsForBids = get(entries).length > 0 ? get(entries).map((e) => e.id) : knownEntryIds;
-
-		// Run all three reconcile queries together rather than serially —
-		// entries and live_lots are already independent of each other, and
-		// bids can now start immediately too by trusting the caller-supplied
-		// (or previously-reconciled) entry ids instead of waiting on this
-		// round's entries query just to re-derive ids for the .in() filter.
-		const [{ data: entryRows }, { data: liveLotRows }, { data: bidRows }] = await Promise.all([
-			supabase.from('player_entries').select('id, status').eq('tournament_id', tournamentId),
-			supabase
-				.from('live_lots')
-				.select('id, entry_id, queue_position, opened_at, closed_at, closes_at, winning_bid_id')
-				.eq('tournament_id', tournamentId),
-			entryIdsForBids.length > 0
-				? supabase
-						.from('bids')
-						.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at, bidder_name')
-						.in('entry_id', entryIdsForBids)
-						.order('placed_at', { ascending: true })
-				: Promise.resolve({ data: [] as RealtimeBid[] })
-		]);
-
-		entries.set(entryRows ?? []);
-		liveLots.set(liveLotRows ?? []);
-		// Re-filter against this round's authoritative entry ids, not
-		// entryIdsForBids — a caller-supplied snapshot could in principle be
-		// stale, and this keeps a bid for an id outside the real entry list
-		// from ever slipping onto the board.
-		const authoritativeEntryIds = new Set((entryRows ?? []).map((e) => e.id));
-		bids.set((bidRows ?? []).filter((b) => authoritativeEntryIds.has(b.entry_id)));
+		if (knownEntryIds.length > 0) {
+			// The caller already knows the entry ids (from its own SSR load),
+			// so all three queries can run together — nothing here depends on
+			// another query's result.
+			const [{ data: entryRows }, { data: liveLotRows }, { data: bidRows }] = await Promise.all([
+				entriesQuery(),
+				liveLotsQuery(),
+				bidsQuery(knownEntryIds)
+			]);
+			entries.set(entryRows ?? []);
+			liveLots.set(liveLotRows ?? []);
+			// Re-filter against this round's authoritative entry ids, not
+			// knownEntryIds — a caller-supplied snapshot could in principle be
+			// stale, and this keeps a bid for an id outside the real entry
+			// list from ever slipping onto the board.
+			const authoritativeEntryIds = new Set((entryRows ?? []).map((e) => e.id));
+			bids.set((bidRows ?? []).filter((b) => authoritativeEntryIds.has(b.entry_id)));
+		} else {
+			// No caller-supplied ids (e.g. the "My Bids" page, or a reconnect
+			// on a page that never had them) — the bids query has to wait for
+			// *this call's own* entries query to learn which ids to filter by.
+			// This must not read the `entries` store's current value instead:
+			// reconcile() can run twice back-to-back (the immediate call below
+			// plus the channel's own SUBSCRIBED-triggered call), and reading a
+			// shared store from a second, possibly-concurrent call risks
+			// seeing it still empty because the first call's own query simply
+			// hasn't resolved yet — silently skipping the bids fetch on both
+			// calls and leaving every pre-existing bid permanently missing
+			// (reported directly: "My Bids" showing empty in production).
+			const [{ data: entryRows }, { data: liveLotRows }] = await Promise.all([
+				entriesQuery(),
+				liveLotsQuery()
+			]);
+			entries.set(entryRows ?? []);
+			liveLots.set(liveLotRows ?? []);
+			const { data: bidRows } = await bidsQuery((entryRows ?? []).map((e) => e.id));
+			bids.set(bidRows ?? []);
+		}
 		ready.set(true);
 	}
 
