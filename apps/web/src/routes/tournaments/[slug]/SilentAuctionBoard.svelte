@@ -475,7 +475,14 @@
 									<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
 										Current high
 									</p>
-									<p class="font-data text-lg">{@render currentHigh(high, 'lg')}</p>
+									<!-- div, not p — currentHigh's skeleton branch renders a Skeleton
+									     (a <div>), and a <div> inside a <p> is invalid HTML; the browser
+									     silently closes the <p> early to recover, producing a different DOM
+									     tree than the one SSR rendered and triggering a hydration mismatch
+									     (reported directly against production, via svelte.dev/e/hydration_mismatch
+									     — reproduced locally with a dev build, which additionally logs the
+									     specific `node_invalid_placement_ssr` warning naming this exact nesting). -->
+									<div class="font-data text-lg">{@render currentHigh(high, 'lg')}</div>
 								</div>
 								{#if player.status === 'open'}
 									<form
