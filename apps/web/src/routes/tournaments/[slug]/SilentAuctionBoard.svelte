@@ -162,17 +162,6 @@
 		return boxes;
 	});
 
-	// Caps at 4 per row (matching the homepage's own stat-grid precedent)
-	// but never wider than the actual number of boxes, so e.g. exactly 3
-	// flights doesn't leave an empty tinted cell trailing in a 4-wide row.
-	let potGridColsClass = $derived(
-		potBoxes.length >= 4
-			? 'sm:grid-cols-4'
-			: potBoxes.length === 3
-				? 'sm:grid-cols-3'
-				: 'sm:grid-cols-2'
-	);
-
 	// Splits a formatted amount ("$1,850.00") into characters for the
 	// slot-machine effect, each keyed by distance from the *end* of the
 	// string rather than the start — bid amounts only ever grow (a bid must
@@ -246,31 +235,37 @@
 		<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
 	</div>
 	{#if potBoxes.length > 1}
-		<div
-			class="grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40 {potGridColsClass}"
-		>
-			{#each potBoxes as box, i (i)}
-				<div class="flex flex-col gap-1 bg-scorecard p-3">
-					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase"
-						>{box.label}</span
-					>
-					{#if box.lines.length > 1}
-						<div class="flex flex-col gap-0.5">
-							{#each box.lines as line (line.label)}
-								<div class="flex items-baseline justify-between gap-2">
-									<span class="font-data text-[0.6rem] tracking-wider text-ink/50 uppercase"
-										>{line.label}</span
-									>
-									<span class="font-data text-sm text-ink">{formatCurrency(line.total)}</span>
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					{#each potBoxes as box, i (i)}
+						<Table.Head>{box.label}</Table.Head>
+					{/each}
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				<Table.Row>
+					{#each potBoxes as box, i (i)}
+						<Table.Cell class="font-data">
+							{#if box.lines.length > 1}
+								<div class="flex flex-col gap-0.5">
+									{#each box.lines as line (line.label)}
+										<div class="flex items-baseline gap-2">
+											<span class="text-[0.6rem] tracking-wider text-ink/50 uppercase"
+												>{line.label}</span
+											>
+											<span>{formatCurrency(line.total)}</span>
+										</div>
+									{/each}
 								</div>
-							{/each}
-						</div>
-					{:else}
-						<span class="font-data text-sm text-ink">{formatCurrency(box.lines[0].total)}</span>
-					{/if}
-				</div>
-			{/each}
-		</div>
+							{:else}
+								{formatCurrency(box.lines[0].total)}
+							{/if}
+						</Table.Cell>
+					{/each}
+				</Table.Row>
+			</Table.Body>
+		</Table.Root>
 	{/if}
 </div>
 
