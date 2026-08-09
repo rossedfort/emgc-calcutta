@@ -106,6 +106,45 @@
 		)
 	);
 
+	// Pot totals: grouped by the same (flight, division) split as the
+	// player-list sections above — a Championship flight's Gross/Net stay
+	// two separate pots here too, matching the payout system's own
+	// per-(flight, division) pot scoping (computePotByGroup), not a
+	// per-flight combination. Computed from the *unfiltered* player list
+	// (search/status/flight filters only affect what rows are visible
+	// below, not what counts toward the pot) and each player's current
+	// high bid — the same live, reactive `liveBids` data the board's own
+	// "Current high" column already renders, so this updates in real time
+	// as bids land with no extra query. This is a distinct, "pot so far"
+	// concept from the payout system's post-sale pot (sum of only
+	// winning_bid_id amounts on sold_* entries) — during the silent
+	// auction almost nothing is sold yet, so that definition would show
+	// $0 the whole time; this instead sums every entry's current
+	// highest live bid (0 if none yet), win-or-not-yet-decided.
+	let potGroups = $derived(
+		groupPlayersByFlightAndDivision(
+			players,
+			tournament.flights,
+			tournament.championship_flight
+		).map(({ group, players: groupPlayers }) => ({
+			group,
+			total: groupPlayers.reduce((sum, p) => sum + (currentHighBid(liveBids, p.id)?.amount ?? 0), 0)
+		}))
+	);
+
+	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
+
+	// Caps at 4 per row (matching the homepage's own stat-grid precedent)
+	// but never wider than the actual number of groups, so e.g. exactly 3
+	// flights doesn't leave an empty tinted cell trailing in a 4-wide row.
+	let potGridColsClass = $derived(
+		potGroups.length >= 4
+			? 'sm:grid-cols-4'
+			: potGroups.length === 3
+				? 'sm:grid-cols-3'
+				: 'sm:grid-cols-2'
+	);
+
 	// Splits a formatted amount ("$1,850.00") into characters for the
 	// slot-machine effect, each keyed by distance from the *end* of the
 	// string rather than the start — bid amounts only ever grow (a bid must
@@ -172,6 +211,27 @@
 		bidAmounts[entryId] = '';
 	}
 </script>
+
+<div class="flex flex-col gap-2">
+	<div class="flex items-baseline justify-between">
+		<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Total pot</span>
+		<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
+	</div>
+	{#if potGroups.length > 1}
+		<div
+			class="grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40 {potGridColsClass}"
+		>
+			{#each potGroups as { group, total } (`${group.flight}::${group.division}`)}
+				<div class="flex flex-col gap-1 bg-scorecard p-3">
+					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase"
+						>{group.label}</span
+					>
+					<span class="font-data text-sm text-ink">{formatCurrency(total)}</span>
+				</div>
+			{/each}
+		</div>
+	{/if}
+</div>
 
 <p class="text-sm text-ink/70">
 	The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
