@@ -19,6 +19,7 @@
 	let liveEntries = $state<RealtimePlayerEntry[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
 	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
+	let bidsReady = $state(false);
 
 	// The root tournament layout owns the single ticking interval (see its
 	// own comment) and shares it via context, rather than this page
@@ -29,16 +30,22 @@
 	let now = $derived(clock.now);
 
 	onMount(() => {
-		const rt = createTournamentRealtime(data.supabase, data.tournament.id);
+		const rt = createTournamentRealtime(
+			data.supabase,
+			data.tournament.id,
+			data.players.map((p) => p.id)
+		);
 		const unsubBids = rt.bids.subscribe((bids) => (liveBids = bids));
 		const unsubEntries = rt.entries.subscribe((entries) => (liveEntries = entries));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
 		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
+		const unsubReady = rt.ready.subscribe((r) => (bidsReady = r));
 		return () => {
 			unsubBids();
 			unsubEntries();
 			unsubLots();
 			unsubConnection();
+			unsubReady();
 			rt.destroy();
 		};
 	});
@@ -69,6 +76,7 @@
 			tournament={data.tournament}
 			{players}
 			{liveBids}
+			{bidsReady}
 			currentUserId={data.currentUserId}
 			supabase={data.supabase}
 		/>

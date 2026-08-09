@@ -18,6 +18,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Table from '$lib/components/ui/table';
 	import { currentHighBid } from '$lib/bids';
 	import {
@@ -34,6 +35,7 @@
 		tournament,
 		players,
 		liveBids,
+		bidsReady,
 		currentUserId,
 		supabase
 	}: {
@@ -48,6 +50,11 @@
 		};
 		players: FieldPlayerRow[];
 		liveBids: RealtimeBid[];
+		// False for the brief window before the Realtime store's first
+		// reconcile() resolves (see $lib/stores/realtime.ts) — bid-derived UI
+		// (current-high column, pot totals) renders a skeleton instead of a
+		// misleading "no bids yet"/$0.00 during that gap.
+		bidsReady: boolean;
 		currentUserId: string;
 		supabase: SupabaseClient<Database>;
 	} = $props();
@@ -232,7 +239,11 @@
 <div class="flex flex-col gap-2">
 	<div class="flex items-baseline justify-between">
 		<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Total pot</span>
-		<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
+		{#if bidsReady}
+			<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
+		{:else}
+			<Skeleton class="h-5 w-24" />
+		{/if}
 	</div>
 	{#if potBoxes.length > 1}
 		<Table.Root>
@@ -247,7 +258,9 @@
 				<Table.Row>
 					{#each potBoxes as box, i (i)}
 						<Table.Cell class="font-data">
-							{#if box.lines.length > 1}
+							{#if !bidsReady}
+								<Skeleton class="h-4 w-16" />
+							{:else if box.lines.length > 1}
 								<div class="flex flex-col gap-0.5">
 									{#each box.lines as line (line.label)}
 										<div class="flex items-baseline gap-2">
@@ -285,7 +298,9 @@
 </div>
 
 {#snippet currentHigh(high: RealtimeBid | null)}
-	{#if high}
+	{#if !bidsReady}
+		<Skeleton class="h-5 w-16" />
+	{:else if high}
 		<span class="inline-flex">
 			{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}
 				{#if isDigit}
