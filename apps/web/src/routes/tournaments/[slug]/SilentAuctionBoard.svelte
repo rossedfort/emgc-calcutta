@@ -242,7 +242,9 @@
 		{#if bidsReady}
 			<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
 		{:else}
-			<Skeleton class="h-5 w-24" />
+			<!-- h-7 matches text-lg's own line-height (1.75rem) so this doesn't
+			     change the row's height once the real value swaps in. -->
+			<Skeleton class="h-7 w-24" />
 		{/if}
 	</div>
 	{#if potBoxes.length > 1}
@@ -258,21 +260,29 @@
 				<Table.Row>
 					{#each potBoxes as box, i (i)}
 						<Table.Cell class="font-data">
-							{#if !bidsReady}
-								<Skeleton class="h-4 w-16" />
-							{:else if box.lines.length > 1}
+							{#if box.lines.length > 1}
+								<!-- Same wrapper/label markup whether or not bidsReady — only the
+								     amount itself swaps for a skeleton — so a box's line count
+								     (known up front from tournament.flights, independent of bids)
+								     keeps this cell's height identical across the transition. -->
 								<div class="flex flex-col gap-0.5">
 									{#each box.lines as line (line.label)}
 										<div class="flex items-baseline gap-2">
 											<span class="text-[0.6rem] tracking-wider text-ink/50 uppercase"
 												>{line.label}</span
 											>
-											<span>{formatCurrency(line.total)}</span>
+											{#if bidsReady}
+												<span>{formatCurrency(line.total)}</span>
+											{:else}
+												<Skeleton class="h-5 w-14" />
+											{/if}
 										</div>
 									{/each}
 								</div>
-							{:else}
+							{:else if bidsReady}
 								{formatCurrency(box.lines[0].total)}
+							{:else}
+								<Skeleton class="h-5 w-16" />
 							{/if}
 						</Table.Cell>
 					{/each}
@@ -297,9 +307,13 @@
 	{/if}
 </div>
 
-{#snippet currentHigh(high: RealtimeBid | null)}
+{#snippet currentHigh(high: RealtimeBid | null, size: 'sm' | 'lg' = 'sm')}
 	{#if !bidsReady}
-		<Skeleton class="h-5 w-16" />
+		<!-- Matches the line-height of whichever text size the caller renders
+		     the real value at (desktop table's inherited text-sm vs the
+		     mobile card's text-lg) so swapping in real data doesn't reflow
+		     the row/card around it. -->
+		<Skeleton class={size === 'lg' ? 'h-7 w-20' : 'h-5 w-16'} />
 	{:else if high}
 		<span class="inline-flex">
 			{#each currencyChars(formatCurrency(high.amount)) as { char, isDigit, key } (key)}
@@ -459,7 +473,7 @@
 									<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
 										Current high
 									</p>
-									<p class="font-data text-lg">{@render currentHigh(high)}</p>
+									<p class="font-data text-lg">{@render currentHigh(high, 'lg')}</p>
 								</div>
 								{#if player.status === 'open'}
 									<form
