@@ -24,7 +24,8 @@ export const AUDIT_ACTIONS = [
 	'placement_set',
 	'stake_buyback_requested',
 	'stake_buyback_accepted',
-	'stake_buyback_rejected'
+	'stake_buyback_rejected',
+	'stake_buyback_auto_approved'
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

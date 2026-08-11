@@ -233,6 +233,25 @@ function buildEmail(
         }),
       };
     }
+    case "stake_buyback_auto_approved": {
+      const subject =
+        `${playerName} bought back part of their stake automatically`;
+      const text =
+        `${playerName} bought back ${formattedPercentage}% of their stake in ${tournamentName} for ${formattedAmount}. This was within the tournament's pre-approved percentage, so no action is needed from you.`;
+      return {
+        subject,
+        text,
+        html: renderEmailLayout({
+          previewText: text,
+          heading: subject,
+          bodyHtml: [
+            emailParagraph(text),
+            emailButton("View My Balance", meBalanceUrl()),
+          ].join("\n"),
+          settingsUrl: settingsUrl(),
+        }),
+      };
+    }
     case "stake_buyback_accepted": {
       const subject = "Your buy-back request was accepted";
       const text =

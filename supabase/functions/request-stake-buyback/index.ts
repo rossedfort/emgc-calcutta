@@ -8,19 +8,33 @@
 // themselves (self-bidding is unrestricted elsewhere in this app per
 // spec 4.9, but "buy back your own stake from yourself" is nonsensical).
 //
-// percentage/amount are computed here from tournament.buy_back_percentage
-// and the entry's own winning_bid.amount, never trusted from the client
-// — same "server computes the money math" posture set-placement already
+// amount is computed here from the caller's own percentage and the
+// entry's own winning_bid.amount, never trusted from the client — same
+// "server computes the money math" posture set-placement already
 // established for Payout.amount — then locked onto the stake_buybacks
-// row so a later tournament-setting edit can't retroactively change an
-// already-requested arrangement.
+// row alongside percentage so a later tournament-setting edit can't
+// retroactively change an already-requested arrangement.
+//
+// Phase 33: percentage is now the caller's own choice (validated against
+// the same > 0 and < 1 bound the column itself enforces), not always
+// exactly tournament.buy_back_percentage — that setting is now an
+// auto-approval *ceiling* instead of the one rate every request had to
+// use. A request at or below it inserts directly as status: "accepted"
+// (auto_approved: true, no buyer action needed); above it, falls through
+// to the original "insert as pending, buyer must respond" flow
+// unchanged. auto_approved can never need set-placement's "recompute an
+// already-placed entry's split" logic the way a late manual acceptance
+// can (see respond-stake-buyback): this function can only ever succeed
+// before tournaments.event_start_at, and placements only ever get set
+// well after that, once the golf itself has concluded.
 //
 // Upserts on entry_id rather than always inserting: a rejected request
 // can be reconsidered by re-requesting, which edits the same row back to
-// 'pending' instead of accumulating a new row per attempt (matching this
-// app's "nothing truly unrecoverable" pattern — void-bid, link/unlink,
-// Phase 12.5's reject/un-reject). A 'pending' or 'accepted' existing row
-// blocks a new request outright; only 'rejected' allows it.
+// 'pending' (or straight to 'accepted', if this attempt's percentage now
+// clears the ceiling) instead of accumulating a new row per attempt
+// (matching this app's "nothing truly unrecoverable" pattern — void-bid,
+// link/unlink, Phase 12.5's reject/un-reject). A 'pending' or 'accepted'
+// existing row blocks a new request outright; only 'rejected' allows it.
 //
 // Sending the actual ask to the buyer is handled entirely by this app,
 // not a mailto: draft composed client-side (that approach was tried and
@@ -28,7 +42,8 @@
 // optional personal note the golfer typed into the modal), and the
 // stake_buybacks_notify_after_insert/_after_repending triggers (see the
 // Phase 14 task 2 migration, extended by the message column's own
-// migration) forward it into the existing dispatch-notification pipeline
+// migration, and the Phase 33 auto-approval migration's parallel pair of
+// triggers) forward it into the existing dispatch-notification pipeline
 // so the buyer gets one real email with no client mail app involved.
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
@@ -52,6 +67,17 @@ export default {
         return Response.json({ error: "entryId is required" }, {
           status: 400,
         });
+      }
+      if (
+        typeof body.percentage !== "number" ||
+        !Number.isFinite(body.percentage) ||
+        body.percentage <= 0 ||
+        body.percentage >= 1
+      ) {
+        return Response.json(
+          { error: "percentage must be greater than 0 and less than 1" },
+          { status: 400 },
+        );
       }
 
       // Matches the message column's own check constraint (char_length
@@ -153,9 +179,12 @@ export default {
         );
       }
 
-      const percentage = entry.tournaments.buy_back_percentage;
+      const percentage = body.percentage;
       const amount = Math.round(entry.winning_bid.amount * percentage * 100) /
         100;
+      const autoApproved = percentage <= entry.tournaments.buy_back_percentage;
+      const status = autoApproved ? "accepted" : "pending";
+      const now = new Date().toISOString();
 
       const { data: stakeBuyback, error: upsertError } = await ctx
         .supabaseAdmin
@@ -169,14 +198,20 @@ export default {
             percentage,
             amount,
             message,
-            status: "pending",
-            requested_at: new Date().toISOString(),
-            responded_at: null,
+            status,
+            auto_approved: autoApproved,
+            requested_at: now,
+            // No human decided this — responded_by stays null either way
+            // (also true for the still-pending branch, unchanged from
+            // before). responded_at is set for an auto-approved request
+            // since it genuinely was resolved at this instant, just not
+            // by the buyer.
+            responded_at: autoApproved ? now : null,
             responded_by: null,
           },
           { onConflict: "entry_id" },
         )
-        .select("id, status, percentage, amount")
+        .select("id, status, percentage, amount, auto_approved")
         .single();
       if (upsertError) {
         return Response.json({ error: upsertError.message }, {
@@ -191,7 +226,9 @@ export default {
         entry_id: entry.id,
         actor_id: ctx.userClaims!.id,
         actor_identity: ctx.userClaims?.email ?? null,
-        action: "stake_buyback_requested",
+        action: autoApproved
+          ? "stake_buyback_auto_approved"
+          : "stake_buyback_requested",
         entity_type: "PlayerEntry",
         entity_id: entry.id,
         after: {
@@ -199,6 +236,7 @@ export default {
           buyer_id: entry.winning_bid.bidder_id,
           percentage,
           amount,
+          auto_approved: autoApproved,
           message,
         },
         ip,
@@ -209,9 +247,10 @@ export default {
         {
           stakeBuyback: {
             id: stakeBuyback.id,
-            status: "pending",
+            status: stakeBuyback.status as "pending" | "accepted",
             percentage: stakeBuyback.percentage,
             amount: stakeBuyback.amount,
+            autoApproved: stakeBuyback.auto_approved,
           },
         } satisfies RequestStakeBuybackResponse,
       );

@@ -36,8 +36,11 @@ export interface StakeRow {
 	last_name: string;
 	division: string;
 	amount: number;
+	// The tournament's auto-approval ceiling (Phase 33) — the golfer can
+	// request any percentage up to just under 100%, not only this one, but
+	// it's still the modal's sensible default (no buyer response needed at
+	// or below it).
 	buy_back_percentage: number;
-	buy_back_amount: number;
 	buyer: {
 		first_name: string | null;
 		last_name: string | null;
@@ -199,7 +202,6 @@ export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => 
 				division: entry.division,
 				amount: entry.winning_bid.amount,
 				buy_back_percentage: buyBackPercentage,
-				buy_back_amount: Math.round(entry.winning_bid.amount * buyBackPercentage * 100) / 100,
 				buyer: entry.winning_bid.buyer,
 				can_request:
 					!isSelfBought &&
