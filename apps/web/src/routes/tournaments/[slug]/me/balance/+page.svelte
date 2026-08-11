@@ -261,8 +261,8 @@
 		{supabase}
 		entryId={selectedStakeRow.id}
 		tournamentName={tournament.name}
-		percentage={selectedStakeRow.buy_back_percentage}
-		amount={selectedStakeRow.buy_back_amount}
+		maxPercentage={selectedStakeRow.buy_back_percentage}
+		winningBidAmount={selectedStakeRow.amount}
 		buyer={selectedStakeRow.buyer ?? { first_name: null, last_name: null, email: '', phone: null }}
 		onSuccess={() => invalidateAll()}
 	/>
