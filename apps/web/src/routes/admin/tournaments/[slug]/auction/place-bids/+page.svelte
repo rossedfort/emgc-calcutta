@@ -199,8 +199,7 @@
 				<Combobox
 					options={participantOptions}
 					bind:value={bidderId}
-					placeholder="Search participants…"
-					searchPlaceholder="Search by name or email…"
+					placeholder="Search by name or email…"
 					emptyText="No participants found."
 				/>
 			</div>
@@ -211,8 +210,7 @@
 					<Combobox
 						options={entryOptions}
 						bind:value={entryId}
-						placeholder="Search open players…"
-						searchPlaceholder="Search by name…"
+						placeholder="Search by name…"
 						emptyText="No open players found."
 					/>
 				</div>
