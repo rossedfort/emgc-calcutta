@@ -498,6 +498,7 @@ export type Database = {
       stake_buybacks: {
         Row: {
           amount: number;
+          auto_approved: boolean;
           buyer_id: string;
           entry_id: string;
           id: string;
@@ -512,6 +513,7 @@ export type Database = {
         };
         Insert: {
           amount: number;
+          auto_approved?: boolean;
           buyer_id: string;
           entry_id: string;
           id?: string;
@@ -526,6 +528,7 @@ export type Database = {
         };
         Update: {
           amount?: number;
+          auto_approved?: boolean;
           buyer_id?: string;
           entry_id?: string;
           id?: string;

@@ -16,7 +16,14 @@ export type NotificationTrigger =
   | "stake_buyback_requested"
   // Phase 14: the buyer responded — sent to the golfer, not the buyer.
   | "stake_buyback_accepted"
-  | "stake_buyback_rejected";
+  | "stake_buyback_rejected"
+  // Phase 33: the requested percentage was at or below the tournament's
+  // configured ceiling, so the request auto-approved with no buyer
+  // action needed — sent to the buyer as an FYI, not a "please respond"
+  // ask like stake_buyback_requested. No golfer-facing equivalent: the
+  // golfer already sees this outcome synchronously in the UI the moment
+  // they submit the request.
+  | "stake_buyback_auto_approved";
 
 export interface DispatchNotificationRequest {
   userId: string;
