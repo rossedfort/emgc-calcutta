@@ -44,6 +44,16 @@ export interface QueueLot {
 	player: QueuePlayer;
 }
 
+// Phase 32: for the admin-on-behalf-of-participant bid panel embedded at
+// the top of this page (AdminBidForm) — every participant with a roster
+// entry in this tournament, since place-bid's own roster-membership check
+// means anyone else would just fail server-side.
+export interface AdminBidParticipant {
+	id: string;
+	name: string;
+	email: string;
+}
+
 export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
@@ -142,10 +152,32 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		return player ? [{ id: lot.id, queue_position: lot.queue_position, player }] : [];
 	});
 
+	const { data: rosterRows, error: rosterError } = await supabase
+		.from('players')
+		.select('user_id, users(id, first_name, last_name, email)')
+		.eq('tournament_id', tournament.id)
+		.not('user_id', 'is', null);
+	if (rosterError) {
+		error(500, rosterError.message);
+	}
+
+	const participantsById = new Map<string, AdminBidParticipant>();
+	for (const row of rosterRows ?? []) {
+		if (!row.users) continue;
+		participantsById.set(row.users.id, {
+			id: row.users.id,
+			name:
+				[row.users.first_name, row.users.last_name].filter(Boolean).join(' ') || row.users.email,
+			email: row.users.email
+		});
+	}
+	const participants = [...participantsById.values()].sort((a, b) => a.name.localeCompare(b.name));
+
 	return {
 		tournament,
 		players,
 		queue,
+		participants,
 		title: `${tournament.name} · Live auction · EMGC Bet`,
 		description: `Run the live auction for ${tournament.name}.`
 	};

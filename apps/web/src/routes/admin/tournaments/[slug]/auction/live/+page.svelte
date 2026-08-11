@@ -6,6 +6,7 @@
 		RealtimeLiveLot,
 		RealtimePlayerEntry
 	} from '@emgc-calcutta/shared-types';
+	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
@@ -123,6 +124,20 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
+	{#if currentLot && currentPlayer}
+		<div class="flex flex-col gap-3 rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
+			<AdminBidForm
+				supabase={data.supabase}
+				tournament={data.tournament}
+				participants={data.participants}
+				entryId={currentPlayer.id}
+				entryLabel={formatPlayerName(currentPlayer)}
+				highBid={high}
+			/>
+		</div>
+	{/if}
+
 	<RealtimeStatusBanner status={connectionStatus} />
 
 	{#if errorMessage}
