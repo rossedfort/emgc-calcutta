@@ -72,7 +72,8 @@
 					...player,
 					myBidAmount: myHigh.amount,
 					highBidAmount: high?.amount ?? myHigh.amount,
-					isHigh: high?.bidder_id === data.currentUserId
+					isHigh: high?.bidder_id === data.currentUserId,
+					placedByAdmin: myHigh.placed_by_admin_id !== null
 				}
 			];
 		})
@@ -110,6 +111,9 @@
 						</Table.Cell>
 						<Table.Cell class="font-data whitespace-nowrap">
 							{formatCurrency(row.myBidAmount)}
+							{#if row.placedByAdmin}
+								<Badge variant="sand" class="ml-1">Admin-placed</Badge>
+							{/if}
 						</Table.Cell>
 						<Table.Cell class="font-data whitespace-nowrap">
 							{formatCurrency(row.highBidAmount)}

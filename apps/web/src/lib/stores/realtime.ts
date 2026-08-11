@@ -67,7 +67,9 @@ export function createTournamentRealtime(
 		ids.length > 0
 			? supabase
 					.from('bids')
-					.select('id, entry_id, bidder_id, amount, phase, placed_at, voided_at, bidder_name')
+					.select(
+						'id, entry_id, bidder_id, amount, phase, placed_at, voided_at, bidder_name, placed_by_admin_id'
+					)
 					.in('entry_id', ids)
 					.order('placed_at', { ascending: true })
 			: Promise.resolve({ data: [] as RealtimeBid[] });

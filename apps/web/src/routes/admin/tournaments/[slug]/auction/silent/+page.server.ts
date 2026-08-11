@@ -8,6 +8,7 @@ export interface SilentAuctionBidRow {
 	voided_at: string | null;
 	void_reason: string | null;
 	bidder_name: string | null;
+	placed_by_admin_id: string | null;
 	division: string;
 	player: { slug: string; first_name: string; last_name: string };
 }
@@ -31,7 +32,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: bids, error: bidsError } = await supabase
 		.from('bids')
 		.select(
-			`id, amount, placed_at, voided_at, void_reason, bidder_name,
+			`id, amount, placed_at, voided_at, void_reason, bidder_name, placed_by_admin_id,
 			player_entries!bids_entry_id_fkey!inner(tournament_id, division, players(slug, first_name, last_name))`
 		)
 		.eq('player_entries.tournament_id', tournament.id)
@@ -52,6 +53,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 						voided_at: bid.voided_at,
 						void_reason: bid.void_reason,
 						bidder_name: bid.bidder_name,
+						placed_by_admin_id: bid.placed_by_admin_id,
 						division: bid.player_entries.division,
 						player: bid.player_entries.players
 					}

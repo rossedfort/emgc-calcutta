@@ -120,6 +120,9 @@
 									{:else}
 										<span class="text-muted-foreground">—</span>
 									{/if}
+									{#if bid.placed_by_admin_id}
+										<Badge variant="sand" class="ml-1">Admin-placed</Badge>
+									{/if}
 								</Table.Cell>
 								<Table.Cell class="font-data whitespace-nowrap"
 									>{formatCurrency(bid.amount)}</Table.Cell

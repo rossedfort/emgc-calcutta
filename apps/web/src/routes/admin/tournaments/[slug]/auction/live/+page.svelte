@@ -171,6 +171,9 @@
 					<span class="font-data text-lg text-ink">
 						{high ? formatCurrency(high.amount) : 'No bids yet'}
 					</span>
+					{#if high?.placed_by_admin_id}
+						<Badge variant="sand" class="w-fit">Admin-placed</Badge>
+					{/if}
 				</div>
 				<div class="flex flex-col gap-1 bg-scorecard p-3">
 					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">

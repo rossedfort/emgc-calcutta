@@ -18,6 +18,10 @@ export interface RealtimeBid {
 	// `users` per row — see that column's own migration for why. Null
 	// only if the bidder hadn't set a name yet when the bid was placed.
 	bidder_name: string | null;
+	// Phase 32: set to the acting admin's id when this bid was placed on
+	// behalf of the bidder (the admin "Place bids" screen), null for the
+	// overwhelming majority of bids that are still self-placed.
+	placed_by_admin_id: string | null;
 }
 
 // Renamed from RealtimePlayer (Phase 11) — status now lives on
