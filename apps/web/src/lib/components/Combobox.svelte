@@ -41,22 +41,56 @@
 	let open = $state(false);
 	let containerEl = $state<HTMLDivElement | null>(null);
 
+	// Includes the description (when present) rather than just the label —
+	// two options can share an identical label (e.g. a Championship-flight
+	// golfer's Gross and Net player_entries rows are both named the same),
+	// so the collapsed field needs the description to stay unambiguous
+	// about which one is actually selected, not just which player.
+	function displayFor(option: Option | null): string {
+		if (!option) return '';
+		return option.description ? `${option.label} (${option.description})` : option.label;
+	}
+
+	let selectedOption = $derived(options.find((o) => o.value === value) ?? null);
+
 	// A writable $derived (Svelte 5.25+): starts out tracking the current
-	// selection's label, but reassigning it (via bind:value as the user
-	// types) overrides that until the derived expression itself changes
-	// again — e.g. a selection, or the parent resetting `value` to null
-	// after a successful submit. That's exactly "sync to the selection,
-	// except while the user is actively typing."
-	let query = $derived(options.find((o) => o.value === value)?.label ?? '');
+	// selection's display text, but reassigning it (via bind:value as the
+	// user types, or explicitly on focus/close below) overrides that until
+	// the derived expression's own dependencies (`value`/`options`) change
+	// again — e.g. a genuine new selection, or the parent resetting `value`
+	// to null after a successful submit.
+	let query = $derived(displayFor(selectedOption));
 
 	function select(option: Option) {
 		value = option.value;
 		open = false;
 	}
 
+	// Reopening a field that already has a selection previously pre-filled
+	// the *compound* "label (description)" text — which, being more
+	// specific than a plain name, often didn't fuzzy-match a sibling option
+	// well enough to show it (e.g. reopening "Abigail Lambert (Flight A
+	// Flight · gross)" could show no results at all, since none of that
+	// exact text appears in the Net entry's own registered value). Clearing
+	// the field on focus instead means reopening always starts by browsing
+	// the full list, exactly like a fresh search.
+	function focusForSearch() {
+		open = true;
+		query = '';
+	}
+
+	// The counterpart to focusForSearch(): closing without picking a new
+	// option needs to explicitly restore the field to reflect the existing
+	// selection, since `value` itself hasn't changed and so the $derived
+	// above won't recompute on its own.
+	function closeWithoutSelecting() {
+		open = false;
+		query = displayFor(selectedOption);
+	}
+
 	function handleWindowPointerDown(event: PointerEvent) {
 		if (containerEl && !containerEl.contains(event.target as Node)) {
-			open = false;
+			closeWithoutSelecting();
 		}
 	}
 
@@ -73,9 +107,9 @@
 			bind:value={query}
 			{disabled}
 			{placeholder}
-			onfocus={() => (open = true)}
+			onfocus={focusForSearch}
 			onkeydown={(event) => {
-				if (event.key === 'Escape') open = false;
+				if (event.key === 'Escape') closeWithoutSelecting();
 			}}
 			class={cn(
 				'dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 h-8 w-full rounded-lg border bg-transparent px-2.5 py-1 text-base transition-colors outline-none focus-visible:ring-3 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm'
@@ -91,8 +125,17 @@
 					</CommandPrimitive.Empty>
 					<CommandPrimitive.Group>
 						{#each options as option (option.value)}
+							<!-- bits-ui's Command registers each item by this `value` prop
+							     internally (a Map keyed by the exact string, used for both
+							     scoring/filtering and the registered-item lookup) — it has
+							     to be unique per item, not just human-searchable text.
+							     option.label alone collides whenever two options share a
+							     name (a Championship-flight golfer's Gross/Net entries),
+							     silently corrupting bits-ui's filtering for the second one
+							     registered. Folding the description in keeps it both
+							     unique and still text the typed query matches against. -->
 							<CommandPrimitive.Item
-								value={option.label}
+								value={option.description ? `${option.label} ${option.description}` : option.label}
 								onSelect={() => select(option)}
 								class="flex cursor-default flex-col rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-selected:bg-muted data-selected:text-foreground"
 							>
