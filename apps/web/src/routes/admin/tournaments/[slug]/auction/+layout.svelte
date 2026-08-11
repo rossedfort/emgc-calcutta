@@ -10,10 +10,6 @@
 		size="sub"
 		tabs={[
 			{
-				href: resolve('/admin/tournaments/[slug]/auction/queue', { slug: data.tournament.slug }),
-				label: 'Live auction queue'
-			},
-			{
 				href: resolve('/admin/tournaments/[slug]/auction/live', { slug: data.tournament.slug }),
 				label: 'Live auction'
 			},

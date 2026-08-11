@@ -99,13 +99,17 @@ export interface PayoutGroup {
 // marked_paid_by), not a bidirectional pair between the same two tables
 // like player_entries<->bids — but the effect on PostgREST's embed
 // inference is the same "more than one relationship was found" failure.
+//
+// bidder:users!bids_bidder_id_fkey (Phase 32) needs the same hint for the
+// same reason: bids now has two FK paths to users (bidder_id and the new
+// placed_by_admin_id), so this embed needs disambiguating too.
 export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, flight, division, status, buyer_marked_paid_at, players(slug, first_name, last_name, is_field), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email, phone))'
+			'id, flight, division, status, buyer_marked_paid_at, players(slug, first_name, last_name, is_field), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users!bids_bidder_id_fkey(id, first_name, last_name, email, phone))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live']);
@@ -162,7 +166,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 			? await supabase
 					.from('player_entries')
 					.select(
-						'id, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(bidder:users(first_name, last_name, email, phone))'
+						'id, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(bidder:users!bids_bidder_id_fkey(first_name, last_name, email, phone))'
 					)
 					.in('id', fieldLotIdsForSwept)
 			: { data: [], error: null };

@@ -6,11 +6,13 @@
 		RealtimeLiveLot,
 		RealtimePlayerEntry
 	} from '@emgc-calcutta/shared-types';
+	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import * as Table from '$lib/components/ui/table';
 	import { currentHighBid } from '$lib/bids';
 	import {
 		formatHandicapIndex,
@@ -111,9 +113,31 @@
 			closeFormEl?.requestSubmit();
 		}
 	});
+
+	// Phase 32: the reorderable queue table (merged in from the former
+	// standalone /auction/queue screen) is a plain server-loaded list,
+	// refreshed via each action's own invalidateAll() — not Realtime-driven
+	// like the current-lot card above. It's a deliberate management action
+	// screen, not something that needs to react to bids landing elsewhere.
+	let queuePending = $state<Record<string, boolean>>({});
+	let sortPending = $state(false);
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
+	{#if currentLot && currentPlayer}
+		<div class="flex flex-col gap-3 rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
+			<AdminBidForm
+				supabase={data.supabase}
+				tournament={data.tournament}
+				participants={data.participants}
+				entryId={currentPlayer.id}
+				entryLabel={formatPlayerName(currentPlayer)}
+				highBid={high}
+			/>
+		</div>
+	{/if}
+
 	<RealtimeStatusBanner status={connectionStatus} />
 
 	{#if errorMessage}
@@ -162,6 +186,9 @@
 					<span class="font-data text-lg text-ink">
 						{high ? formatCurrency(high.amount) : 'No bids yet'}
 					</span>
+					{#if high?.placed_by_admin_id}
+						<Badge variant="sand" class="w-fit">Admin-placed</Badge>
+					{/if}
 				</div>
 				<div class="flex flex-col gap-1 bg-scorecard p-3">
 					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
@@ -232,7 +259,168 @@
 	{:else}
 		<EmptyState
 			title="Queue is empty"
-			description="Add reserved players to the queue before starting the live auction."
+			description="Reserved players are added to the queue automatically as they cross the reserve threshold during the silent auction."
 		/>
 	{/if}
+
+	<div class="flex flex-col gap-2">
+		<div class="flex items-center justify-between gap-2">
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">Upcoming queue</p>
+			{#if data.queue.length > 1}
+				<div class="flex items-center gap-2">
+					<span class="text-xs text-ink/60">Sort:</span>
+					<form
+						method="POST"
+						action="?/sortHandicapAsc"
+						use:enhance={() => {
+							sortPending = true;
+							return async ({ update }) => {
+								await update();
+								sortPending = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="outline" size="sm" disabled={sortPending}>
+							Handicap ascending
+						</Button>
+					</form>
+					<form
+						method="POST"
+						action="?/sortHandicapDesc"
+						use:enhance={() => {
+							sortPending = true;
+							return async ({ update }) => {
+								await update();
+								sortPending = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="outline" size="sm" disabled={sortPending}>
+							Handicap descending
+						</Button>
+					</form>
+					<form
+						method="POST"
+						action="?/sortShuffle"
+						use:enhance={() => {
+							sortPending = true;
+							return async ({ update }) => {
+								await update();
+								sortPending = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="outline" size="sm" disabled={sortPending}>
+							Shuffle
+						</Button>
+					</form>
+				</div>
+			{/if}
+		</div>
+		{#if data.queue.length === 0}
+			<EmptyState
+				title="Nothing queued"
+				description="Players are added automatically as they cross the reserve threshold during the silent auction."
+			/>
+		{:else}
+			<Table.Root>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head class="w-12">#</Table.Head>
+						<Table.Head>Name</Table.Head>
+						<Table.Head>Flight</Table.Head>
+						<Table.Head>Handicap</Table.Head>
+						<Table.Head>Actions</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each data.queue as lot, index (lot.id)}
+						<Table.Row>
+							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
+							<Table.Cell class="font-medium text-ink">
+								{formatPlayerName(lot.player)}
+								<DivisionBadge division={lot.player.division} />
+								{#if lot.player.is_field}
+									<Badge variant="brass">Field lot</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell>{lot.player.flight || '—'}</Table.Cell>
+							<Table.Cell class="font-data"
+								>{formatHandicapIndex(lot.player.handicap_index)}</Table.Cell
+							>
+							<Table.Cell>
+								<div class="flex items-center gap-1">
+									<form
+										method="POST"
+										action="?/moveUp"
+										use:enhance={() => {
+											queuePending[lot.id] = true;
+											return async ({ update }) => {
+												await update();
+												queuePending[lot.id] = false;
+											};
+										}}
+									>
+										<input type="hidden" name="lotId" value={lot.id} />
+										<Button
+											type="submit"
+											variant="outline"
+											size="icon-sm"
+											disabled={index === 0 || queuePending[lot.id]}
+											aria-label="Move {formatPlayerName(lot.player)} up"
+										>
+											↑
+										</Button>
+									</form>
+									<form
+										method="POST"
+										action="?/moveDown"
+										use:enhance={() => {
+											queuePending[lot.id] = true;
+											return async ({ update }) => {
+												await update();
+												queuePending[lot.id] = false;
+											};
+										}}
+									>
+										<input type="hidden" name="lotId" value={lot.id} />
+										<Button
+											type="submit"
+											variant="outline"
+											size="icon-sm"
+											disabled={index === data.queue.length - 1 || queuePending[lot.id]}
+											aria-label="Move {formatPlayerName(lot.player)} down"
+										>
+											↓
+										</Button>
+									</form>
+									<form
+										method="POST"
+										action="?/remove"
+										use:enhance={() => {
+											queuePending[lot.id] = true;
+											return async ({ update }) => {
+												await update();
+												queuePending[lot.id] = false;
+											};
+										}}
+									>
+										<input type="hidden" name="lotId" value={lot.id} />
+										<Button
+											type="submit"
+											variant="destructive"
+											size="sm"
+											disabled={queuePending[lot.id]}
+										>
+											Remove
+										</Button>
+									</form>
+								</div>
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+		{/if}
+	</div>
 </div>

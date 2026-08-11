@@ -61,7 +61,7 @@
 				label: 'Players'
 			},
 			{
-				href: resolve('/admin/tournaments/[slug]/auction/queue', { slug: data.tournament.slug }),
+				href: resolve('/admin/tournaments/[slug]/auction/live', { slug: data.tournament.slug }),
 				label: 'Auction',
 				match: `/admin/tournaments/${data.tournament.slug}/auction`
 			},

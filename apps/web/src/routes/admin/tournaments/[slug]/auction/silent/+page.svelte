@@ -1,18 +1,76 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import type { RealtimeBid, RealtimePlayerEntry } from '@emgc-calcutta/shared-types';
+	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
+	import Combobox from '$lib/components/Combobox.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import VoidBidDialog from '$lib/components/VoidBidDialog.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
+	import { currentHighBid } from '$lib/bids';
 	import { formatPlayerName } from '$lib/players';
+	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 	import type { SilentAuctionBidRow } from './+page.server';
 
 	let { data } = $props();
 	let { supabase, tournament, bids } = $derived(data);
+
+	let liveBids = $state<RealtimeBid[]>([]);
+	let liveEntries = $state<RealtimePlayerEntry[]>([]);
+	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
+
+	onMount(() => {
+		const rt = createTournamentRealtime(
+			supabase,
+			tournament.id,
+			data.entries.map((e) => e.id)
+		);
+		const unsubBids = rt.bids.subscribe((b) => (liveBids = b));
+		const unsubEntries = rt.entries.subscribe((e) => (liveEntries = e));
+		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
+		return () => {
+			unsubBids();
+			unsubEntries();
+			unsubConnection();
+			rt.destroy();
+		};
+	});
+
+	// Phase 32: the admin-on-behalf-of-participant bid panel needs to know
+	// which entries are currently open (many are, during silent phase) and
+	// each one's current high bid — both live-updated the same way the
+	// merged live auction screen's own player list is, so an entry crossing
+	// the threshold elsewhere drops out of this search without a reload.
+	let currentEntries = $derived(
+		data.entries.map((entry) => {
+			const live = liveEntries.find((e) => e.id === entry.id);
+			return live ? { ...entry, status: live.status } : entry;
+		})
+	);
+	let openEntries = $derived(currentEntries.filter((entry) => entry.status === 'open'));
+	let entryOptions = $derived(
+		openEntries.map((entry) => ({
+			value: entry.id,
+			label: formatPlayerName(entry),
+			description:
+				[
+					entry.flight ? `Flight ${entry.flight}` : null,
+					entry.division !== 'overall' ? entry.division : null
+				]
+					.filter(Boolean)
+					.join(' · ') || undefined
+		}))
+	);
+
+	let bidEntryId = $state<string | null>(null);
+	let selectedEntry = $derived(currentEntries.find((e) => e.id === bidEntryId) ?? null);
+	let selectedEntryHigh = $derived(bidEntryId ? currentHighBid(liveBids, bidEntryId) : null);
 
 	let playerFilter = $state('');
 	let bidderFilter = $state('');
@@ -62,6 +120,36 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
+	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+		<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
+		<p class="text-sm text-ink/70">
+			The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
+				tournament.threshold_amount
+			)} or more reserve a player for the live auction — each new bid must beat the current high by at
+			least {formatCurrency(tournament.min_increment)}.
+		</p>
+		<div class="flex flex-col gap-1">
+			<span class="font-data text-xs tracking-widest text-fairway uppercase">Player</span>
+			<Combobox
+				options={entryOptions}
+				bind:value={bidEntryId}
+				placeholder="Search by name…"
+				emptyText="No open players found."
+			/>
+		</div>
+		<AdminBidForm
+			{supabase}
+			{tournament}
+			participants={data.participants}
+			entryId={bidEntryId}
+			entryLabel={selectedEntry ? formatPlayerName(selectedEntry) : null}
+			highBid={selectedEntryHigh}
+			onSuccess={() => invalidateAll()}
+		/>
+	</div>
+
+	<RealtimeStatusBanner status={connectionStatus} />
+
 	<div class="flex flex-col gap-2">
 		<h2 class="font-display text-lg font-semibold text-ink">Recent silent auction bids</h2>
 		<p class="text-sm text-ink/60">
@@ -119,6 +207,9 @@
 										{bid.bidder_name}
 									{:else}
 										<span class="text-muted-foreground">—</span>
+									{/if}
+									{#if bid.placed_by_admin_id}
+										<Badge variant="sand" class="ml-1">Admin-placed</Badge>
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="font-data whitespace-nowrap"

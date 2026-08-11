@@ -25,12 +25,21 @@
 // safely express "amount must exceed current high by the min increment"
 // under concurrent bids).
 //
-// Deliberately does NOT check bidderId against the *specific* target
-// player's linked userId — self-bidding is normal, deliberate Calcutta
-// behavior (spec 4.9), not a bug to guard against. This is a wholly
-// separate concern from the roster-membership check below, which is about
-// whether the caller can bid in THIS TOURNAMENT at all, not about which
-// specific player they're bidding on.
+// Deliberately does NOT check the acting bidder's own id against the
+// *specific* target player's linked userId — self-bidding is normal,
+// deliberate Calcutta behavior (spec 4.9), not a bug to guard against. This
+// is a wholly separate concern from the roster-membership check below,
+// which is about whether the acting bidder can bid in THIS TOURNAMENT at
+// all, not about which specific player they're bidding on.
+//
+// "Acting bidder" (Phase 32): normally the caller themselves, but the
+// request body's bidderId field lets an Admin/Owner caller place a bid on
+// behalf of a different participant instead — see the on-behalf-of block
+// near the top of the handler. Every check below that used to reference
+// the caller's own id directly (roster membership, idempotency, the bid
+// row's bidder_id/bidder_name) uses whichever identity is acting, so this
+// entire flow works unchanged for the normal self-bid case where the two
+// are the same.
 //
 // After a successful silent bid, conditionally flips the player to
 // "reserved" if the amount crosses the tournament's threshold — a
@@ -98,6 +107,57 @@ export default {
         return Response.json({ error: "amount must be a positive number" }, {
           status: 400,
         });
+      }
+
+      // On-behalf-of bidding (Phase 32): the admin "Place bids" screen lets
+      // an Admin/Owner enter bids for participants during the in-person
+      // portion of the silent/live auction. bidderId is rejected outright
+      // for a non-admin/owner caller, rather than silently falling back to
+      // "place this as yourself" — a caller that explicitly asked to bid
+      // for someone else and got a bid recorded under their own identity
+      // instead would be a confusing, hard-to-notice footgun.
+      let actingBidderId = ctx.userClaims!.id;
+      let actingBidderName: string | null;
+      const isOnBehalf = typeof body.bidderId === "string" &&
+        body.bidderId.length > 0;
+      if (isOnBehalf) {
+        if (caller.role !== "admin" && caller.role !== "owner") {
+          return Response.json({
+            error:
+              "Only an Admin or Owner can place a bid on behalf of another participant",
+          }, { status: 403 });
+        }
+        const { data: targetUser, error: targetUserError } = await ctx
+          .supabaseAdmin
+          .from("users")
+          .select("first_name, last_name")
+          .eq("id", body.bidderId!)
+          .maybeSingle();
+        if (targetUserError) {
+          return Response.json({ error: targetUserError.message }, {
+            status: 500,
+          });
+        }
+        if (!targetUser) {
+          return Response.json({ error: "Participant not found" }, {
+            status: 404,
+          });
+        }
+        actingBidderId = body.bidderId!;
+        actingBidderName = [targetUser.first_name, targetUser.last_name]
+          .filter(Boolean)
+          .join(" ") || null;
+      } else {
+        // Denormalized onto the row so it rides along on the existing
+        // postgres_changes Realtime channel with zero extra queries — see
+        // the bidder_name migration's own header comment for why this is
+        // safe under bids_select_participant_plus's existing whole-row
+        // grant. Null if the caller hasn't set a name yet (both columns are
+        // nullable on `users`); the UI omits the "(name)" suffix in that
+        // case rather than showing something empty/misleading.
+        actingBidderName = [caller.first_name, caller.last_name]
+          .filter(Boolean)
+          .join(" ") || null;
       }
 
       const { data: entry, error: entryError } = await ctx.supabaseAdmin
@@ -178,21 +238,26 @@ export default {
       }
 
       // Bid eligibility is 1:1 with this tournament's Player roster (spec
-      // 4.9) — the caller needs *a* Player row in this tournament, not
-      // necessarily the one they're bidding on.
+      // 4.9) — the acting bidder (the on-behalf participant, if this is an
+      // admin-placed bid; otherwise the caller themselves) needs *a* Player
+      // row in this tournament, not necessarily the one they're bidding on.
       const { data: rosterEntry, error: rosterError } = await ctx.supabaseAdmin
         .from("players")
         .select("id")
         .eq("tournament_id", entry.tournament_id)
-        .eq("user_id", ctx.userClaims!.id)
+        .eq("user_id", actingBidderId)
         .maybeSingle();
       if (rosterError) {
         return Response.json({ error: rosterError.message }, { status: 500 });
       }
       if (!rosterEntry) {
         return Response.json(
-          { error: "You're not entered in this tournament" },
-          { status: 403 },
+          {
+            error: isOnBehalf
+              ? "That participant isn't entered in this tournament"
+              : "You're not entered in this tournament",
+          },
+          { status: isOnBehalf ? 400 : 403 },
         );
       }
 
@@ -211,7 +276,7 @@ export default {
         .from("bids")
         .select("id")
         .eq("entry_id", body.entryId)
-        .eq("bidder_id", ctx.userClaims!.id)
+        .eq("bidder_id", actingBidderId)
         .eq("amount", body.amount)
         .gte("placed_at", idempotencyCutoff)
         .limit(1)
@@ -223,7 +288,9 @@ export default {
       }
       if (recentDuplicate) {
         return Response.json({
-          error: "You just placed this bid — wait a moment before trying again",
+          error: isOnBehalf
+            ? "That bid was just placed for this participant — wait a moment before trying again"
+            : "You just placed this bid — wait a moment before trying again",
         }, { status: 409 });
       }
 
@@ -320,27 +387,17 @@ export default {
         }, { status: 400 });
       }
 
-      // Denormalized onto the row so it rides along on the existing
-      // postgres_changes Realtime channel with zero extra queries — see
-      // the bidder_name migration's own header comment for why this is
-      // safe under bids_select_participant_plus's existing whole-row
-      // grant. Null if the caller hasn't set a name yet (both columns are
-      // nullable on `users`); the UI omits the "(name)" suffix in that
-      // case rather than showing something empty/misleading.
-      const bidderName = [caller.first_name, caller.last_name]
-        .filter(Boolean)
-        .join(" ") || null;
-
       const { data: bid, error: insertError } = await ctx.supabaseAdmin
         .from("bids")
         .insert({
           entry_id: body.entryId,
-          bidder_id: ctx.userClaims!.id,
+          bidder_id: actingBidderId,
           amount: body.amount,
           phase,
-          bidder_name: bidderName,
+          bidder_name: actingBidderName,
+          placed_by_admin_id: isOnBehalf ? ctx.userClaims!.id : null,
         })
-        .select("id, amount, phase, placed_at")
+        .select("id, amount, phase, placed_at, bidder_id, placed_by_admin_id")
         .single();
       if (insertError) {
         return Response.json({ error: insertError.message }, {
@@ -362,6 +419,12 @@ export default {
           amount: bid.amount,
           phase: bid.phase,
           placed_at: bid.placed_at,
+          bidder_id: bid.bidder_id,
+          // Present whenever this was an admin-placed bid, so the audit
+          // trail records both who acted (actor_id above) and who it was
+          // placed for — otherwise indistinguishable from a self-placed
+          // bid once written.
+          placed_by_admin_id: bid.placed_by_admin_id,
         },
         ip,
         user_agent,

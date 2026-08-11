@@ -137,6 +137,7 @@ export type Database = {
           id: string;
           phase: Database["public"]["Enums"]["bid_phase"];
           placed_at: string;
+          placed_by_admin_id: string | null;
           void_reason: string | null;
           voided_at: string | null;
         };
@@ -148,6 +149,7 @@ export type Database = {
           id?: string;
           phase: Database["public"]["Enums"]["bid_phase"];
           placed_at?: string;
+          placed_by_admin_id?: string | null;
           void_reason?: string | null;
           voided_at?: string | null;
         };
@@ -159,6 +161,7 @@ export type Database = {
           id?: string;
           phase?: Database["public"]["Enums"]["bid_phase"];
           placed_at?: string;
+          placed_by_admin_id?: string | null;
           void_reason?: string | null;
           voided_at?: string | null;
         };
@@ -175,6 +178,13 @@ export type Database = {
             columns: ["entry_id"];
             isOneToOne: false;
             referencedRelation: "player_entries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "bids_placed_by_admin_id_fkey";
+            columns: ["placed_by_admin_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
             referencedColumns: ["id"];
           },
         ];

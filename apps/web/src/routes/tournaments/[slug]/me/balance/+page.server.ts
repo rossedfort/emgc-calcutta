@@ -167,7 +167,7 @@ export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => 
 			.select(
 				`id, division,
 				players!inner(first_name, last_name, user_id),
-				winning_bid:bids!player_entries_winning_bid_id_fkey!inner(amount, bidder_id, buyer:users(first_name, last_name, email, phone)),
+				winning_bid:bids!player_entries_winning_bid_id_fkey!inner(amount, bidder_id, buyer:users!bids_bidder_id_fkey(first_name, last_name, email, phone)),
 				stake_buyback:stake_buybacks(status)`
 			)
 			.eq('tournament_id', tournament.id)

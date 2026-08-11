@@ -334,6 +334,12 @@
 		{:else if high.bidder_id === currentUserId}
 			<span class="ml-1 font-sans text-xs text-ink/60">(Your bid)</span>
 		{/if}
+		{#if high.placed_by_admin_id}
+			<!-- Phase 32: shown regardless of bid_anonymity_enabled, since
+			     this flags who acted (an admin) rather than who the bid
+			     belongs to, so it doesn't leak the suppressed bidder identity. -->
+			<Badge variant="sand" class="ml-1">Admin-placed</Badge>
+		{/if}
 	{:else}
 		-
 	{/if}
