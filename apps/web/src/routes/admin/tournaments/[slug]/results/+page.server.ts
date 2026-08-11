@@ -42,9 +42,10 @@ export type ResultsGroup = SharedResultsGroup<ResultsRow>;
 // Only sold entries are eligible for a placement (set-placement itself
 // rejects anything else) — open/reserved/no_bid entries never appear
 // here. winning_bid:bids!player_entries_winning_bid_id_fkey and
-// bidder:users(...) mirror the bookkeeping page's own disambiguated
-// embeds (player_entries<->bids has two FK paths; see that page's load
-// function for the full explanation).
+// bidder:users!bids_bidder_id_fkey(...) mirror the bookkeeping page's own
+// disambiguated embeds (player_entries<->bids and, since Phase 32,
+// bids<->users each have two FK paths; see that page's load function for
+// the full explanation).
 //
 // Sorted by placement ascending (1st, 2nd, 3rd... in finishing order),
 // nulls last so not-yet-placed entries trail the list rather than
@@ -67,7 +68,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, flight, division, status, placement, field_entry_id, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users(id, first_name, last_name, email))'
+			'id, flight, division, status, placement, field_entry_id, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users!bids_bidder_id_fkey(id, first_name, last_name, email))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live', 'field']);
@@ -95,7 +96,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 			? await supabase
 					.from('player_entries')
 					.select(
-						'id, players(slug, first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(bidder:users(id, first_name, last_name, email))'
+						'id, players(slug, first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(bidder:users!bids_bidder_id_fkey(id, first_name, last_name, email))'
 					)
 					.in('id', fieldEntryIds)
 			: { data: [], error: null };
