@@ -16,6 +16,12 @@
 			{
 				href: resolve('/admin/tournaments/[slug]/auction/silent', { slug: data.tournament.slug }),
 				label: 'Silent auction bids'
+			},
+			{
+				href: resolve('/admin/tournaments/[slug]/auction/place-bids', {
+					slug: data.tournament.slug
+				}),
+				label: 'Place bids'
 			}
 		]}
 	/>
