@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@emgc-calcutta/shared-types';
+import {
+	cursorFilterExpression,
+	type Cursor,
+	type CursorDirection
+} from '$lib/server/cursorPagination';
 import { localDateTimeToUtcIso } from '$lib/time';
 
 export interface AuditFilters {
@@ -33,9 +38,10 @@ export const AUDIT_EVENT_SELECT =
 	'id, action, entity_type, entity_id, actor_identity, reason, before, after, created_at, tournaments(name), players(first_name, last_name)';
 
 // Shared by the list page and the CSV export endpoint — both need the exact
-// same filtered query, just with a different row cap: the list caps at 200
-// for display, export intentionally doesn't (offline dispute resolution
-// means the whole filtered set, not just what's currently on screen).
+// same filtered query, just with different pagination: the list page cursor-
+// paginates (options.cursor/direction, Phase 35), export intentionally
+// leaves both unset for one uncapped query (offline dispute resolution means
+// the whole filtered set, not just what's currently on screen).
 //
 // entity_id is polymorphic and player_id has no denormalized name of its
 // own, so "filter by player name" is a two-step lookup: find matching
@@ -44,15 +50,22 @@ export const AUDIT_EVENT_SELECT =
 export async function queryAuditEvents(
 	supabase: SupabaseClient<Database>,
 	filters: AuditFilters,
-	options: { limit?: number } = {}
+	options: { limit?: number; cursor?: Cursor | null; direction?: CursorDirection } = {}
 ) {
+	const direction = options.direction ?? 'before';
+	const ascending = direction === 'after';
+
 	let query = supabase
 		.from('audit_events')
 		.select(AUDIT_EVENT_SELECT)
-		.order('created_at', { ascending: false });
+		.order('created_at', { ascending })
+		.order('id', { ascending });
 
 	if (options.limit) {
 		query = query.limit(options.limit);
+	}
+	if (options.cursor) {
+		query = query.or(cursorFilterExpression(options.cursor, direction, 'created_at'));
 	}
 	if (filters.participant) {
 		query = query.ilike('actor_identity', `%${filters.participant}%`);
