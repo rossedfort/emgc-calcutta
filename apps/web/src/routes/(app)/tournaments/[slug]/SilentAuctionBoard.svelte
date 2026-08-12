@@ -18,7 +18,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Table from '$lib/components/ui/table';
-	import { currentHighBid } from '$lib/bids';
+	import { currencyChars, currentHighBid } from '$lib/bids';
 	import {
 		PLAYER_STATUSES,
 		formatHandicapIndex,
@@ -147,23 +147,6 @@
 	);
 
 	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
-
-	// Splits a formatted amount ("$1,850.00") into characters for the
-	// slot-machine effect, each keyed by distance from the *end* of the
-	// string rather than the start — bid amounts only ever grow (a bid must
-	// beat the current high), so a new leading digit appearing (e.g.
-	// "$99.00" -> "$100.00") only ever prepends a character; keying from the
-	// right means the existing trailing digits' SlotMachineDigit instances
-	// (and the mid-spin state they're holding) keep their identity instead
-	// of every position remapping to a different character.
-	function currencyChars(formatted: string): { char: string; isDigit: boolean; key: number }[] {
-		const chars = formatted.split('');
-		return chars.map((char, i) => ({
-			char,
-			isDigit: char >= '0' && char <= '9',
-			key: chars.length - 1 - i
-		}));
-	}
 
 	// No bid yet on this entry: the floor is the tournament's minimum opening
 	// bid (place-bid's own `!highBid` branch, Phase 21), not min_increment —

@@ -16,18 +16,22 @@
 	// there and here — (app)'s AppShell, admin's plain wrapper, the
 	// tournament's PageHeader/tab nav, and the auction sub-nav. This is what
 	// actually makes the page shell-less (see admin/tournaments/[slug]/
-	// auction/live/+page.svelte's "TV Display" button). It does NOT skip
-	// any ancestor *load* functions — admin/+layout.server.ts's role check
-	// still runs on every request to this route, same as any other admin
-	// page; only the component tree is reset, not the data/auth chain.
-	// Because it resets past (app)'s +layout.svelte, app.css (normally
-	// loaded there) has to be imported directly here too.
+	// auction/live/+page.svelte's "TV Display" button). This reset also
+	// skips the ancestor *load* chain, not just the component tree —
+	// admin/+layout.server.ts's role check and admin/tournaments/[slug]/
+	// +layout.server.ts's tournament fetch do NOT run for this route despite
+	// living in that part of the tree (confirmed via this route's own
+	// generated $types.d.ts, see +page.server.ts's header comment), so both
+	// are reimplemented directly in +page.server.ts rather than relied on
+	// from ancestors. Because the reset goes past (app)'s +layout.svelte,
+	// app.css (normally loaded there) has to be imported directly here too.
 	let { data } = $props();
 
 	let liveBids = $state<RealtimeBid[]>([]);
 	let liveEntries = $state<RealtimePlayerEntry[]>([]);
 	let liveLots = $state<RealtimeLiveLot[]>([]);
 	let connectionStatus = $state<RealtimeConnectionStatus>('connecting');
+	let bidsReady = $state(false);
 	let now = $state(new Date());
 
 	onMount(() => {
@@ -40,12 +44,14 @@
 		const unsubEntries = rt.entries.subscribe((entries) => (liveEntries = entries));
 		const unsubLots = rt.liveLots.subscribe((lots) => (liveLots = lots));
 		const unsubConnection = rt.connectionStatus.subscribe((s) => (connectionStatus = s));
+		const unsubReady = rt.ready.subscribe((r) => (bidsReady = r));
 		const tick = setInterval(() => (now = new Date()), 1000);
 		return () => {
 			unsubBids();
 			unsubEntries();
 			unsubLots();
 			unsubConnection();
+			unsubReady();
 			rt.destroy();
 			clearInterval(tick);
 		};
@@ -72,9 +78,9 @@
 		tournament={data.tournament}
 		{players}
 		{liveBids}
+		{bidsReady}
 		{liveLots}
 		currentUserId={data.currentUserId}
-		supabase={data.supabase}
 		{now}
 	/>
 </div>

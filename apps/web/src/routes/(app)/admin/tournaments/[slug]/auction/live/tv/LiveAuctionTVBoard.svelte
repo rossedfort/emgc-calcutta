@@ -1,46 +1,44 @@
 <script lang="ts">
-	import type { SupabaseClient } from '@supabase/supabase-js';
-	import { FunctionsHttpError } from '@supabase/supabase-js';
-	import type {
-		Database,
-		ErrorResponse,
-		PlaceBidRequest,
-		PlaceBidResponse,
-		RealtimeBid,
-		RealtimeLiveLot
-	} from '@emgc-calcutta/shared-types';
+	import type { RealtimeBid, RealtimeLiveLot } from '@emgc-calcutta/shared-types';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import SlotMachineDigit from '$lib/components/SlotMachineDigit.svelte';
 	import { Badge } from '$lib/components/ui/badge';
-	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
-	import { currentHighBid } from '$lib/bids';
+	import { currencyChars, currentHighBid } from '$lib/bids';
 	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
 	import { routes } from '$lib/routes';
 	import type { FieldPlayerRow } from './+page.server';
 
-	// Same content/behavior as the participant-facing LiveAuctionBoard (see
-	// tournaments/[slug]/LiveAuctionBoard.svelte) — this is its TV-sized
-	// counterpart, split out once that component was reworked for normal
-	// desktop/mobile viewing rather than scaling all the way up to
-	// TV-legible type. Rendered shell-less (see ../+page@.svelte).
+	// Same content as the participant-facing LiveAuctionBoard (see
+	// tournaments/[slug]/LiveAuctionBoard.svelte) minus the bid form — this
+	// is a passive display for the room, not a bidding surface, and is
+	// TV-sized rather than scaled for normal desktop/mobile viewing.
+	// Rendered shell-less (see ../+page@.svelte).
 	let {
 		tournament,
 		players,
 		liveBids,
+		bidsReady,
 		liveLots,
 		currentUserId,
-		supabase,
 		now
 	}: {
-		tournament: { slug: string; min_increment: number; minimum_bid: number };
+		tournament: { slug: string };
 		players: FieldPlayerRow[];
 		liveBids: RealtimeBid[];
+		bidsReady: boolean;
 		liveLots: RealtimeLiveLot[];
 		currentUserId: string;
-		supabase: SupabaseClient<Database>;
 		now: Date;
 	} = $props();
+
+	// Same "don't spin in on first paint" guard as LiveAuctionBoard/
+	// SilentAuctionBoard — only true once the Realtime store's initial
+	// snapshot has landed.
+	let pastInitialLoad = $state(false);
+	$effect(() => {
+		if (bidsReady) pastInitialLoad = true;
+	});
 
 	let currentLot = $derived(
 		liveLots.find((lot) => lot.opened_at !== null && lot.closed_at === null) ?? null
@@ -73,47 +71,6 @@
 
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-	}
-
-	function suggestedBid(): number {
-		return currentLotHigh
-			? currentLotHigh.amount + tournament.min_increment
-			: tournament.minimum_bid;
-	}
-
-	let bidAmount = $state<string | number>('');
-	let bidPending = $state(false);
-	let bidError = $state('');
-
-	async function placeBid() {
-		if (!currentPlayer) return;
-		const raw = bidAmount;
-		const amount = raw === undefined || raw === '' ? suggestedBid() : Number(raw);
-		if (!Number.isFinite(amount) || amount <= 0) {
-			bidError = 'Enter a valid bid amount';
-			return;
-		}
-
-		bidPending = true;
-		bidError = '';
-
-		const { error: invokeError } = await supabase.functions.invoke<PlaceBidResponse>('place-bid', {
-			body: { entryId: currentPlayer.id, amount } satisfies PlaceBidRequest
-		});
-
-		bidPending = false;
-
-		if (invokeError) {
-			let message = invokeError.message;
-			if (invokeError instanceof FunctionsHttpError) {
-				const body = (await invokeError.context.json().catch(() => null)) as ErrorResponse | null;
-				message = body?.error ?? message;
-			}
-			bidError = message;
-			return;
-		}
-
-		bidAmount = '';
 	}
 </script>
 
@@ -168,9 +125,22 @@
 						Current high
 					</span>
 					<span
-						class="font-data text-5xl leading-none tracking-tight text-ink tabular-nums xl:text-6xl 2xl:text-7xl"
+						class="font-data inline-flex text-5xl leading-none tracking-tight text-ink tabular-nums xl:text-6xl 2xl:text-7xl"
 					>
-						{currentLotHigh ? formatCurrency(currentLotHigh.amount) : 'No bids yet'}
+						{#if currentLotHigh}
+							{#each currencyChars(formatCurrency(currentLotHigh.amount)) as { char, isDigit, key } (key)}
+								{#if isDigit}
+									<SlotMachineDigit digit={char} delayMs={key * 60} spinIn={pastInitialLoad} />
+								{:else}
+									<span
+										class="inline-block text-center align-bottom"
+										style="height: 1.2em; width: 0.62em; line-height: 1.2em;">{char}</span
+									>
+								{/if}
+							{/each}
+						{:else}
+							No bids yet
+						{/if}
 					</span>
 				</div>
 				<div class="flex flex-col gap-2 bg-scorecard p-6 xl:p-8">
@@ -189,37 +159,6 @@
 					</span>
 				</div>
 			</div>
-
-			<form
-				class="mt-8 flex flex-col gap-2"
-				onsubmit={(event) => {
-					event.preventDefault();
-					placeBid();
-				}}
-			>
-				<div class="flex items-center gap-4">
-					<Input
-						type="number"
-						step="0.01"
-						min="0.01"
-						placeholder={suggestedBid().toFixed(2)}
-						bind:value={bidAmount}
-						disabled={bidPending}
-						class="h-14 text-xl"
-					/>
-					<Button
-						type="submit"
-						variant="brass"
-						disabled={bidPending}
-						class="h-14 bg-brass px-8 text-xl font-semibold text-ink hover:bg-brass/90"
-					>
-						{bidPending ? 'Bidding…' : 'Bid'}
-					</Button>
-				</div>
-				{#if bidError}
-					<Badge variant="flag" class="w-fit">{bidError}</Badge>
-				{/if}
-			</form>
 		</div>
 	{/if}
 
@@ -228,8 +167,13 @@
 			<p class="font-data text-sm tracking-widest text-fairway uppercase">Up next</p>
 			<div class="max-h-[36rem] overflow-y-auto">
 				<div class="grid grid-cols-2 gap-6 xl:grid-cols-3">
-					{#each upcomingLots as { lot, player } (lot.id)}
-						<div class="rounded-lg border border-brass/30 bg-scorecard p-8 text-ink">
+					{#each upcomingLots as { lot, player }, index (lot.id)}
+						<div class="flex gap-4 rounded-lg border border-brass/30 bg-scorecard p-8 text-ink">
+							<span
+								class="font-data flex size-10 shrink-0 items-center justify-center rounded-full border border-brass/40 text-lg text-ink/70"
+							>
+								{index + 1}
+							</span>
 							<div class="flex items-start justify-between gap-2">
 								<div class="flex flex-col gap-1">
 									<a

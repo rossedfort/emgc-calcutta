@@ -11,10 +11,11 @@
 	} from '@emgc-calcutta/shared-types';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
+	import SlotMachineDigit from '$lib/components/SlotMachineDigit.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { currentHighBid } from '$lib/bids';
+	import { currencyChars, currentHighBid } from '$lib/bids';
 	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
 	import { routes } from '$lib/routes';
 	import type { FieldPlayerRow } from './+page.server';
@@ -23,6 +24,7 @@
 		tournament,
 		players,
 		liveBids,
+		bidsReady,
 		liveLots,
 		currentUserId,
 		supabase,
@@ -31,11 +33,21 @@
 		tournament: { slug: string; min_increment: number; minimum_bid: number };
 		players: FieldPlayerRow[];
 		liveBids: RealtimeBid[];
+		bidsReady: boolean;
 		liveLots: RealtimeLiveLot[];
 		currentUserId: string;
 		supabase: SupabaseClient<Database>;
 		now: Date;
 	} = $props();
+
+	// Same "don't spin in on first paint" guard SilentAuctionBoard uses —
+	// only true once the Realtime store's initial snapshot has landed, so a
+	// lot that already has a bid when this page loads just shows the amount
+	// immediately instead of animating up from 0.
+	let pastInitialLoad = $state(false);
+	$effect(() => {
+		if (bidsReady) pastInitialLoad = true;
+	});
 
 	// At most one lot should ever be opened-but-not-closed at a time — an
 	// application-level invariant the Admin's open/close controls are
@@ -188,9 +200,22 @@
 						Current high
 					</span>
 					<span
-						class="font-data text-lg leading-none tracking-tight text-ink tabular-nums sm:text-2xl"
+						class="font-data inline-flex text-lg leading-none tracking-tight text-ink tabular-nums sm:text-2xl"
 					>
-						{currentLotHigh ? formatCurrency(currentLotHigh.amount) : 'No bids yet'}
+						{#if currentLotHigh}
+							{#each currencyChars(formatCurrency(currentLotHigh.amount)) as { char, isDigit, key } (key)}
+								{#if isDigit}
+									<SlotMachineDigit digit={char} delayMs={key * 60} spinIn={pastInitialLoad} />
+								{:else}
+									<span
+										class="inline-block text-center align-bottom"
+										style="height: 1.2em; width: 0.62em; line-height: 1.2em;">{char}</span
+									>
+								{/if}
+							{/each}
+						{:else}
+							No bids yet
+						{/if}
 					</span>
 				</div>
 				<div class="flex flex-col gap-1 bg-scorecard p-3 sm:p-4">
@@ -254,8 +279,13 @@
 			     hero panel above, same hierarchy as before. -->
 			<div class="max-h-[32rem] overflow-y-auto">
 				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-					{#each upcomingLots as { lot, player } (lot.id)}
-						<div class="rounded-lg border border-brass/30 bg-scorecard p-4 text-ink">
+					{#each upcomingLots as { lot, player }, index (lot.id)}
+						<div class="flex gap-3 rounded-lg border border-brass/30 bg-scorecard p-4 text-ink">
+							<span
+								class="font-data flex size-6 shrink-0 items-center justify-center rounded-full border border-brass/40 text-xs text-ink/70"
+							>
+								{index + 1}
+							</span>
 							<div class="flex items-start justify-between gap-2">
 								<div class="flex flex-col gap-1">
 									<a

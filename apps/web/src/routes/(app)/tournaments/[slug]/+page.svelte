@@ -85,6 +85,7 @@
 			tournament={data.tournament}
 			{players}
 			{liveBids}
+			{bidsReady}
 			{liveLots}
 			currentUserId={data.currentUserId}
 			supabase={data.supabase}
