@@ -45,7 +45,7 @@
 	>
 		{#snippet actions()}
 			{#if tvHref}
-				<Button href={tvHref} target="_blank" variant="outline" size="sm">
+				<Button href={tvHref} target="_blank" variant="ghost" size="xs">
 					<ExternalLinkIcon class="size-4" />
 					TV Display
 				</Button>
