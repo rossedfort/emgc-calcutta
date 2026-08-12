@@ -131,20 +131,21 @@
 
 	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 p-6 text-ink">
 		<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
-		{#if currentLot && currentPlayer}
-			<AdminBidForm
-				supabase={data.supabase}
-				tournament={data.tournament}
-				participants={data.participants}
-				entryId={currentPlayer.id}
-				entryLabel={formatPlayerName(currentPlayer)}
-				highBid={high}
-			/>
-		{:else}
-			<p class="text-sm text-ink/70">
+		<p class="text-sm text-ink/70">
+			{#if currentLot && currentPlayer}
+				Bidding on {formatPlayerName(currentPlayer)}.
+			{:else}
 				No lot is currently open for bidding — advance the queue below to open the next one.
-			</p>
-		{/if}
+			{/if}
+		</p>
+		<AdminBidForm
+			supabase={data.supabase}
+			tournament={data.tournament}
+			participants={data.participants}
+			entryId={currentPlayer?.id ?? null}
+			entryLabel={currentPlayer ? formatPlayerName(currentPlayer) : null}
+			highBid={high}
+		/>
 	</div>
 
 	<RealtimeStatusBanner status={connectionStatus} />
@@ -153,86 +154,104 @@
 		<p class="text-sm text-destructive">{errorMessage}</p>
 	{/if}
 
-	{#if currentLot && currentPlayer}
-		<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
-			<div class="flex items-start justify-between gap-2">
-				<div class="flex flex-col gap-1">
-					<p class="flex items-center gap-2 font-display text-xl font-semibold text-ink">
+	<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+		<div class="flex items-start justify-between gap-2">
+			<div class="flex flex-col gap-1">
+				<p class="flex items-center gap-2 font-display text-xl font-semibold text-ink">
+					{#if currentPlayer}
 						{formatPlayerName(currentPlayer)}
 						<DivisionBadge division={currentPlayer.division} />
-					</p>
-					{#if currentPlayer.is_field}
-						{@const pooled = pooledPlayers(currentPlayer.id)}
-						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
-							{currentPlayer.flight ? `Flight ${currentPlayer.flight} · ` : ''}Pooled players:
-							{pooled.length > 0 ? pooled.map((p) => formatPlayerName(p)).join(', ') : '—'}
-						</span>
-					{:else if currentPlayer.flight || currentPlayer.handicap_index !== null}
-						<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
-							{[
-								currentPlayer.flight ? `Flight ${currentPlayer.flight}` : null,
-								currentPlayer.handicap_index !== null
-									? `HCP ${formatHandicapIndex(currentPlayer.handicap_index)}`
-									: null
-							]
-								.filter(Boolean)
-								.join(' · ')}
-						</span>
+					{:else}
+						No lot open
 					{/if}
-				</div>
+				</p>
+				{#if currentPlayer?.is_field}
+					{@const pooled = pooledPlayers(currentPlayer.id)}
+					<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+						{currentPlayer.flight ? `Flight ${currentPlayer.flight} · ` : ''}Pooled players:
+						{pooled.length > 0 ? pooled.map((p) => formatPlayerName(p)).join(', ') : '—'}
+					</span>
+				{:else if currentPlayer && (currentPlayer.flight || currentPlayer.handicap_index !== null)}
+					<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+						{[
+							currentPlayer.flight ? `Flight ${currentPlayer.flight}` : null,
+							currentPlayer.handicap_index !== null
+								? `HCP ${formatHandicapIndex(currentPlayer.handicap_index)}`
+								: null
+						]
+							.filter(Boolean)
+							.join(' · ')}
+					</span>
+				{:else}
+					<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+						Advance the queue below to open the next lot.
+					</span>
+				{/if}
+			</div>
+			{#if currentPlayer}
 				<Badge variant={playerStatusBadgeVariant(currentPlayer.status)}>
 					{playerStatusLabel(currentPlayer.status)}
 				</Badge>
-			</div>
+			{:else}
+				<Badge variant="outline">Idle</Badge>
+			{/if}
+		</div>
 
-			<div
-				class="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40"
-			>
-				<div class="flex flex-col gap-1 bg-scorecard p-3">
-					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
-						Current high
-					</span>
-					<span class="font-data text-lg text-ink">
-						{high ? formatCurrency(high.amount) : 'No bids yet'}
-					</span>
-					{#if high?.placed_by_admin_id}
-						<Badge variant="sand" class="w-fit">Admin-placed</Badge>
+		<div
+			class="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40"
+		>
+			<div class="flex flex-col gap-1 bg-scorecard p-3">
+				<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+					Current high
+				</span>
+				<span class="font-data text-lg text-ink">
+					{#if !currentLot}
+						—
+					{:else if high}
+						{formatCurrency(high.amount)}
+					{:else}
+						No bids yet
 					{/if}
-				</div>
-				<div class="flex flex-col gap-1 bg-scorecard p-3">
-					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
-						Closes in
-					</span>
-					<span class="font-data text-lg text-ink">
-						{secondsRemaining !== null ? `${secondsRemaining}s` : '—'}
-					</span>
-				</div>
+				</span>
+				{#if high?.placed_by_admin_id}
+					<Badge variant="sand" class="w-fit">Admin-placed</Badge>
+				{/if}
 			</div>
+			<div class="flex flex-col gap-1 bg-scorecard p-3">
+				<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+					Closes in
+				</span>
+				<span class="font-data text-lg text-ink">
+					{secondsRemaining !== null ? `${secondsRemaining}s` : '—'}
+				</span>
+			</div>
+		</div>
 
-			<form
-				method="POST"
-				action="?/close"
-				class="mt-4"
-				bind:this={closeFormEl}
-				use:enhance={() => {
-					closeSubmitting = true;
-					return async ({ update }) => {
-						await update();
-						closeSubmitting = false;
-					};
-				}}
-			>
-				<input type="hidden" name="lotId" value={currentLot.id} />
-				<Button type="submit" variant="destructive" disabled={closeSubmitting}>
-					{closeSubmitting
+		<form
+			method="POST"
+			action="?/close"
+			class="mt-4"
+			bind:this={closeFormEl}
+			use:enhance={() => {
+				closeSubmitting = true;
+				return async ({ update }) => {
+					await update();
+					closeSubmitting = false;
+				};
+			}}
+		>
+			<input type="hidden" name="lotId" value={currentLot?.id ?? ''} />
+			<Button type="submit" variant="destructive" disabled={!currentLot || closeSubmitting}>
+				{!currentLot
+					? 'No lot open'
+					: closeSubmitting
 						? 'Closing…'
 						: high
 							? `Close lot — sell to ${formatCurrency(high.amount)}`
 							: 'Close lot — no bid'}
-				</Button>
-			</form>
-		</div>
-	{/if}
+			</Button>
+		</form>
+	</div>
 
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center justify-between gap-2">
