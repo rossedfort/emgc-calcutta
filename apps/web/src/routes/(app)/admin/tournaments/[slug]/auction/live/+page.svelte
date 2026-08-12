@@ -1,19 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { navigating, page } from '$app/state';
 	import type {
 		RealtimeBid,
 		RealtimeLiveLot,
 		RealtimePlayerEntry
 	} from '@emgc-calcutta/shared-types';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import { Info } from '@lucide/svelte';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
+	import CursorPager from '$lib/components/CursorPager.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
-	import { Badge } from '$lib/components/ui/badge';
+	import VoidBidDialog from '$lib/components/VoidBidDialog.svelte';
+	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
+	import * as Tooltip from '$lib/components/ui/tooltip/index';
 	import { currentHighBid } from '$lib/bids';
 	import {
 		formatHandicapIndex,
@@ -23,6 +31,7 @@
 	} from '$lib/players';
 	import { routes } from '$lib/routes';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
+	import type { LiveAuctionBidRow, LiveLotState } from './+page.server';
 
 	let { data, form } = $props();
 
@@ -123,6 +132,80 @@
 	// screen, not something that needs to react to bids landing elsewhere.
 	let queuePending = $state<Record<string, boolean>>({});
 	let sortPending = $state(false);
+
+	// Phase 36: "Recent live auction bids" review/void table — a plain
+	// page-load snapshot refreshed via invalidateAll() after a void, same
+	// as the silent auction admin page's own bid review table (not
+	// Realtime-driven like the current-lot card above; this is a screen an
+	// Admin opens to audit/correct bids, not one watched live).
+	let bidIsQuerying = $derived(navigating.to?.route.id === page.route.id);
+	let bidFiltersActive = $derived(
+		Boolean(data.liveBidFilters.player || data.liveBidFilters.bidder)
+	);
+
+	function bidPageUrl(params: Record<string, string | null>): string {
+		const url = new URL(page.url);
+		for (const [key, value] of Object.entries(params)) {
+			if (value === null) {
+				url.searchParams.delete(key);
+			} else {
+				url.searchParams.set(key, value);
+			}
+		}
+		return `${url.pathname}${url.search}`;
+	}
+
+	let bidNextHref = $derived(
+		data.liveBidsHasNext ? bidPageUrl({ cursor: data.liveBidsNextCursor, dir: 'before' }) : null
+	);
+	let bidPrevHref = $derived(
+		data.liveBidsHasPrev ? bidPageUrl({ cursor: data.liveBidsPrevCursor, dir: 'after' }) : null
+	);
+
+	function changeBidPageSize(size: string) {
+		goto(bidPageUrl({ page_size: size, cursor: null, dir: null }));
+	}
+
+	function lotStateBadgeVariant(state: LiveLotState): BadgeVariant {
+		switch (state) {
+			case 'open':
+				return 'flag';
+			case 'closed':
+				return 'fairway';
+			default:
+				return 'outline';
+		}
+	}
+
+	function lotStateLabel(state: LiveLotState): string {
+		switch (state) {
+			case 'open':
+				return 'Open now';
+			case 'closed':
+				return 'Closed';
+			default:
+				return 'Not yet opened';
+		}
+	}
+
+	const bidDateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+		month: 'short',
+		day: 'numeric',
+		hour: 'numeric',
+		minute: '2-digit'
+	});
+
+	function formatBidDateTime(iso: string): string {
+		return bidDateTimeFormatter.format(new Date(iso));
+	}
+
+	let voidDialogOpen = $state(false);
+	let voidTarget = $state<LiveAuctionBidRow | null>(null);
+
+	function openVoidDialog(bid: LiveAuctionBidRow) {
+		voidTarget = bid;
+		voidDialogOpen = true;
+	}
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -437,4 +520,162 @@
 			</Table.Root>
 		{/if}
 	</div>
+
+	<div class="flex flex-col gap-2">
+		<h2 class="font-display text-lg font-semibold text-ink">Recent live auction bids</h2>
+		<p class="text-sm text-ink/60">
+			Bids placed during the live auction, newest first. Voiding a closed lot's winning bid
+			recomputes the winner immediately.
+		</p>
+
+		<form
+			method="GET"
+			class="flex flex-wrap items-end gap-3 rounded-lg border border-brass/30 bg-scorecard p-4"
+		>
+			<label class="flex flex-col gap-1 text-sm">
+				<span class="text-muted-foreground">Player</span>
+				<Input
+					type="text"
+					name="player"
+					value={data.liveBidFilters.player}
+					placeholder="Name"
+					disabled={bidIsQuerying}
+				/>
+			</label>
+			<label class="flex flex-col gap-1 text-sm">
+				<span class="text-muted-foreground">Bidder</span>
+				<Input
+					type="text"
+					name="bidder"
+					value={data.liveBidFilters.bidder}
+					placeholder="Name"
+					disabled={bidIsQuerying}
+				/>
+			</label>
+			<input type="hidden" name="page_size" value={data.liveBidPageSize} />
+			<Button type="submit" variant="brass" size="sm" disabled={bidIsQuerying}>
+				{#if bidIsQuerying}
+					<LoaderCircleIcon class="size-3.5 animate-spin" />
+				{/if}
+				{bidIsQuerying ? 'Applying…' : 'Apply filters'}
+			</Button>
+			{#if bidFiltersActive}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={bidIsQuerying}
+					onclick={() => goto(routes.adminTournamentAuctionLive(data.tournament.slug))}
+				>
+					Clear
+				</Button>
+			{/if}
+		</form>
+
+		{#if data.liveBids.length === 0}
+			<EmptyState
+				title={bidFiltersActive ? 'No bids match these filters' : 'No live auction bids yet'}
+			/>
+		{:else}
+			<Table.Root class={bidIsQuerying ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Player</Table.Head>
+						<Table.Head>Bidder</Table.Head>
+						<Table.Head>Amount</Table.Head>
+						<Table.Head>Placed</Table.Head>
+						<Table.Head>Lot</Table.Head>
+						<Table.Head>Status</Table.Head>
+						<Table.Head>Actions</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each data.liveBids as bid (bid.id)}
+						<Table.Row>
+							<Table.Cell class="font-medium text-ink">
+								<a
+									href={routes.tournamentPlayer(data.tournament.slug, bid.player.slug)}
+									class="hover:underline">{formatPlayerName(bid.player)}</a
+								>
+								<DivisionBadge division={bid.division} />
+							</Table.Cell>
+							<Table.Cell>
+								{#if bid.bidder_name}
+									{bid.bidder_name}
+								{:else}
+									<span class="text-muted-foreground">—</span>
+								{/if}
+								{#if bid.placed_by_admin_id}
+									<Badge variant="sand" class="ml-1">Admin-placed</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="font-data whitespace-nowrap"
+								>{formatCurrency(bid.amount)}</Table.Cell
+							>
+							<Table.Cell class="font-data whitespace-nowrap"
+								>{formatBidDateTime(bid.placed_at)}</Table.Cell
+							>
+							<Table.Cell>
+								{#if bid.lot_state}
+									<Badge variant={lotStateBadgeVariant(bid.lot_state)}>
+										{lotStateLabel(bid.lot_state)}
+									</Badge>
+								{:else}
+									<span class="text-muted-foreground">—</span>
+								{/if}
+							</Table.Cell>
+							<Table.Cell>
+								{#if bid.voided_at}
+									<div class="flex items-center gap-1">
+										<Badge variant="flag">Voided</Badge>
+										{#if bid.void_reason}
+											<Tooltip.Provider>
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														<Info size="16" />
+													</Tooltip.Trigger>
+													<Tooltip.Content>
+														<p>{bid.void_reason}</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+										{/if}
+									</div>
+								{:else}
+									<Badge variant="fairway">Active</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell>
+								{#if !bid.voided_at}
+									<Button variant="destructive" size="sm" onclick={() => openVoidDialog(bid)}>
+										Void
+									</Button>
+								{/if}
+							</Table.Cell>
+						</Table.Row>
+					{/each}
+				</Table.Body>
+			</Table.Root>
+			<CursorPager
+				pageSize={data.liveBidPageSize}
+				hasNext={data.liveBidsHasNext}
+				hasPrev={data.liveBidsHasPrev}
+				nextHref={bidNextHref}
+				prevHref={bidPrevHref}
+				disabled={bidIsQuerying}
+				onPageSizeChange={changeBidPageSize}
+			/>
+		{/if}
+	</div>
 </div>
+
+{#if voidTarget}
+	<VoidBidDialog
+		bind:open={voidDialogOpen}
+		supabase={data.supabase}
+		bidId={voidTarget.id}
+		playerName={formatPlayerName(voidTarget.player)}
+		amount={voidTarget.amount}
+		onSuccess={() => invalidateAll()}
+	/>
+{/if}
