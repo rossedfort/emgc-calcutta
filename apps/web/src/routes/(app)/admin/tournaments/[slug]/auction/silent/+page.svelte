@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { navigating, page } from '$app/state';
+	import { goto, invalidateAll } from '$app/navigation';
 	import type { RealtimeBid, RealtimePlayerEntry } from '@emgc-calcutta/shared-types';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
+	import CursorPager from '$lib/components/CursorPager.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip/index';
 	import { Info } from '@lucide/svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
@@ -83,28 +86,35 @@
 	// with the rest of the app's "phase-aware" admin screens.
 	let silentAuctionEnded = $derived(new Date(tournament.silent_auction_end) <= new Date());
 
-	let playerFilter = $state('');
-	let bidderFilter = $state('');
+	// The filter form is a plain GET, so re-querying is a real SvelteKit
+	// navigation (re-running this route's server `load`) rather than a
+	// fetch this component kicks off itself — `navigating` is the only
+	// signal available for it. Scoped to "navigating to this same route"
+	// so the indicator doesn't flash while leaving the page entirely.
+	let isQuerying = $derived(navigating.to?.route.id === page.route.id);
 
-	// Client-side filtering, matching the participant auction board's own
-	// pattern — this table is already scoped to one tournament and capped
-	// at 100 rows server-side, the same bounded scale, so there's no need
-	// for the audit log's URL-param/server-side approach.
-	let filteredBids = $derived(
-		bids.filter((bid) => {
-			if (
-				playerFilter.trim() &&
-				!formatPlayerName(bid.player).toLowerCase().includes(playerFilter.trim().toLowerCase())
-			)
-				return false;
-			if (
-				bidderFilter.trim() &&
-				!(bid.bidder_name ?? '').toLowerCase().includes(bidderFilter.trim().toLowerCase())
-			)
-				return false;
-			return true;
-		})
+	let filtersActive = $derived(Boolean(data.filters.player || data.filters.bidder));
+
+	function pageUrl(params: Record<string, string | null>): string {
+		const url = new URL(page.url);
+		for (const [key, value] of Object.entries(params)) {
+			if (value === null) {
+				url.searchParams.delete(key);
+			} else {
+				url.searchParams.set(key, value);
+			}
+		}
+		return `${url.pathname}${url.search}`;
+	}
+
+	let nextHref = $derived(
+		data.hasNext ? pageUrl({ cursor: data.nextCursor, dir: 'before' }) : null
 	);
+	let prevHref = $derived(data.hasPrev ? pageUrl({ cursor: data.prevCursor, dir: 'after' }) : null);
+
+	function changePageSize(size: string) {
+		goto(pageUrl({ page_size: size, cursor: null, dir: null }));
+	}
 
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -181,102 +191,135 @@
 
 	<div class="flex flex-col gap-2">
 		<h2 class="font-display text-lg font-semibold text-ink">Recent silent auction bids</h2>
-		<p class="text-sm text-ink/60">
-			The most recent 100 bids placed during the silent auction. Voiding is soft and reversible by
-			an Owner.
-		</p>
+		<p class="text-sm text-ink/60">Bids placed during the silent auction, newest first.</p>
+
+		<form
+			method="GET"
+			class="flex flex-wrap items-end gap-3 rounded-lg border border-brass/30 bg-scorecard p-4"
+		>
+			<label class="flex flex-col gap-1 text-sm">
+				<span class="text-muted-foreground">Player</span>
+				<Input
+					type="text"
+					name="player"
+					value={data.filters.player}
+					placeholder="Name"
+					disabled={isQuerying}
+				/>
+			</label>
+			<label class="flex flex-col gap-1 text-sm">
+				<span class="text-muted-foreground">Bidder</span>
+				<Input
+					type="text"
+					name="bidder"
+					value={data.filters.bidder}
+					placeholder="Name"
+					disabled={isQuerying}
+				/>
+			</label>
+			<input type="hidden" name="page_size" value={data.pageSize} />
+			<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
+				{#if isQuerying}
+					<LoaderCircleIcon class="size-3.5 animate-spin" />
+				{/if}
+				{isQuerying ? 'Applying…' : 'Apply filters'}
+			</Button>
+			{#if filtersActive}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={isQuerying}
+					onclick={() => goto(routes.adminTournamentAuctionSilent(tournament.slug))}
+				>
+					Clear
+				</Button>
+			{/if}
+		</form>
 
 		{#if bids.length === 0}
-			<EmptyState title="No silent auction bids yet" />
+			<EmptyState
+				title={filtersActive ? 'No bids match these filters' : 'No silent auction bids yet'}
+			/>
 		{:else}
-			<div class="flex flex-wrap gap-2">
-				<Input
-					type="search"
-					placeholder="Filter by player…"
-					bind:value={playerFilter}
-					class="max-w-56"
-				/>
-				<Input
-					type="search"
-					placeholder="Filter by bidder…"
-					bind:value={bidderFilter}
-					class="max-w-56"
-				/>
-			</div>
-
-			{#if filteredBids.length === 0}
-				<EmptyState title="No bids match these filters" />
-			{:else}
-				<Table.Root>
-					<Table.Header>
+			<Table.Root class={isQuerying ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
+				<Table.Header>
+					<Table.Row>
+						<Table.Head>Player</Table.Head>
+						<Table.Head>Bidder</Table.Head>
+						<Table.Head>Amount</Table.Head>
+						<Table.Head>Placed</Table.Head>
+						<Table.Head>Status</Table.Head>
+						<Table.Head>Actions</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
+					{#each bids as bid (bid.id)}
 						<Table.Row>
-							<Table.Head>Player</Table.Head>
-							<Table.Head>Bidder</Table.Head>
-							<Table.Head>Amount</Table.Head>
-							<Table.Head>Placed</Table.Head>
-							<Table.Head>Status</Table.Head>
-							<Table.Head>Actions</Table.Head>
+							<Table.Cell class="font-medium text-ink">
+								<a
+									href={routes.tournamentPlayer(tournament.slug, bid.player.slug)}
+									class="hover:underline">{formatPlayerName(bid.player)}</a
+								>
+								<DivisionBadge division={bid.division} />
+							</Table.Cell>
+							<Table.Cell>
+								{#if bid.bidder_name}
+									{bid.bidder_name}
+								{:else}
+									<span class="text-muted-foreground">—</span>
+								{/if}
+								{#if bid.placed_by_admin_id}
+									<Badge variant="sand" class="ml-1">Admin-placed</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell class="font-data whitespace-nowrap"
+								>{formatCurrency(bid.amount)}</Table.Cell
+							>
+							<Table.Cell class="font-data whitespace-nowrap"
+								>{formatDateTime(bid.placed_at)}</Table.Cell
+							>
+							<Table.Cell>
+								{#if bid.voided_at}
+									<div class="flex items-center gap-1">
+										<Badge variant="flag">Voided</Badge>
+										{#if bid.void_reason}
+											<Tooltip.Provider>
+												<Tooltip.Root>
+													<Tooltip.Trigger>
+														<Info size="16" />
+													</Tooltip.Trigger>
+													<Tooltip.Content>
+														<p>{bid.void_reason}</p>
+													</Tooltip.Content>
+												</Tooltip.Root>
+											</Tooltip.Provider>
+										{/if}
+									</div>
+								{:else}
+									<Badge variant="fairway">Active</Badge>
+								{/if}
+							</Table.Cell>
+							<Table.Cell>
+								{#if !bid.voided_at}
+									<Button variant="destructive" size="sm" onclick={() => openVoidDialog(bid)}>
+										Void
+									</Button>
+								{/if}
+							</Table.Cell>
 						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each filteredBids as bid (bid.id)}
-							<Table.Row>
-								<Table.Cell class="font-medium text-ink">
-									<a
-										href={routes.tournamentPlayer(tournament.slug, bid.player.slug)}
-										class="hover:underline">{formatPlayerName(bid.player)}</a
-									>
-									<DivisionBadge division={bid.division} />
-								</Table.Cell>
-								<Table.Cell>
-									{#if bid.bidder_name}
-										{bid.bidder_name}
-									{:else}
-										<span class="text-muted-foreground">—</span>
-									{/if}
-									{#if bid.placed_by_admin_id}
-										<Badge variant="sand" class="ml-1">Admin-placed</Badge>
-									{/if}
-								</Table.Cell>
-								<Table.Cell class="font-data whitespace-nowrap"
-									>{formatCurrency(bid.amount)}</Table.Cell
-								>
-								<Table.Cell class="font-data whitespace-nowrap"
-									>{formatDateTime(bid.placed_at)}</Table.Cell
-								>
-								<Table.Cell>
-									{#if bid.voided_at}
-										<div class="flex items-center gap-1">
-											<Badge variant="flag">Voided</Badge>
-											{#if bid.void_reason}
-												<Tooltip.Provider>
-													<Tooltip.Root>
-														<Tooltip.Trigger>
-															<Info size="16" />
-														</Tooltip.Trigger>
-														<Tooltip.Content>
-															<p>{bid.void_reason}</p>
-														</Tooltip.Content>
-													</Tooltip.Root>
-												</Tooltip.Provider>
-											{/if}
-										</div>
-									{:else}
-										<Badge variant="fairway">Active</Badge>
-									{/if}
-								</Table.Cell>
-								<Table.Cell>
-									{#if !bid.voided_at}
-										<Button variant="destructive" size="sm" onclick={() => openVoidDialog(bid)}>
-											Void
-										</Button>
-									{/if}
-								</Table.Cell>
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			{/if}
+					{/each}
+				</Table.Body>
+			</Table.Root>
+			<CursorPager
+				pageSize={data.pageSize}
+				hasNext={data.hasNext}
+				hasPrev={data.hasPrev}
+				{nextHref}
+				{prevHref}
+				disabled={isQuerying}
+				onPageSizeChange={changePageSize}
+			/>
 		{/if}
 	</div>
 </div>

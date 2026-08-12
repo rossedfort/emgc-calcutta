@@ -1,5 +1,13 @@
 import { error } from '@sveltejs/kit';
 import type { Enums } from '@emgc-calcutta/shared-types';
+import { parsePageSize } from '$lib/pagination';
+import {
+	buildCursorPage,
+	cursorFilterExpression,
+	decodeCursor,
+	encodeCursor,
+	parseCursorDirection
+} from '$lib/server/cursorPagination';
 import type { PageServerLoad } from './$types';
 
 export interface SilentAuctionBidRow {
@@ -35,6 +43,18 @@ export interface AdminBidParticipant {
 	email: string;
 }
 
+export interface SilentBidFilters {
+	player: string;
+	bidder: string;
+}
+
+function parseSilentBidFilters(url: URL): SilentBidFilters {
+	return {
+		player: url.searchParams.get('player')?.trim() ?? '',
+		bidder: url.searchParams.get('bidder')?.trim() ?? ''
+	};
+}
+
 // Admin review/void surface for the silent auction's bids — a plain
 // page-load snapshot (refreshed via invalidateAll() after a void), not
 // realtime-driven like auction/live: this is a review table an Admin opens
@@ -42,16 +62,29 @@ export interface AdminBidParticipant {
 // live. Scoped to phase = 'silent' since auction/live is the existing,
 // separate screen for live-phase lots.
 //
+// Cursor-paginated (Phase 35), same shared logic as the audit log
+// ($lib/server/cursorPagination.ts), sorted by placed_at instead of
+// created_at. Player/bidder search moved server-side alongside it — a
+// client-side filter over just the current page would silently stop
+// finding matches on every page but the first.
+//
 // player_entries!bids_entry_id_fkey!inner disambiguates the embed (bids
 // and player_entries now have two FK paths between them — the other being
 // player_entries.winning_bid_id -> bids.id, same ambiguity void-bid's own
 // server-side query has to resolve) and turns it into an inner join so
-// .eq('player_entries.tournament_id', ...) can actually scope the root
-// `bids` rows to this tournament rather than being ignored.
-export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
+// .eq('player_entries.tournament_id', ...) (and the player-search .in()
+// below) can actually scope/filter the root `bids` rows through it rather
+// than being ignored.
+export const load: PageServerLoad = async ({ url, parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
-	const { data: bids, error: bidsError } = await supabase
+	const filters = parseSilentBidFilters(url);
+	const pageSize = parsePageSize(url.searchParams.get('page_size'));
+	const direction = parseCursorDirection(url.searchParams.get('dir'));
+	const cursor = decodeCursor(url.searchParams.get('cursor'));
+	const ascending = direction === 'after';
+
+	let bidsQuery = supabase
 		.from('bids')
 		.select(
 			`id, amount, placed_at, voided_at, void_reason, bidder_name, placed_by_admin_id,
@@ -59,13 +92,50 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		)
 		.eq('player_entries.tournament_id', tournament.id)
 		.eq('phase', 'silent')
-		.order('placed_at', { ascending: false })
-		.limit(100);
+		.order('placed_at', { ascending })
+		.order('id', { ascending })
+		.limit(pageSize + 1);
+
+	if (cursor) {
+		bidsQuery = bidsQuery.or(cursorFilterExpression(cursor, direction, 'placed_at'));
+	}
+	if (filters.bidder) {
+		bidsQuery = bidsQuery.ilike('bidder_name', `%${filters.bidder}%`);
+	}
+	if (filters.player) {
+		// Same two-step "find matching player ids first" approach as the
+		// audit log's own player filter — bids has no direct player_id of
+		// its own to search against.
+		const { data: matchingPlayers, error: playersError } = await supabase
+			.from('players')
+			.select('id')
+			.eq('tournament_id', tournament.id)
+			.or(`first_name.ilike.%${filters.player}%,last_name.ilike.%${filters.player}%`);
+		if (playersError) {
+			error(500, playersError.message);
+		}
+		const ids = (matchingPlayers ?? []).map((p) => p.id);
+		// No matches: filter down to an id that can never exist, rather than
+		// skipping the filter entirely (which would silently show everyone).
+		bidsQuery = bidsQuery.in(
+			'player_entries.player_id',
+			ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000']
+		);
+	}
+
+	const { data: bids, error: bidsError } = await bidsQuery;
 	if (bidsError) {
 		error(500, bidsError.message);
 	}
 
-	const rows: SilentAuctionBidRow[] = (bids ?? []).flatMap((bid) =>
+	const { rows, hasNext, hasPrev } = buildCursorPage(
+		bids ?? [],
+		direction,
+		cursor !== null,
+		pageSize
+	);
+
+	const bidRows: SilentAuctionBidRow[] = rows.flatMap((bid) =>
 		bid.player_entries?.players
 			? [
 					{
@@ -128,9 +198,24 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const participants = [...participantsById.values()].sort((a, b) => a.name.localeCompare(b.name));
 
 	return {
-		bids: rows,
+		bids: bidRows,
 		entries,
 		participants,
+		filters,
+		pageSize,
+		hasNext,
+		hasPrev,
+		nextCursor:
+			hasNext && rows.length > 0
+				? encodeCursor({
+						sortValue: rows[rows.length - 1].placed_at,
+						id: rows[rows.length - 1].id
+					})
+				: null,
+		prevCursor:
+			hasPrev && rows.length > 0
+				? encodeCursor({ sortValue: rows[0].placed_at, id: rows[0].id })
+				: null,
 		title: `${tournament.name} · Silent auction bids · EMGC Bet`,
 		description: `Review and void silent-auction bids for ${tournament.name}.`
 	};

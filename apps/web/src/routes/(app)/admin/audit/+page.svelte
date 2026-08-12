@@ -10,7 +10,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { AUDIT_ACTIONS, auditActionLabel, type AuditEventRow } from '$lib/auditActions';
-	import { PAGE_SIZES } from '$lib/pagination';
+	import CursorPager from '$lib/components/CursorPager.svelte';
 	import { routes } from '$lib/routes';
 	import { createAuditRealtime, type AuditRealtime } from '$lib/stores/auditRealtime';
 	import type { RealtimeConnectionStatus } from '$lib/stores/realtime';
@@ -324,32 +324,14 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
-		<div class="flex flex-wrap items-center justify-between gap-3">
-			<label class="flex items-center gap-2 text-sm text-muted-foreground">
-				Rows per page
-				<select
-					value={data.pageSize}
-					onchange={(e) => changePageSize(e.currentTarget.value)}
-					disabled={isQuerying}
-					class="rounded-md border border-input bg-background px-2 py-1.5 text-sm disabled:opacity-50"
-				>
-					{#each PAGE_SIZES as size (size)}
-						<option value={size}>{size}</option>
-					{/each}
-				</select>
-			</label>
-			<div class="flex items-center gap-2">
-				{#if prevHref && !isQuerying}
-					<Button variant="outline" size="sm" href={prevHref}>Previous</Button>
-				{:else}
-					<Button variant="outline" size="sm" disabled>Previous</Button>
-				{/if}
-				{#if nextHref && !isQuerying}
-					<Button variant="outline" size="sm" href={nextHref}>Next</Button>
-				{:else}
-					<Button variant="outline" size="sm" disabled>Next</Button>
-				{/if}
-			</div>
-		</div>
+		<CursorPager
+			pageSize={data.pageSize}
+			hasNext={data.hasNext}
+			hasPrev={data.hasPrev}
+			{nextHref}
+			{prevHref}
+			disabled={isQuerying}
+			onPageSizeChange={changePageSize}
+		/>
 	{/if}
 </div>

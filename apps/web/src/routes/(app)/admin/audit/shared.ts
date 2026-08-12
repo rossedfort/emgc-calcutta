@@ -65,7 +65,7 @@ export async function queryAuditEvents(
 		query = query.limit(options.limit);
 	}
 	if (options.cursor) {
-		query = query.or(cursorFilterExpression(options.cursor, direction));
+		query = query.or(cursorFilterExpression(options.cursor, direction, 'created_at'));
 	}
 	if (filters.participant) {
 		query = query.ilike('actor_identity', `%${filters.participant}%`);

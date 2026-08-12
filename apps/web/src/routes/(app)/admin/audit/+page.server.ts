@@ -69,13 +69,13 @@ export const load: PageServerLoad = async ({ url, locals: { supabase } }) => {
 		nextCursor:
 			hasNext && rows.length > 0
 				? encodeCursor({
-						createdAt: rows[rows.length - 1].created_at,
+						sortValue: rows[rows.length - 1].created_at,
 						id: rows[rows.length - 1].id
 					})
 				: null,
 		prevCursor:
 			hasPrev && rows.length > 0
-				? encodeCursor({ createdAt: rows[0].created_at, id: rows[0].id })
+				? encodeCursor({ sortValue: rows[0].created_at, id: rows[0].id })
 				: null,
 		title: 'Audit log · EMGC Bet',
 		description: 'Search and export the EMGC Bet admin audit trail.'

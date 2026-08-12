@@ -2,31 +2,33 @@
 // pagination (Audit Events first, Silent Auction Bids next per the backlog's
 // own "template the other two tables can follow" note) — the tricky parts
 // (composite cursor encoding, the bidirectional hasNext/hasPrev logic) only
-// need working out once.
+// need working out once. Column-name-agnostic (`sortColumn` passed in at
+// each call site) since the two tables sort by different timestamp columns
+// (audit_events.created_at, bids.placed_at).
 export type CursorDirection = 'before' | 'after';
 
 export interface Cursor {
-	createdAt: string;
+	sortValue: string;
 	id: string;
 }
 
-// created_at is an ISO timestamp (no literal "|"), id is a uuid (no "|"
+// sortValue is an ISO timestamp (no literal "|"), id is a uuid (no "|"
 // either) — a single separator is enough, no need for URL-unsafe framing;
 // URLSearchParams handles percent-encoding the whole value automatically.
 const CURSOR_SEPARATOR = '|';
 
 export function encodeCursor(cursor: Cursor): string {
-	return `${cursor.createdAt}${CURSOR_SEPARATOR}${cursor.id}`;
+	return `${cursor.sortValue}${CURSOR_SEPARATOR}${cursor.id}`;
 }
 
 export function decodeCursor(raw: string | null): Cursor | null {
 	if (!raw) return null;
 	const separatorIndex = raw.lastIndexOf(CURSOR_SEPARATOR);
 	if (separatorIndex === -1) return null;
-	const createdAt = raw.slice(0, separatorIndex);
+	const sortValue = raw.slice(0, separatorIndex);
 	const id = raw.slice(separatorIndex + 1);
-	if (!createdAt || !id) return null;
-	return { createdAt, id };
+	if (!sortValue || !id) return null;
+	return { sortValue, id };
 }
 
 export function parseCursorDirection(raw: string | null): CursorDirection {
@@ -34,16 +36,20 @@ export function parseCursorDirection(raw: string | null): CursorDirection {
 }
 
 // A raw PostgREST `.or()` filter string expressing a strict tuple
-// comparison — (created_at, id) </> cursor — rather than filtering on
-// created_at alone: two audit events (or bids) landing in the same
-// transaction can share an identical created_at down to the microsecond,
+// comparison — (sortColumn, id) </> cursor — rather than filtering on the
+// sort column alone: two rows (audit events, bids) landing in the same
+// transaction can share an identical timestamp down to the microsecond,
 // and a single-column cursor would silently skip or duplicate one of them
 // across a page boundary. Only meaningful alongside a matching
-// `.order('created_at', {ascending}).order('id', {ascending})` on the same
+// `.order(sortColumn, {ascending}).order('id', {ascending})` on the same
 // query, so the tiebreak this expresses actually matches fetch order.
-export function cursorFilterExpression(cursor: Cursor, direction: CursorDirection): string {
+export function cursorFilterExpression(
+	cursor: Cursor,
+	direction: CursorDirection,
+	sortColumn: string
+): string {
 	const op = direction === 'before' ? 'lt' : 'gt';
-	return `created_at.${op}.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.${op}.${cursor.id})`;
+	return `${sortColumn}.${op}.${cursor.sortValue},and(${sortColumn}.eq.${cursor.sortValue},id.${op}.${cursor.id})`;
 }
 
 export interface CursorPage<T> {
@@ -68,7 +74,7 @@ export interface CursorPage<T> {
 //     Prev from a page that still exists, hasNext is unconditionally true.
 //     Its own extra (pageSize + 1)th row (dropped before display) proves a
 //     still-earlier page exists beyond this one (hasPrev).
-export function buildCursorPage<T extends { id: string; created_at: string }>(
+export function buildCursorPage<T>(
 	fetched: T[],
 	direction: CursorDirection,
 	cursorPresent: boolean,
