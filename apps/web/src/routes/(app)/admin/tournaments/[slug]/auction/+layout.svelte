@@ -26,12 +26,12 @@
 		size="sub"
 		tabs={[
 			{
-				href: routes.adminTournamentAuctionLive(data.tournament.slug),
-				label: 'Live auction'
+				href: routes.adminTournamentAuctionSilent(data.tournament.slug),
+				label: 'Silent auction'
 			},
 			{
-				href: routes.adminTournamentAuctionSilent(data.tournament.slug),
-				label: 'Silent bids'
+				href: routes.adminTournamentAuctionLive(data.tournament.slug),
+				label: 'Live auction'
 			},
 			{
 				href: routes.adminTournamentAuctionLiveBids(data.tournament.slug),
