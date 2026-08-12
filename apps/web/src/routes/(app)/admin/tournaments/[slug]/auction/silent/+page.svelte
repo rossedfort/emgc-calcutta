@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import type { RealtimeBid, RealtimePlayerEntry } from '@emgc-calcutta/shared-types';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip/index';
+	import { Info } from '@lucide/svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
@@ -15,6 +16,7 @@
 	import * as Table from '$lib/components/ui/table';
 	import { currentHighBid } from '$lib/bids';
 	import { formatPlayerName } from '$lib/players';
+	import { routes } from '$lib/routes';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 	import type { SilentAuctionBidRow } from './+page.server';
 
@@ -72,6 +74,14 @@
 	let selectedEntry = $derived(currentEntries.find((e) => e.id === bidEntryId) ?? null);
 	let selectedEntryHigh = $derived(bidEntryId ? currentHighBid(liveBids, bidEntryId) : null);
 
+	// Matches the [slug]/+layout.svelte's own silentAuctionEnded check —
+	// once the deadline passes, close_silent_auctions() (pg_cron) sweeps
+	// every open entry to sold_silent/no_bid within a minute, so placing a
+	// bid here would just fail entryStatus validation in place-bid. Hiding
+	// the form instead of leaving it up to error out keeps this consistent
+	// with the rest of the app's "phase-aware" admin screens.
+	let silentAuctionEnded = $derived(new Date(tournament.silent_auction_end) <= new Date());
+
 	let playerFilter = $state('');
 	let bidderFilter = $state('');
 
@@ -120,32 +130,38 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
-	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 p-6 text-ink">
 		<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
-		<p class="text-sm text-ink/70">
-			The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
-				tournament.threshold_amount
-			)} or more reserve a player for the live auction — each new bid must beat the current high by at
-			least {formatCurrency(tournament.min_increment)}.
-		</p>
-		<div class="flex flex-col gap-1">
-			<span class="font-data text-xs tracking-widest text-fairway uppercase">Player</span>
-			<Combobox
-				options={entryOptions}
-				bind:value={bidEntryId}
-				placeholder="Search by name…"
-				emptyText="No open players found."
+		{#if silentAuctionEnded}
+			<p class="text-sm text-ink/70">
+				The silent auction has closed — bids can no longer be placed on behalf of participants.
+			</p>
+		{:else}
+			<p class="text-sm text-ink/70">
+				The minimum opening bid is {formatCurrency(tournament.minimum_bid)}. Bids of {formatCurrency(
+					tournament.threshold_amount
+				)} or more reserve a player for the live auction — each new bid must beat the current high by
+				at least {formatCurrency(tournament.min_increment)}.
+			</p>
+			<div class="flex flex-col gap-1">
+				<span class="font-data text-xs tracking-widest text-fairway uppercase">Player</span>
+				<Combobox
+					options={entryOptions}
+					bind:value={bidEntryId}
+					placeholder="Search by name…"
+					emptyText="No open players found."
+				/>
+			</div>
+			<AdminBidForm
+				{supabase}
+				{tournament}
+				participants={data.participants}
+				entryId={bidEntryId}
+				entryLabel={selectedEntry ? formatPlayerName(selectedEntry) : null}
+				highBid={selectedEntryHigh}
+				onSuccess={() => invalidateAll()}
 			/>
-		</div>
-		<AdminBidForm
-			{supabase}
-			{tournament}
-			participants={data.participants}
-			entryId={bidEntryId}
-			entryLabel={selectedEntry ? formatPlayerName(selectedEntry) : null}
-			highBid={selectedEntryHigh}
-			onSuccess={() => invalidateAll()}
-		/>
+		{/if}
 	</div>
 
 	<RealtimeStatusBanner status={connectionStatus} />
@@ -194,10 +210,7 @@
 							<Table.Row>
 								<Table.Cell class="font-medium text-ink">
 									<a
-										href={resolve('/tournaments/[slug]/players/[playerSlug]', {
-											slug: tournament.slug,
-											playerSlug: bid.player.slug
-										})}
+										href={routes.tournamentPlayer(tournament.slug, bid.player.slug)}
 										class="hover:underline">{formatPlayerName(bid.player)}</a
 									>
 									<DivisionBadge division={bid.division} />
@@ -220,10 +233,21 @@
 								>
 								<Table.Cell>
 									{#if bid.voided_at}
-										<Badge variant="flag">Voided</Badge>
-										{#if bid.void_reason}
-											<p class="mt-1 text-xs text-ink/60">{bid.void_reason}</p>
-										{/if}
+										<div class="flex items-center gap-1">
+											<Badge variant="flag">Voided</Badge>
+											{#if bid.void_reason}
+												<Tooltip.Provider>
+													<Tooltip.Root>
+														<Tooltip.Trigger>
+															<Info size="16" />
+														</Tooltip.Trigger>
+														<Tooltip.Content>
+															<p>{bid.void_reason}</p>
+														</Tooltip.Content>
+													</Tooltip.Root>
+												</Tooltip.Provider>
+											{/if}
+										</div>
 									{:else}
 										<Badge variant="fairway">Active</Badge>
 									{/if}
