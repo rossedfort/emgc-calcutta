@@ -50,6 +50,8 @@ export const routes = {
 		resolve('/(app)/admin/tournaments/[slug]/auction/live', { slug }),
 	adminTournamentAuctionSilent: (slug: string) =>
 		resolve('/(app)/admin/tournaments/[slug]/auction/silent', { slug }),
+	adminTournamentAuctionLeadingBids: (slug: string) =>
+		resolve('/(app)/admin/tournaments/[slug]/auction/leading-bids', { slug }),
 	// TV display: breaks out of every ancestor layout via +page@.svelte, so
 	// it's not part of the (app) group's rendered shell despite living in
 	// the same part of the route tree as the admin live-auction screen.
