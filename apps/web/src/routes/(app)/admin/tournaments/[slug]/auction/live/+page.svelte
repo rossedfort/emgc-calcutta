@@ -6,7 +6,6 @@
 		RealtimeLiveLot,
 		RealtimePlayerEntry
 	} from '@emgc-calcutta/shared-types';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
@@ -21,7 +20,6 @@
 		playerStatusBadgeVariant,
 		playerStatusLabel
 	} from '$lib/players';
-	import { routes } from '$lib/routes';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data, form } = $props();
@@ -117,18 +115,6 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
-	<div class="flex justify-end">
-		<Button
-			href={routes.adminTournamentAuctionLiveTV(data.tournament.slug)}
-			target="_blank"
-			variant="outline"
-			size="sm"
-		>
-			<ExternalLinkIcon class="size-4" />
-			TV Display
-		</Button>
-	</div>
-
 	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 p-6 text-ink">
 		<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
 		<p class="text-sm text-ink/70">

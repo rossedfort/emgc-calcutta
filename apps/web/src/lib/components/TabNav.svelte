@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 
 	// Route-navigation tab bar (plain <a> links, not a client-side panel
@@ -13,7 +14,8 @@
 	// exactly one sub-route (edit) it should stay highlighted for.
 	let {
 		tabs,
-		size = 'default'
+		size = 'default',
+		actions
 	}: {
 		tabs: {
 			href: string;
@@ -23,6 +25,7 @@
 			matchPrefix?: string;
 		}[];
 		size?: 'default' | 'sub';
+		actions?: Snippet;
 	} = $props();
 
 	function isActive(tab: (typeof tabs)[number]): boolean {
@@ -51,13 +54,20 @@
 	}
 </script>
 
-<nav
-	class="flex gap-4 overflow-x-auto border-b {size === 'sub'
+<div
+	class="flex items-center justify-between gap-2 border-b {size === 'sub'
 		? 'border-brass/20'
 		: 'border-brass/30'}"
 >
-	{#each tabs as tab (tab.href)}
-		<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- callers already build tab.href via resolve(); this component only ever receives typed routes, it just can't call resolve() itself since that needs a literal route id -->
-		<a href={tab.href} class={tabClass(tab)}>{tab.label}</a>
-	{/each}
-</nav>
+	<nav class="flex gap-4 overflow-x-auto">
+		{#each tabs as tab (tab.href)}
+			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- callers already build tab.href via resolve(); this component only ever receives typed routes, it just can't call resolve() itself since that needs a literal route id -->
+			<a href={tab.href} class={tabClass(tab)}>{tab.label}</a>
+		{/each}
+	</nav>
+	{#if actions}
+		<div class="flex shrink-0 items-start gap-2">
+			{@render actions()}
+		</div>
+	{/if}
+</div>
