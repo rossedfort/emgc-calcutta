@@ -404,29 +404,6 @@
 							>
 							<Table.Cell>
 								<div class="flex items-center gap-1">
-									{#if index === 0}
-										<form
-											method="POST"
-											action="?/advance"
-											use:enhance={() => {
-												advanceSubmitting = true;
-												return async ({ update }) => {
-													await update();
-													advanceSubmitting = false;
-												};
-											}}
-										>
-											<input type="hidden" name="lotId" value={lot.id} />
-											<Button
-												type="submit"
-												variant="brass"
-												size="sm"
-												disabled={!!currentLot || advanceSubmitting}
-											>
-												{advanceSubmitting ? 'Opening…' : 'Advance'}
-											</Button>
-										</form>
-									{/if}
 									<form
 										method="POST"
 										action="?/moveUp"
@@ -492,6 +469,29 @@
 											Remove
 										</Button>
 									</form>
+									{#if index === 0}
+										<form
+											method="POST"
+											action="?/advance"
+											use:enhance={() => {
+												advanceSubmitting = true;
+												return async ({ update }) => {
+													await update();
+													advanceSubmitting = false;
+												};
+											}}
+										>
+											<input type="hidden" name="lotId" value={lot.id} />
+											<Button
+												type="submit"
+												variant="brass"
+												size="sm"
+												disabled={!!currentLot || advanceSubmitting}
+											>
+												{advanceSubmitting ? 'Opening…' : 'Advance'}
+											</Button>
+										</form>
+									{/if}
 								</div>
 							</Table.Cell>
 						</Table.Row>
