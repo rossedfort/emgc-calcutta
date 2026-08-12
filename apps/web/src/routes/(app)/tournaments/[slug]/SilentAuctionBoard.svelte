@@ -340,17 +340,26 @@
 	     the page). Confirmed directly in-browser, not assumed: the sticky
 	     header simply didn't stick until this override. This table's columns
 	     are narrow enough not to need horizontal scroll protection at the
-	     md+ widths it's shown at, so overflow-visible here is safe. -->
+	     md+ widths it's shown at, so overflow-visible here is safe.
+
+	     Every `top-*` value below is offset by AppShell's own sticky header
+	     (h-14 = 3.5rem) — these stick within the page, one level down from
+	     that outer header, not the true viewport top. The flight-group row's
+	     top-[5.625rem] stacks a second offset on top of that: 3.5rem (header)
+	     + 2.125rem (this table header row's own rendered height), so it
+	     lands right below the column headers instead of sticking at the
+	     same spot and covering them. If AppShell's header height ever
+	     changes, these need to move with it. -->
 	<div class="[&_[data-slot=table-container]]:overflow-visible">
 		<Table.Root class="hidden md:table">
 			<Table.Header>
 				<Table.Row>
-					<Table.Head class="sticky top-0 z-20 w-12 bg-background">#</Table.Head>
-					<Table.Head class="sticky top-0 z-20 bg-background">Player</Table.Head>
-					<Table.Head class="sticky top-0 z-20 bg-background">Handicap</Table.Head>
-					<Table.Head class="sticky top-0 z-20 bg-background">Status</Table.Head>
-					<Table.Head class="sticky top-0 z-20 bg-background">Current high</Table.Head>
-					<Table.Head class="sticky top-0 z-20 bg-background">Bid</Table.Head>
+					<Table.Head class="sticky top-14 z-20 w-12 bg-background">#</Table.Head>
+					<Table.Head class="sticky top-14 z-20 bg-background">Player</Table.Head>
+					<Table.Head class="sticky top-14 z-20 bg-background">Handicap</Table.Head>
+					<Table.Head class="sticky top-14 z-20 bg-background">Status</Table.Head>
+					<Table.Head class="sticky top-14 z-20 bg-background">Current high</Table.Head>
+					<Table.Head class="sticky top-14 z-20 bg-background">Bid</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
@@ -358,7 +367,7 @@
 					<Table.Row class="bg-sand/20 hover:bg-sand/20">
 						<Table.Cell
 							colspan={6}
-							class="sticky top-8.5 z-10 bg-sand font-data text-xs tracking-widest text-fairway uppercase"
+							class="sticky top-[5.625rem] z-10 bg-sand font-data text-xs tracking-widest text-fairway uppercase"
 						>
 							{group.label}
 						</Table.Cell>
@@ -435,8 +444,10 @@
 	<div class="flex flex-col gap-4 md:hidden">
 		{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
 			<div class="flex flex-col gap-2">
+				<!-- top-14 offsets below AppShell's own sticky header (h-14),
+				     same reasoning as the desktop table's sticky cells above. -->
 				<h3
-					class="font-data sticky top-0 z-10 -mx-4 border-b border-brass/30 bg-background px-4 py-2 text-sm font-semibold tracking-widest text-fairway uppercase sm:-mx-8 sm:px-8"
+					class="font-data sticky top-14 z-10 -mx-4 border-b border-brass/30 bg-background px-4 py-2 text-sm font-semibold tracking-widest text-fairway uppercase sm:-mx-8 sm:px-8"
 				>
 					{group.label}
 				</h3>
