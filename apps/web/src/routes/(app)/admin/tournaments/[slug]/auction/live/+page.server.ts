@@ -1,14 +1,6 @@
 import { error, fail } from '@sveltejs/kit';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database, Enums } from '@emgc-calcutta/shared-types';
-import { parsePageSize } from '$lib/pagination';
-import {
-	buildCursorPage,
-	cursorFilterExpression,
-	decodeCursor,
-	encodeCursor,
-	parseCursorDirection
-} from '$lib/server/cursorPagination';
 import type { Actions, PageServerLoad } from './$types';
 
 // One row per player_entries row (Phase 11) — see FieldPlayerRow
@@ -62,39 +54,7 @@ export interface AdminBidParticipant {
 	email: string;
 }
 
-// Phase 36: null only in the defensive case where a live-phase bid's entry
-// somehow has no live_lots row at all — shouldn't happen (an entry can only
-// receive a live bid once it has an open lot, per place-bid's own
-// validation), but this mirrors the rest of the codebase's "fail soft
-// rather than assume" bias for exactly that kind of shouldn't-happen gap.
-export type LiveLotState = 'not_yet_opened' | 'open' | 'closed';
-
-export interface LiveAuctionBidRow {
-	id: string;
-	amount: number;
-	placed_at: string;
-	voided_at: string | null;
-	void_reason: string | null;
-	bidder_name: string | null;
-	placed_by_admin_id: string | null;
-	division: string;
-	player: { slug: string; first_name: string; last_name: string };
-	lot_state: LiveLotState | null;
-}
-
-export interface LiveBidFilters {
-	player: string;
-	bidder: string;
-}
-
-function parseLiveBidFilters(url: URL): LiveBidFilters {
-	return {
-		player: url.searchParams.get('player')?.trim() ?? '',
-		bidder: url.searchParams.get('bidder')?.trim() ?? ''
-	};
-}
-
-export const load: PageServerLoad = async ({ url, parent, locals: { supabase } }) => {
+export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
 	const { tournament } = await parent();
 
 	const { data: entries } = await supabase
@@ -213,130 +173,11 @@ export const load: PageServerLoad = async ({ url, parent, locals: { supabase } }
 	}
 	const participants = [...participantsById.values()].sort((a, b) => a.name.localeCompare(b.name));
 
-	// Phase 36: "Recent live auction bids" review/void table — same cursor-
-	// pagination + server-side search shape Phase 35 already established for
-	// Silent Auction Bids, sorted by placed_at instead of created_at. See
-	// SilentBidFilters/queryEvents in auction/silent/+page.server.ts for the
-	// identical player-search two-step-lookup reasoning.
-	const bidFilters = parseLiveBidFilters(url);
-	const bidPageSize = parsePageSize(url.searchParams.get('page_size'));
-	const bidDirection = parseCursorDirection(url.searchParams.get('dir'));
-	const bidCursor = decodeCursor(url.searchParams.get('cursor'));
-	const bidAscending = bidDirection === 'after';
-
-	let liveBidsQuery = supabase
-		.from('bids')
-		.select(
-			`id, amount, placed_at, voided_at, void_reason, bidder_name, placed_by_admin_id, entry_id,
-			player_entries!bids_entry_id_fkey!inner(tournament_id, division, players(slug, first_name, last_name))`
-		)
-		.eq('player_entries.tournament_id', tournament.id)
-		.eq('phase', 'live')
-		.order('placed_at', { ascending: bidAscending })
-		.order('id', { ascending: bidAscending })
-		.limit(bidPageSize + 1);
-
-	if (bidCursor) {
-		liveBidsQuery = liveBidsQuery.or(cursorFilterExpression(bidCursor, bidDirection, 'placed_at'));
-	}
-	if (bidFilters.bidder) {
-		liveBidsQuery = liveBidsQuery.ilike('bidder_name', `%${bidFilters.bidder}%`);
-	}
-	if (bidFilters.player) {
-		const { data: matchingPlayers, error: playersError } = await supabase
-			.from('players')
-			.select('id')
-			.eq('tournament_id', tournament.id)
-			.or(`first_name.ilike.%${bidFilters.player}%,last_name.ilike.%${bidFilters.player}%`);
-		if (playersError) {
-			error(500, playersError.message);
-		}
-		const ids = (matchingPlayers ?? []).map((p) => p.id);
-		liveBidsQuery = liveBidsQuery.in(
-			'player_entries.player_id',
-			ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000']
-		);
-	}
-
-	const { data: liveBids, error: liveBidsError } = await liveBidsQuery;
-	if (liveBidsError) {
-		error(500, liveBidsError.message);
-	}
-
-	const {
-		rows: liveBidRows,
-		hasNext: bidsHasNext,
-		hasPrev: bidsHasPrev
-	} = buildCursorPage(liveBids ?? [], bidDirection, bidCursor !== null, bidPageSize);
-
-	// Lot state per bid — the whole reason it's worth calling out separately
-	// from an ordinary void (see void-bid/index.ts's own header comment): a
-	// bid on a still-open (or not-yet-opened) lot needs no special handling
-	// when voided (place-bid/close_live_lot's own high-bid lookups already
-	// exclude voided bids), but voiding a *closed* lot's winning bid
-	// recomputes the winner immediately. One live_lots row per entry ever
-	// (see live_lots' own migration comment), so a plain Map is safe here —
-	// fetched unconditionally (not just not-yet-opened, unlike the queue
-	// query above) since a bid can belong to a lot in any of the three
-	// states.
-	const bidEntryIds = liveBidRows.map((bid) => bid.entry_id);
-	const { data: bidLots, error: bidLotsError } =
-		bidEntryIds.length > 0
-			? await supabase
-					.from('live_lots')
-					.select('entry_id, opened_at, closed_at')
-					.in('entry_id', bidEntryIds)
-			: { data: [], error: null };
-	if (bidLotsError) {
-		error(500, bidLotsError.message);
-	}
-	const lotStateByEntryId = new Map<string, LiveLotState>(
-		(bidLots ?? []).map((lot) => [
-			lot.entry_id,
-			lot.closed_at ? 'closed' : lot.opened_at ? 'open' : 'not_yet_opened'
-		])
-	);
-
-	const liveAuctionBids: LiveAuctionBidRow[] = liveBidRows.flatMap((bid) =>
-		bid.player_entries?.players
-			? [
-					{
-						id: bid.id,
-						amount: bid.amount,
-						placed_at: bid.placed_at,
-						voided_at: bid.voided_at,
-						void_reason: bid.void_reason,
-						bidder_name: bid.bidder_name,
-						placed_by_admin_id: bid.placed_by_admin_id,
-						division: bid.player_entries.division,
-						player: bid.player_entries.players,
-						lot_state: lotStateByEntryId.get(bid.entry_id) ?? null
-					}
-				]
-			: []
-	);
-
 	return {
 		tournament,
 		players,
 		queue,
 		participants,
-		liveBids: liveAuctionBids,
-		liveBidFilters: bidFilters,
-		liveBidPageSize: bidPageSize,
-		liveBidsHasNext: bidsHasNext,
-		liveBidsHasPrev: bidsHasPrev,
-		liveBidsNextCursor:
-			bidsHasNext && liveBidRows.length > 0
-				? encodeCursor({
-						sortValue: liveBidRows[liveBidRows.length - 1].placed_at,
-						id: liveBidRows[liveBidRows.length - 1].id
-					})
-				: null,
-		liveBidsPrevCursor:
-			bidsHasPrev && liveBidRows.length > 0
-				? encodeCursor({ sortValue: liveBidRows[0].placed_at, id: liveBidRows[0].id })
-				: null,
 		title: `${tournament.name} · Live auction · EMGC Bet`,
 		description: `Run the live auction for ${tournament.name}.`
 	};

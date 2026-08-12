@@ -18,6 +18,10 @@
 				label: 'Live auction'
 			},
 			{
+				href: routes.adminTournamentAuctionLiveBids(data.tournament.slug),
+				label: 'Live bids'
+			},
+			{
 				href: routes.adminTournamentAuctionLeadingBids(data.tournament.slug),
 				label: 'Leading bids'
 			}
