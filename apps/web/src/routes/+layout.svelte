@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import '../app.css';
 	import ErrorState from '$lib/components/ErrorState.svelte';
+	import UpdateBanner from '$lib/components/UpdateBanner.svelte';
 
 	let { children } = $props();
 </script>
@@ -10,6 +11,8 @@
 	<title>{page.data.title}</title>
 	<meta name="description" content={page.data.description} />
 </svelte:head>
+
+<UpdateBanner />
 
 <!-- Catches unhandled errors thrown while rendering/updating the component
      tree on the client (a bug in a $derived, an effect, template markup) —
