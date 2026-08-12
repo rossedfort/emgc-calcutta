@@ -3,7 +3,6 @@
 	import { navigating, page } from '$app/state';
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { RealtimeBid, RealtimePlayerEntry } from '@emgc-calcutta/shared-types';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
@@ -141,18 +140,6 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
-	<div class="flex justify-end">
-		<Button
-			href={routes.adminTournamentAuctionSilentTV(tournament.slug)}
-			target="_blank"
-			variant="outline"
-			size="sm"
-		>
-			<ExternalLinkIcon class="size-4" />
-			TV Display
-		</Button>
-	</div>
-
 	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 p-6 text-ink">
 		<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
 		{#if silentAuctionEnded}

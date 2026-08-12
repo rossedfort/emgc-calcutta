@@ -115,20 +115,24 @@
 		/>
 	</div>
 
-	{#if entryId}
-		<div
-			class="grid grid-cols-1 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40 sm:grid-cols-2"
-		>
-			<div class="flex flex-col gap-1 bg-scorecard p-3">
-				<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
-					Current high
-				</span>
-				<span class="font-data text-lg text-ink">
-					{highBid ? formatCurrency(highBid.amount) : 'No bids yet'}
-				</span>
-			</div>
+	<div
+		class="grid grid-cols-1 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40 sm:grid-cols-2"
+	>
+		<div class="flex flex-col gap-1 bg-scorecard p-3">
+			<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+				Current high
+			</span>
+			<span class="font-data text-lg text-ink">
+				{#if !entryId}
+					—
+				{:else if highBid}
+					{formatCurrency(highBid.amount)}
+				{:else}
+					No bids yet
+				{/if}
+			</span>
 		</div>
-	{/if}
+	</div>
 
 	<form
 		class="flex flex-col gap-2"

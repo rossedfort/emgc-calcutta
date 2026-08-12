@@ -159,11 +159,20 @@ export default {
 
       let recomputed = false;
       let newWinningBidId: string | null = null;
+      // Amount/bidder_name (not just id) so the response can carry enough
+      // for the caller to build a "winner recomputed" message without a
+      // follow-up lookup (Phase 36) — the void action already changed who
+      // owes money for this player, so that shouldn't be easy to miss.
+      let newWinningBid: {
+        id: string;
+        amount: number;
+        bidder_name: string | null;
+      } | null = null;
       if (affectedLot) {
         const { data: newHighBid, error: newHighBidError } = await ctx
           .supabaseAdmin
           .from("bids")
-          .select("id")
+          .select("id, amount, bidder_name")
           .eq("entry_id", bid.entry_id)
           .is("voided_at", null)
           .order("amount", { ascending: false })
@@ -200,6 +209,7 @@ export default {
 
         recomputed = true;
         newWinningBidId = newHighBid?.id ?? null;
+        newWinningBid = newHighBid ?? null;
       }
 
       const { ip, user_agent } = requestMetadata(req);
@@ -236,6 +246,7 @@ export default {
             void_reason: voidedBid.void_reason!,
           },
           recomputed,
+          new_winning_bid: newWinningBid,
         } satisfies VoidBidResponse,
       );
     },

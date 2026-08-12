@@ -2,6 +2,7 @@
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import type { Database, VoidBidRequest, VoidBidResponse } from '@emgc-calcutta/shared-types';
+	import { toast } from 'svelte-sonner';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Button } from '$lib/components/ui/button';
 	import { Label } from '$lib/components/ui/label';
@@ -47,7 +48,7 @@
 		submitting = true;
 		errorMessage = '';
 
-		const { error } = await supabase.functions.invoke<VoidBidResponse>('void-bid', {
+		const { data, error } = await supabase.functions.invoke<VoidBidResponse>('void-bid', {
 			body: { bidId, reason: trimmedReason } satisfies VoidBidRequest
 		});
 
@@ -60,6 +61,18 @@
 				if (errBody?.error) errorMessage = errBody.error;
 			}
 			return;
+		}
+
+		// Only ever fires for a closed live lot's winning bid (silent bids
+		// have no lot to recompute against) — called out explicitly rather
+		// than left to a silent table refresh, since this changes who owes
+		// money for the player, not just this one bid's own status.
+		if (data?.recomputed) {
+			toast(
+				data.new_winning_bid
+					? `Winner recomputed for ${playerName} — now ${data.new_winning_bid.bidder_name ?? 'an unnamed bidder'} at ${formatCurrency(data.new_winning_bid.amount)}.`
+					: `${playerName} has no remaining bids after this void — status reverted to no bid.`
+			);
 		}
 
 		onSuccess?.();

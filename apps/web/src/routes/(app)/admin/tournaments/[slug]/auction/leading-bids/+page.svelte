@@ -78,14 +78,13 @@
 			<Table.Body>
 				{#each bidderGroups as group (group.key)}
 					<Table.Row class="bg-sand/20 hover:bg-sand/20">
-						<Table.Cell class="text-sm text-fairway">
+						<Table.Cell colspan={5} class="text-sm text-fairway">
 							{group.name}
 							<span class="text-ink/50 text-xs font-data">
 								· {group.bidCount}
 								{group.bidCount === 1 ? 'bid' : 'bids'} · {formatCurrency(group.totalAmount)} if all held
 							</span>
 						</Table.Cell>
-						<Table.Cell colspan={4} />
 					</Table.Row>
 					{#each group.rows as row (row.id)}
 						<Table.Row>
