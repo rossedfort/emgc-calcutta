@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { resolve } from '$app/paths';
+	import { routes } from '$lib/routes';
 	import DivisionBadge from './DivisionBadge.svelte';
 	import { Badge, type BadgeVariant } from './ui/badge';
 
@@ -12,7 +12,7 @@
 	// vs. a read-only current-bid/last-bid line) is the caller's own
 	// snippet, not a lowest-common-denominator prop list.
 	//
-	// Takes slug/playerSlug rather than a pre-resolved href — resolve() is
+	// Takes slug/playerSlug rather than a pre-resolved href — routes.* is
 	// always called at the point of rendering the <a> everywhere else in
 	// this app (see AppShell), and both current call sites link to the same
 	// route shape anyway.
@@ -55,7 +55,7 @@
 	<div class="flex items-start justify-between gap-3">
 		<div class="flex min-w-0 flex-col gap-1.5">
 			<a
-				href={resolve('/tournaments/[slug]/players/[playerSlug]', { slug, playerSlug })}
+				href={routes.tournamentPlayer(slug, playerSlug)}
 				class="font-display text-lg leading-tight font-semibold text-ink hover:underline"
 			>
 				{name}

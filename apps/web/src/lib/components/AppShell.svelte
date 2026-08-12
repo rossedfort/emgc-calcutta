@@ -2,7 +2,6 @@
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import type { Snippet } from 'svelte';
 	import { afterNavigate, goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import * as Avatar from '$lib/components/ui/avatar';
@@ -10,6 +9,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { initials } from '$lib/initials';
 	import { formatUserName, type UserProfile } from '$lib/profile';
+	import { routes } from '$lib/routes';
 
 	interface Props {
 		profile: UserProfile | null;
@@ -34,7 +34,7 @@
 	async function signOut() {
 		const { error } = await supabase.auth.signOut();
 		if (!error) {
-			goto(resolve('/login'));
+			goto(routes.login());
 		}
 	}
 
@@ -87,12 +87,12 @@
 			<DropdownMenu.Content align="end">
 				<DropdownMenu.Item>
 					{#snippet child({ props })}
-						<a href={resolve('/profile')} {...props}>View profile</a>
+						<a href={routes.profile()} {...props}>View profile</a>
 					{/snippet}
 				</DropdownMenu.Item>
 				<DropdownMenu.Item>
 					{#snippet child({ props })}
-						<a href={resolve('/settings/notifications')} {...props}>Notification settings</a>
+						<a href={routes.settingsNotifications()} {...props}>Notification settings</a>
 					{/snippet}
 				</DropdownMenu.Item>
 				<DropdownMenu.Separator />
@@ -108,11 +108,11 @@
 				'w-full shrink-0 flex-col gap-1 border-b border-brass/30 bg-sand/25 p-4 text-sm md:flex md:w-56 md:border-r md:border-b-0'
 			]}
 		>
-			<a href={resolve('/')} class={navLinkClass('/')}>
+			<a href={routes.home()} class={navLinkClass('/')}>
 				{@render navDot('/')}
 				<span>Home</span>
 			</a>
-			<a href={resolve('/help')} class={navLinkClass('/help')}>
+			<a href={routes.help()} class={navLinkClass('/help')}>
 				{@render navDot('/help')}
 				<span>Help</span>
 			</a>
@@ -121,18 +121,18 @@
 				<div class="mt-3 mb-1 border-t border-brass/30 pt-3">
 					<p class="font-data px-2 text-[0.65rem] tracking-widest text-brass/80 uppercase">Admin</p>
 				</div>
-				<a href={resolve('/admin/tournaments')} class={navLinkClass('/admin/tournaments')}>
+				<a href={routes.adminTournaments()} class={navLinkClass('/admin/tournaments')}>
 					{@render navDot('/admin/tournaments')}
 					<span>Tournaments</span>
 				</a>
-				<a href={resolve('/admin/users')} class={navLinkClass('/admin/users')}>
+				<a href={routes.adminUsers()} class={navLinkClass('/admin/users')}>
 					{@render navDot('/admin/users')}
 					<span>Users</span>
 					{#if pendingUserCount}
 						<Badge variant="flag" class="ml-auto">{pendingUserCount}</Badge>
 					{/if}
 				</a>
-				<a href={resolve('/admin/audit')} class={navLinkClass('/admin/audit')}>
+				<a href={routes.adminAudit()} class={navLinkClass('/admin/audit')}>
 					{@render navDot('/admin/audit')}
 					<span>Audit log</span>
 				</a>

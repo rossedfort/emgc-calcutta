@@ -1,0 +1,172 @@
+<script lang="ts">
+	import { enhance } from '$app/forms';
+	import { Button } from '$lib/components/ui/button';
+	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
+	import PageHeader from '$lib/components/PageHeader.svelte';
+	import { formatPlayerName, playerStatusLabel } from '$lib/players';
+	import { formatUserName } from '$lib/profile';
+	import { routes } from '$lib/routes';
+	import PlayerForm from '../../PlayerForm.svelte';
+	import type { PlayerFormValues } from '../../shared';
+
+	let { data, form } = $props();
+
+	let errorMessage = $derived(form && 'error' in form ? (form.error as string) : null);
+
+	let defaultValues = $derived<PlayerFormValues>({
+		first_name: data.player.first_name,
+		last_name: data.player.last_name,
+		flight: data.player.flight,
+		handicap_index: data.player.handicap_index !== null ? String(data.player.handicap_index) : '',
+		preferences: data.player.preferences ?? ''
+	});
+
+	let linkSubmitting = $state(false);
+	let unlinkSubmitting = $state(false);
+	let showRemoveConfirm = $state(false);
+	let removeSubmitting = $state(false);
+</script>
+
+<div class="flex flex-col gap-4 pt-4">
+	<PageHeader title={formatPlayerName(data.player)}>
+		{#snippet actions()}
+			<a
+				href={routes.adminTournamentPlayers(data.tournament.slug)}
+				class="text-sm text-brass hover:underline">Back to players</a
+			>
+		{/snippet}
+	</PageHeader>
+
+	{#if errorMessage}
+		<p class="text-sm text-destructive">{errorMessage}</p>
+	{/if}
+
+	<form method="POST" action="?/updateDetails" use:enhance>
+		<PlayerForm
+			values={(form && 'values' in form
+				? (form.values as PlayerFormValues | undefined)
+				: undefined) ?? defaultValues}
+			errors={form && 'errors' in form ? (form.errors as Record<string, string>) : {}}
+			submitLabel="Save changes"
+		/>
+	</form>
+
+	<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+		<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">Status</p>
+		<!-- One line per entry (Phase 11) — a Championship golfer has two
+		     independent entries (Gross/Net), each with its own status. -->
+		<div class="mt-1 flex flex-col gap-1">
+			{#each data.entries as entry (entry.division)}
+				<p class="font-data flex items-center gap-2 text-sm">
+					{#if entry.division !== 'overall'}<DivisionBadge division={entry.division} />{/if}
+					{playerStatusLabel(entry.status)}
+				</p>
+			{/each}
+		</div>
+
+		<div class="mt-4 border-t border-brass/40"></div>
+
+		<div class="mt-4 flex flex-col gap-2">
+			<p class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+				Linked participant
+			</p>
+
+			{#if data.linkedUser}
+				{@const linkedUserName = formatUserName(data.linkedUser)}
+				<div class="flex items-center gap-3">
+					<p class="text-sm">
+						{linkedUserName ?? data.linkedUser.email}
+						{#if linkedUserName}<span class="text-ink/60">({data.linkedUser.email})</span>{/if}
+					</p>
+					<form
+						method="POST"
+						action="?/unlink"
+						use:enhance={() => {
+							unlinkSubmitting = true;
+							return async ({ update }) => {
+								await update();
+								unlinkSubmitting = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="destructive" size="sm" disabled={unlinkSubmitting}>
+							{unlinkSubmitting ? 'Unlinking…' : 'Unlink'}
+						</Button>
+					</form>
+				</div>
+			{:else}
+				<p class="text-sm text-ink/70">
+					Not linked to a participant — this competitor can't bid unless linked.
+				</p>
+				<form
+					method="POST"
+					action="?/link"
+					class="flex items-center gap-2"
+					use:enhance={() => {
+						linkSubmitting = true;
+						return async ({ update }) => {
+							await update();
+							linkSubmitting = false;
+						};
+					}}
+				>
+					<select
+						name="userId"
+						required
+						disabled={linkSubmitting}
+						class="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+					>
+						<option value="" disabled selected>Choose a participant</option>
+						{#each data.users as user (user.id)}
+							{@const userName = formatUserName(user)}
+							<option value={user.id}
+								>{userName ? `${userName} (${user.email})` : user.email}</option
+							>
+						{/each}
+					</select>
+					<Button type="submit" variant="brass" size="sm" disabled={linkSubmitting}>
+						{linkSubmitting ? 'Linking…' : 'Link'}
+					</Button>
+				</form>
+			{/if}
+		</div>
+	</div>
+
+	<div class="border-t border-destructive/30 pt-4">
+		{#if !showRemoveConfirm}
+			<Button variant="destructive" size="sm" onclick={() => (showRemoveConfirm = true)}>
+				Remove player
+			</Button>
+		{:else}
+			<div class="flex items-center gap-2">
+				<p class="text-sm text-destructive">
+					Remove {formatPlayerName(data.player)}? This can't be undone.
+				</p>
+				<form
+					method="POST"
+					action="?/remove"
+					use:enhance={() => {
+						removeSubmitting = true;
+						return async ({ update }) => {
+							await update();
+							removeSubmitting = false;
+						};
+					}}
+				>
+					<Button type="submit" variant="destructive" size="sm" disabled={removeSubmitting}>
+						{removeSubmitting ? 'Removing…' : 'Yes, remove'}
+					</Button>
+				</form>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={removeSubmitting}
+					onclick={() => (showRemoveConfirm = false)}
+				>
+					Cancel
+				</Button>
+			</div>
+		{/if}
+	</div>
+</div>
