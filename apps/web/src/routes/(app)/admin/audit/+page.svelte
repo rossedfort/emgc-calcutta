@@ -10,6 +10,7 @@
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { AUDIT_ACTIONS, auditActionLabel, type AuditEventRow } from '$lib/auditActions';
+	import { PAGE_SIZES } from '$lib/pagination';
 	import { routes } from '$lib/routes';
 	import { createAuditRealtime, type AuditRealtime } from '$lib/stores/auditRealtime';
 	import type { RealtimeConnectionStatus } from '$lib/stores/realtime';
@@ -22,6 +23,32 @@
 	// instant (see $lib/time.ts's localDateTimeToUtcIso). Computed once, not
 	// reactively: the browser's own timezone doesn't change mid-session.
 	const tzOffsetMinutes = new Date().getTimezoneOffset();
+
+	// Whether we're anywhere but the very first page — used to keep Live
+	// mode (which only makes sense against the newest, unfiltered page)
+	// off here the same way it's already off while filtered.
+	let onFirstPage = $derived(!page.url.searchParams.has('cursor'));
+
+	function pageUrl(params: Record<string, string | null>): string {
+		const url = new URL(page.url);
+		for (const [key, value] of Object.entries(params)) {
+			if (value === null) {
+				url.searchParams.delete(key);
+			} else {
+				url.searchParams.set(key, value);
+			}
+		}
+		return `${url.pathname}${url.search}`;
+	}
+
+	let nextHref = $derived(
+		data.hasNext ? pageUrl({ cursor: data.nextCursor, dir: 'before' }) : null
+	);
+	let prevHref = $derived(data.hasPrev ? pageUrl({ cursor: data.prevCursor, dir: 'after' }) : null);
+
+	function changePageSize(size: string) {
+		goto(pageUrl({ page_size: size, cursor: null, dir: null }));
+	}
 
 	// Carries whatever filters are currently applied — export reflects the
 	// current view, not just the 200 rows shown on screen (the export
@@ -88,9 +115,9 @@
 	// Submitting the filter form is a real navigation, not a client-side
 	// state change this component controls — if live mode is on when that
 	// happens, turn it off rather than leaving a stale subscription running
-	// against what's now a filtered view.
+	// against what's now a filtered (or no-longer-first-page) view.
 	$effect(() => {
-		if (filtersActive && liveEnabled) {
+		if ((filtersActive || !onFirstPage) && liveEnabled) {
 			stopLive();
 		}
 	});
@@ -99,12 +126,13 @@
 	// not something an Admin has to remember to switch on. Only client-side
 	// (onMount, not module-level state) since it opens a Realtime channel;
 	// skipped when the page loads with filters already applied (e.g. a
-	// bookmarked/shared filtered URL) — same "unfiltered view only" rule the
-	// toggle itself already enforces, checked once against the filters this
-	// page loaded with rather than reactively, so it can't fight a later
-	// filter change the effect above already handles.
+	// bookmarked/shared filtered URL) or anywhere but the first page — same
+	// "unfiltered, newest page only" rule the toggle itself already
+	// enforces, checked once against how this page loaded rather than
+	// reactively, so it can't fight a later change the effect above already
+	// handles.
 	onMount(() => {
-		if (!filtersActive) {
+		if (!filtersActive && onFirstPage) {
 			startLive();
 		}
 	});
@@ -114,10 +142,15 @@
 	// New live events are already most-recent-first (auditRealtime.ts
 	// prepends); data.events is the SSR snapshot, also most-recent-first.
 	// Deduping guards the vanishingly unlikely race where an event both
-	// landed in the initial query and arrived as a live INSERT.
+	// landed in the initial query and arrived as a live INSERT. Capped to
+	// the current page size rather than a fixed 100, so live mode never
+	// shows more rows than the paginated view otherwise would.
 	let displayedEvents = $derived.by(() => {
 		const liveIds = new Set(liveEvents.map((e) => e.id));
-		return [...liveEvents, ...data.events.filter((e) => !liveIds.has(e.id))].slice(0, 100);
+		return [...liveEvents, ...data.events.filter((e) => !liveIds.has(e.id))].slice(
+			0,
+			data.pageSize
+		);
 	});
 
 	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
@@ -141,8 +174,12 @@
 			<Button
 				variant={liveEnabled ? 'brass' : 'outline'}
 				size="sm"
-				disabled={filtersActive}
-				title={filtersActive ? 'Clear filters to go live' : undefined}
+				disabled={filtersActive || !onFirstPage}
+				title={filtersActive
+					? 'Clear filters to go live'
+					: !onFirstPage
+						? 'Return to the first page to go live'
+						: undefined}
 				onclick={toggleLive}
 			>
 				<span
@@ -234,6 +271,7 @@
 			</p>
 		</div>
 		<input type="hidden" name="tz_offset_minutes" value={tzOffsetMinutes} />
+		<input type="hidden" name="page_size" value={data.pageSize} />
 		<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
 			{#if isQuerying}
 				<LoaderCircleIcon class="size-3.5 animate-spin" />
@@ -286,10 +324,32 @@
 				{/each}
 			</Table.Body>
 		</Table.Root>
-		{#if displayedEvents.length === 100}
-			<p class="text-xs text-muted-foreground">
-				Showing the 100 most recent matching events — narrow the filters to see older ones.
-			</p>
-		{/if}
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<label class="flex items-center gap-2 text-sm text-muted-foreground">
+				Rows per page
+				<select
+					value={data.pageSize}
+					onchange={(e) => changePageSize(e.currentTarget.value)}
+					disabled={isQuerying}
+					class="rounded-md border border-input bg-background px-2 py-1.5 text-sm disabled:opacity-50"
+				>
+					{#each PAGE_SIZES as size (size)}
+						<option value={size}>{size}</option>
+					{/each}
+				</select>
+			</label>
+			<div class="flex items-center gap-2">
+				{#if prevHref && !isQuerying}
+					<Button variant="outline" size="sm" href={prevHref}>Previous</Button>
+				{:else}
+					<Button variant="outline" size="sm" disabled>Previous</Button>
+				{/if}
+				{#if nextHref && !isQuerying}
+					<Button variant="outline" size="sm" href={nextHref}>Next</Button>
+				{:else}
+					<Button variant="outline" size="sm" disabled>Next</Button>
+				{/if}
+			</div>
+		</div>
 	{/if}
 </div>
