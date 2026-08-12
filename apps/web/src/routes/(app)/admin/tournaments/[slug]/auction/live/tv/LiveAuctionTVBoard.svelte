@@ -91,7 +91,7 @@
 						>
 							{formatPlayerName(currentPlayer)}
 						</a>
-						<DivisionBadge division={currentPlayer.division} />
+						<DivisionBadge division={currentPlayer.division} size="lg" />
 					</span>
 					{#if currentPlayer.is_field}
 						{@const pooled = pooledPlayers(currentPlayer.id)}
