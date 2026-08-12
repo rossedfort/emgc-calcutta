@@ -7,6 +7,7 @@
 	import Papa from 'papaparse';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
 	import { invalidateAll } from '$app/navigation';
+	import { SvelteMap } from 'svelte/reactivity';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -66,6 +67,56 @@
 		link.download = `${data.tournament.slug}-winners.csv`;
 		link.click();
 		URL.revokeObjectURL(url);
+	}
+
+	// Groups the flat, already-sold `players` list by winning bidder —
+	// mirrors the silent auction board's own flight-grouping pattern
+	// (groupPlayersByFlightAndDivision), just keyed by bidder identity
+	// instead of flight/division, and computed client-side here rather than
+	// via a shared helper since this grouping is specific to this one page.
+	// Keyed by bidder id, not name/email — two different bidders could in
+	// principle share a display name. `winning_bid`/`.bidder` are typed
+	// nullable (they mirror the DB columns' own nullability) but every row
+	// here is already status sold_silent/sold_live, which never happens
+	// without a winning bid — the `?? 0`/fallback-key handling below is
+	// defensive, not an expected path.
+	interface BidderGroup {
+		key: string;
+		name: string;
+		bidCount: number;
+		totalAmount: number;
+		rows: typeof players;
+	}
+	let bidderGroups = $derived.by(() => {
+		const groups = new SvelteMap<string, BidderGroup>();
+		for (const player of players) {
+			const bidder = player.winning_bid?.bidder;
+			const key = bidder?.id ?? `unknown-${player.id}`;
+			const amount = player.winning_bid?.amount ?? 0;
+			const existing = groups.get(key);
+			if (existing) {
+				existing.rows.push(player);
+				existing.bidCount += 1;
+				existing.totalAmount += amount;
+				continue;
+			}
+			groups.set(key, {
+				key,
+				name: bidder ? (formatUserName(bidder) ?? bidder.email) : 'Unknown bidder',
+				bidCount: 1,
+				totalAmount: amount,
+				rows: [player]
+			});
+		}
+		return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+	});
+
+	// player.status, not bid.phase — an entry's status already records
+	// exactly which auction phase it sold in (set alongside winning_bid_id
+	// by close_silent_auctions()/close_live_lot() respectively), so this is
+	// free rather than needing a separate query field.
+	function phaseLabel(status: 'sold_silent' | 'sold_live'): string {
+		return status === 'sold_silent' ? 'Silent' : 'Live';
 	}
 
 	function roleLabel(role: 'buyer' | 'golfer' | null): string {
@@ -149,53 +200,63 @@
 			<Table.Root>
 				<Table.Header>
 					<Table.Row>
+						<Table.Head>Bidder</Table.Head>
 						<Table.Head>Player</Table.Head>
-						<Table.Head>Buyer</Table.Head>
+						<Table.Head>Phase</Table.Head>
 						<Table.Head>Amount</Table.Head>
 						<Table.Head>Status</Table.Head>
 						<Table.Head>Actions</Table.Head>
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
-					{#each players as player (player.id)}
-						<Table.Row>
-							<Table.Cell class="font-medium text-ink">
-								{formatPlayerName(player)}
-								<DivisionBadge division={player.division} />
-								{#if player.isField}
-									<Badge variant="brass">Field lot</Badge>
-								{/if}
+					{#each bidderGroups as group (group.key)}
+						<Table.Row class="bg-sand/20 hover:bg-sand/20">
+							<Table.Cell class="text-sm text-fairway">
+								{group.name}
+								<span class="text-ink/50 text-xs font-data">
+									· {group.bidCount}
+									{group.bidCount === 1 ? 'bid' : 'bids'} · {formatCurrency(group.totalAmount)}
+								</span>
 							</Table.Cell>
-							<Table.Cell>
-								{#if player.winning_bid?.bidder}
-									{formatUserName(player.winning_bid.bidder) ?? player.winning_bid.bidder.email}
-								{:else}
-									<span class="text-muted-foreground">—</span>
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="font-data whitespace-nowrap">
-								{player.winning_bid ? formatCurrency(player.winning_bid.amount) : '—'}
-							</Table.Cell>
-							<Table.Cell>
-								{#if player.buyer_marked_paid_at}
-									<Badge variant="fairway">Paid</Badge>
-								{:else}
-									<Badge variant="sand">Owed</Badge>
-								{/if}
-							</Table.Cell>
-							<Table.Cell>
-								{#if !player.buyer_marked_paid_at}
-									<Button
-										variant="brass"
-										size="sm"
-										disabled={pendingBidId === player.id}
-										onclick={() => markBidPaid(player.id)}
-									>
-										Mark paid
-									</Button>
-								{/if}
-							</Table.Cell>
+							<Table.Cell colspan={5} />
 						</Table.Row>
+						{#each group.rows as player (player.id)}
+							<Table.Row>
+								<Table.Cell />
+								<Table.Cell class="font-medium text-ink">
+									{formatPlayerName(player)}
+									<DivisionBadge division={player.division} />
+									{#if player.isField}
+										<Badge variant="brass">Field lot</Badge>
+									{/if}
+								</Table.Cell>
+								<Table.Cell>
+									<Badge variant="outline">{phaseLabel(player.status)}</Badge>
+								</Table.Cell>
+								<Table.Cell class="font-data whitespace-nowrap">
+									{player.winning_bid ? formatCurrency(player.winning_bid.amount) : '—'}
+								</Table.Cell>
+								<Table.Cell>
+									{#if player.buyer_marked_paid_at}
+										<Badge variant="fairway">Paid</Badge>
+									{:else}
+										<Badge variant="sand">Owed</Badge>
+									{/if}
+								</Table.Cell>
+								<Table.Cell>
+									{#if !player.buyer_marked_paid_at}
+										<Button
+											variant="brass"
+											size="sm"
+											disabled={pendingBidId === player.id}
+											onclick={() => markBidPaid(player.id)}
+										>
+											Mark paid
+										</Button>
+									{/if}
+								</Table.Cell>
+							</Table.Row>
+						{/each}
 					{/each}
 				</Table.Body>
 			</Table.Root>
