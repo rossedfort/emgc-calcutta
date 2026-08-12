@@ -58,7 +58,7 @@
 {/snippet}
 
 <div class="flex min-h-screen flex-col">
-	<header class="flex items-center justify-between bg-fairway px-4 py-3 sm:px-6">
+	<header class="sticky top-0 z-30 flex h-14 items-center justify-between bg-fairway px-4 sm:px-6">
 		<div class="flex items-center gap-2">
 			<button
 				type="button"
@@ -105,7 +105,7 @@
 		<nav
 			class={[
 				mobileNavOpen ? 'flex' : 'hidden',
-				'w-full shrink-0 flex-col gap-1 border-b border-brass/30 bg-sand/25 p-4 text-sm md:flex md:w-56 md:border-r md:border-b-0'
+				'sticky top-14 z-20 w-full shrink-0 flex-col gap-1 overflow-y-auto border-b border-brass/30 bg-scorecard p-4 text-sm md:flex md:h-[calc(100vh-3.5rem)] md:w-56 md:border-r md:border-b-0'
 			]}
 		>
 			<a href={routes.home()} class={navLinkClass('/')}>

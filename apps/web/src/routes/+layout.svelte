@@ -1,10 +1,34 @@
 <script lang="ts">
-	import { page } from '$app/state';
+	import { page, updated } from '$app/state';
 	import '../app.css';
 	import ErrorState from '$lib/components/ErrorState.svelte';
-	import UpdateBanner from '$lib/components/UpdateBanner.svelte';
+	import { Toaster } from '$lib/components/ui/sonner';
+	import { toast } from 'svelte-sonner';
 
 	let { children } = $props();
+
+	// Same "notify idle clients of a new deployment" mechanism as before
+	// (see vite.config.ts's kit.version.pollInterval) — now a persistent
+	// toast instead of a dismissible top banner. duration: Infinity keeps
+	// it up until the user dismisses it (the Toaster's own close button)
+	// or actually refreshes, matching the same "stays until acted on"
+	// intent the banner had. `notified` guards against firing more than
+	// once per page load — updated.current never goes back to false on
+	// its own, so without this guard every unrelated re-run of this effect
+	// would queue up a duplicate toast.
+	let notified = false;
+	$effect(() => {
+		if (updated.current && !notified) {
+			notified = true;
+			toast('A new version of the app is available.', {
+				duration: Infinity,
+				action: {
+					label: 'Refresh',
+					onClick: () => location.reload()
+				}
+			});
+		}
+	});
 </script>
 
 <svelte:head>
@@ -12,7 +36,7 @@
 	<meta name="description" content={page.data.description} />
 </svelte:head>
 
-<UpdateBanner />
+<Toaster closeButton />
 
 <!-- Catches unhandled errors thrown while rendering/updating the component
      tree on the client (a bug in a $derived, an effect, template markup) —
