@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import EmptyState from '$lib/components/EmptyState.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { routes } from '$lib/routes';
+	import ErrorState from '$lib/components/ErrorState.svelte';
 
 	// 404s here are always a deliberately-authored, safe-to-show message
 	// (e.g. "Tournament not found") — but a 500 usually carries a raw
@@ -18,10 +16,4 @@
 	);
 </script>
 
-<div class="flex flex-1 items-center justify-center p-4 sm:p-8">
-	<EmptyState variant="destructive" title="Error {page.status}" {description}>
-		{#snippet actions()}
-			<Button href={routes.home()} variant="brass" size="sm">Go home</Button>
-		{/snippet}
-	</EmptyState>
-</div>
+<ErrorState status={page.status} {description} />
