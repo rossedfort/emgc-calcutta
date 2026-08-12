@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { FunctionsHttpError } from '@supabase/supabase-js';
-	import { invalidateAll } from '$app/navigation';
+	import { navigating, page } from '$app/state';
+	import { goto, invalidateAll } from '$app/navigation';
+	import CursorPager from '$lib/components/CursorPager.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -9,48 +11,64 @@
 	import * as Table from '$lib/components/ui/table';
 	import { formatUserName } from '$lib/profile';
 	import { ROLES, roleBadgeVariant, roleLabel, type Role } from '$lib/roles';
+	import { routes } from '$lib/routes';
 	import PageHeader from '$lib/components/PageHeader.svelte';
 	import type { UserRow } from './types';
 
 	let { data } = $props();
-	let { supabase, users, role: viewerRole } = $derived(data);
+	let { supabase, role: viewerRole } = $derived(data);
 	let viewerId = $derived(data.session?.user.id);
 
 	let pendingId: string | null = $state(null);
 	let errorMessage = $state('');
 
-	let searchQuery = $state('');
-	let roleFilters = $state<string[]>([]);
+	// MultiSelectFilter is client-state-driven (no real form control of its
+	// own), unlike the plain text Input below — mirrored into hidden inputs
+	// so it still submits with the rest of the GET form. A writable
+	// $derived, not plain $state: it needs to reset to data.filters.roles
+	// after any navigation (Next/Prev, Clear, a filter submit elsewhere),
+	// not just seed once from the initial load, while still being directly
+	// assignable for MultiSelectFilter's own bind:selected.
+	let roleFilters = $derived(data.filters.roles);
 	let roleOptions = $derived(ROLES.map((role) => ({ value: role, label: roleLabel(role) })));
 
-	let filteredUsers = $derived(
-		users.filter((user) => {
-			if (roleFilters.length > 0 && !roleFilters.includes(user.role)) return false;
-			const query = searchQuery.trim().toLowerCase();
-			if (
-				query &&
-				!(formatUserName(user) ?? '').toLowerCase().includes(query) &&
-				!user.email.toLowerCase().includes(query)
-			) {
-				return false;
+	let isQuerying = $derived(navigating.to?.route.id === page.route.id);
+	let filtersActive = $derived(Boolean(data.filters.search || data.filters.roles.length > 0));
+
+	function pageUrl(params: Record<string, string | null>): string {
+		const url = new URL(page.url);
+		for (const [key, value] of Object.entries(params)) {
+			if (value === null) {
+				url.searchParams.delete(key);
+			} else {
+				url.searchParams.set(key, value);
 			}
-			return true;
-		})
-	);
+		}
+		return `${url.pathname}${url.search}`;
+	}
+
+	let hasNext = $derived(data.page * data.pageSize < data.othersTotal);
+	let hasPrev = $derived(data.page > 1);
+	let nextHref = $derived(hasNext ? pageUrl({ page: String(data.page + 1) }) : null);
+	let prevHref = $derived(hasPrev ? pageUrl({ page: String(data.page - 1) }) : null);
+
+	function changePageSize(size: string) {
+		goto(pageUrl({ page_size: size, page: null }));
+	}
 
 	// Split rather than just sorted to the top, so an Admin working the list
 	// sees "someone's waiting" as its own labeled section instead of having
 	// to notice an unassigned badge mixed into the rest of the table.
 	// Rejected users are unassigned too but split into their own section —
 	// they've already been dealt with, so they'd be dead weight cluttering
-	// the actionable Pending approval list otherwise.
-	let pendingUsers = $derived(
-		filteredUsers.filter((user) => user.role === 'unassigned' && !user.rejected_at)
-	);
-	let rejectedUsers = $derived(
-		filteredUsers.filter((user) => user.role === 'unassigned' && !!user.rejected_at)
-	);
-	let otherUsers = $derived(filteredUsers.filter((user) => user.role !== 'unassigned'));
+	// the actionable Pending approval list otherwise. Both sections are now
+	// server-filtered/unpaginated (see +page.server.ts); only "everyone
+	// else" (`data.others`) is paginated.
+	let pendingUsers = $derived(data.pending);
+	let rejectedUsers = $derived(data.rejected);
+	let otherUsers = $derived(data.others);
+
+	let totalCount = $derived(pendingUsers.length + rejectedUsers.length + data.othersTotal);
 
 	type UserAction =
 		{ label: string; role: Role } | { label: string; action: 'reject' | 'unreject' };
@@ -113,15 +131,44 @@
 		<p class="text-sm text-destructive">{errorMessage}</p>
 	{/if}
 
-	<div class="flex items-center gap-4 text-sm">
-		<Input
-			type="search"
-			placeholder="Search name or email…"
-			bind:value={searchQuery}
-			class="max-w-56"
-		/>
-		<MultiSelectFilter label="Role" options={roleOptions} bind:selected={roleFilters} />
-	</div>
+	<form
+		method="GET"
+		class="flex flex-wrap items-end gap-3 rounded-lg border border-brass/30 bg-scorecard p-4"
+	>
+		<label class="flex flex-col gap-1 text-sm">
+			<span class="text-muted-foreground">Search</span>
+			<Input
+				type="search"
+				name="search"
+				value={data.filters.search}
+				placeholder="Name or email…"
+				disabled={isQuerying}
+				class="max-w-56"
+			/>
+		</label>
+		<div class="flex flex-col gap-1">
+			<span class="text-sm text-muted-foreground">Role</span>
+			<MultiSelectFilter label="Role" options={roleOptions} bind:selected={roleFilters} />
+		</div>
+		{#each roleFilters as role (role)}
+			<input type="hidden" name="role" value={role} />
+		{/each}
+		<input type="hidden" name="page_size" value={data.pageSize} />
+		<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
+			{isQuerying ? 'Applying…' : 'Apply filters'}
+		</Button>
+		{#if filtersActive}
+			<Button
+				type="button"
+				variant="outline"
+				size="sm"
+				disabled={isQuerying}
+				onclick={() => goto(routes.adminUsers())}
+			>
+				Clear
+			</Button>
+		{/if}
+	</form>
 
 	{#snippet usersTable(rows: UserRow[])}
 		<Table.Root>
@@ -168,8 +215,8 @@
 		</Table.Root>
 	{/snippet}
 
-	{#if filteredUsers.length === 0}
-		<EmptyState title="No users match these filters" />
+	{#if totalCount === 0}
+		<EmptyState title={filtersActive ? 'No users match these filters' : 'No users yet'} />
 	{:else}
 		<div class="flex flex-col gap-8">
 			{#if pendingUsers.length > 0}
@@ -185,9 +232,18 @@
 				<div class="flex flex-col gap-2">
 					<div class="flex items-center gap-2">
 						<h2 class="font-display text-lg font-semibold text-ink">All users</h2>
-						<Badge variant="sand">{otherUsers.length}</Badge>
+						<Badge variant="sand">{data.othersTotal}</Badge>
 					</div>
 					{@render usersTable(otherUsers)}
+					<CursorPager
+						pageSize={data.pageSize}
+						{hasNext}
+						{hasPrev}
+						{nextHref}
+						{prevHref}
+						disabled={isQuerying}
+						onPageSizeChange={changePageSize}
+					/>
 				</div>
 			{/if}
 			{#if rejectedUsers.length > 0}
