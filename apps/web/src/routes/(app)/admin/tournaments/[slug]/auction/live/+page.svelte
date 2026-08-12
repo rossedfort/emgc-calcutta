@@ -82,15 +82,6 @@
 		return players.filter((p) => p.field_entry_id === fieldEntryId);
 	}
 
-	let nextQueuedLot = $derived(
-		liveLots
-			.filter((lot) => lot.opened_at === null)
-			.sort((a, b) => a.queue_position - b.queue_position)[0] ?? null
-	);
-	let nextQueuedPlayer = $derived(
-		nextQueuedLot ? (players.find((p) => p.id === nextQueuedLot!.entry_id) ?? null) : null
-	);
-
 	let secondsRemaining = $derived.by(() => {
 		if (!currentLot?.closes_at) return null;
 		const ms = new Date(currentLot.closes_at).getTime() - now.getTime();
@@ -221,9 +212,9 @@
 		</Button>
 	</div>
 
-	{#if currentLot && currentPlayer}
-		<div class="flex flex-col gap-3 rounded-lg border border-brass/30 p-6 text-ink">
-			<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
+	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 p-6 text-ink">
+		<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
+		{#if currentLot && currentPlayer}
 			<AdminBidForm
 				supabase={data.supabase}
 				tournament={data.tournament}
@@ -232,8 +223,12 @@
 				entryLabel={formatPlayerName(currentPlayer)}
 				highBid={high}
 			/>
-		</div>
-	{/if}
+		{:else}
+			<p class="text-sm text-ink/70">
+				No lot is currently open for bidding — advance the queue below to open the next one.
+			</p>
+		{/if}
+	</div>
 
 	<RealtimeStatusBanner status={connectionStatus} />
 
@@ -320,49 +315,11 @@
 				</Button>
 			</form>
 		</div>
-	{:else if nextQueuedLot && nextQueuedPlayer}
-		<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
-			<p class="font-data text-xs tracking-widest text-fairway uppercase">Up next</p>
-			<p class="mt-1 flex items-center gap-2 font-display text-xl font-semibold text-ink">
-				{formatPlayerName(nextQueuedPlayer)}
-				<DivisionBadge division={nextQueuedPlayer.division} />
-			</p>
-			{#if nextQueuedPlayer.is_field}
-				{@const pooled = pooledPlayers(nextQueuedPlayer.id)}
-				<p class="font-data text-xs tracking-wide text-ink/60 uppercase">
-					Pooled players: {pooled.length > 0
-						? pooled.map((p) => formatPlayerName(p)).join(', ')
-						: '—'}
-				</p>
-			{/if}
-			<form
-				method="POST"
-				action="?/advance"
-				class="mt-4"
-				use:enhance={() => {
-					advanceSubmitting = true;
-					return async ({ update }) => {
-						await update();
-						advanceSubmitting = false;
-					};
-				}}
-			>
-				<input type="hidden" name="lotId" value={nextQueuedLot.id} />
-				<Button type="submit" variant="brass" disabled={advanceSubmitting}>
-					{advanceSubmitting ? 'Opening…' : `Advance to ${formatPlayerName(nextQueuedPlayer)}`}
-				</Button>
-			</form>
-		</div>
-	{:else}
-		<EmptyState
-			title="Queue is empty"
-			description="Reserved players are added to the queue automatically as they cross the reserve threshold during the silent auction."
-		/>
 	{/if}
 
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center justify-between gap-2">
-			<p class="font-data text-xs tracking-widest text-fairway uppercase">Upcoming queue</p>
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">Queue</p>
 			{#if data.queue.length > 1}
 				<div class="flex items-center gap-2">
 					<span class="text-xs text-ink/60">Sort:</span>
@@ -447,6 +404,29 @@
 							>
 							<Table.Cell>
 								<div class="flex items-center gap-1">
+									{#if index === 0}
+										<form
+											method="POST"
+											action="?/advance"
+											use:enhance={() => {
+												advanceSubmitting = true;
+												return async ({ update }) => {
+													await update();
+													advanceSubmitting = false;
+												};
+											}}
+										>
+											<input type="hidden" name="lotId" value={lot.id} />
+											<Button
+												type="submit"
+												variant="brass"
+												size="sm"
+												disabled={!!currentLot || advanceSubmitting}
+											>
+												{advanceSubmitting ? 'Opening…' : 'Advance'}
+											</Button>
+										</form>
+									{/if}
 									<form
 										method="POST"
 										action="?/moveUp"
