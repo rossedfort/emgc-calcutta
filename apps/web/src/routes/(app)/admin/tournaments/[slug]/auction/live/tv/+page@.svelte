@@ -8,6 +8,8 @@
 	} from '@emgc-calcutta/shared-types';
 	import '../../../../../../../../app.css';
 	import { createTournamentRealtime, type RealtimeConnectionStatus } from '$lib/stores/realtime';
+	import LastBidTimestamp from '$lib/components/LastBidTimestamp.svelte';
+	import LiveClock from '$lib/components/LiveClock.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import LiveAuctionTVBoard from './LiveAuctionTVBoard.svelte';
 
@@ -63,6 +65,14 @@
 			return live ? { ...player, status: live.status as typeof player.status } : player;
 		})
 	);
+
+	let mostRecentBidPlacedAt = $derived.by(() => {
+		const relevant = liveBids.filter((bid) => bid.phase === 'live' && !bid.voided_at);
+		if (relevant.length === 0) return null;
+		return relevant.reduce((latest, bid) =>
+			new Date(bid.placed_at).getTime() > new Date(latest.placed_at).getTime() ? bid : latest
+		).placed_at;
+	});
 </script>
 
 <svelte:head>
@@ -71,8 +81,10 @@
 </svelte:head>
 
 <div class="min-h-screen bg-fairway/5">
-	<div class="mx-auto flex max-w-7xl flex-col gap-2 px-8 pt-4">
+	<div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-8 pt-4">
+		<LiveClock {now} />
 		<RealtimeStatusBanner status={connectionStatus} />
+		<LastBidTimestamp placedAt={mostRecentBidPlacedAt} />
 	</div>
 	<LiveAuctionTVBoard
 		tournament={data.tournament}
