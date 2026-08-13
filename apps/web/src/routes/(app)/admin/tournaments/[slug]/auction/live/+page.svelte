@@ -1,18 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
+	import { dragHandle, dragHandleZone } from 'svelte-dnd-action';
 	import type {
 		RealtimeBid,
 		RealtimeLiveLot,
 		RealtimePlayerEntry
 	} from '@emgc-calcutta/shared-types';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
+	import GripVerticalIcon from '@lucide/svelte/icons/grip-vertical';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import * as Table from '$lib/components/ui/table';
+	import { Card } from '$lib/components/ui/card';
 	import { currentHighBid } from '$lib/bids';
 	import {
 		formatHandicapIndex,
@@ -105,13 +110,59 @@
 		}
 	});
 
-	// Phase 32: the reorderable queue table (merged in from the former
+	// Phase 32: the reorderable queue list (merged in from the former
 	// standalone /auction/queue screen) is a plain server-loaded list,
 	// refreshed via each action's own invalidateAll() — not Realtime-driven
 	// like the current-lot card above. It's a deliberate management action
 	// screen, not something that needs to react to bids landing elsewhere.
 	let queuePending = $state<Record<string, boolean>>({});
 	let sortPending = $state(false);
+
+	// Phase 38: drag-and-drop reordering. queueItems is a writable $derived
+	// (Svelte 5.25+) mirroring data.queue — svelte-dnd-action freely
+	// reassigns it mid-drag (via `consider`) and on drop (`finalize`) before
+	// persisting, and any direct assignment "sticks" only until data.queue
+	// itself changes again (moveUp/moveDown/remove/advance's own
+	// invalidateAll(), via use:enhance's default post-success behavior, or
+	// this drag's own invalidateAll() below), at which point it recomputes
+	// from server truth — exactly the override-then-resync semantics this
+	// needs, with no separate effect to keep in sync by hand.
+	type QueueItem = (typeof data.queue)[number];
+	let queueItems = $derived(data.queue);
+
+	const flipDurationMs = 200;
+	let reorderPending = $state(false);
+	let reorderError = $state('');
+
+	function handleQueueConsider(e: CustomEvent<{ items: QueueItem[] }>) {
+		queueItems = e.detail.items;
+	}
+
+	async function handleQueueFinalize(e: CustomEvent<{ items: QueueItem[] }>) {
+		queueItems = e.detail.items;
+		reorderPending = true;
+		reorderError = '';
+
+		// resequence_queue re-validates the given id set against the
+		// tournament's current not-yet-opened lots server-side and rejects a
+		// stale/tampered order — no separate server action needed, this can
+		// go straight from the drop event to the RPC (same direct-client-call
+		// pattern AdminBidForm already uses for place-bid).
+		const { error: reorderRpcError } = await data.supabase.rpc('resequence_queue', {
+			p_tournament_id: data.tournament.id,
+			p_ordered_lot_ids: queueItems.map((lot) => lot.id)
+		});
+
+		reorderPending = false;
+
+		if (reorderRpcError) {
+			reorderError = reorderRpcError.message;
+			queueItems = data.queue;
+			return;
+		}
+
+		await invalidateAll();
+	}
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -242,7 +293,7 @@
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center justify-between gap-2">
 			<p class="font-data text-xs tracking-widest text-fairway uppercase">Queue</p>
-			{#if data.queue.length > 1}
+			{#if queueItems.length > 1}
 				<div class="flex items-center gap-2">
 					<span class="text-xs text-ink/60">Sort:</span>
 					<form
@@ -293,133 +344,146 @@
 				</div>
 			{/if}
 		</div>
-		{#if data.queue.length === 0}
+
+		{#if reorderError}
+			<p class="text-sm text-destructive">{reorderError}</p>
+		{/if}
+
+		{#if queueItems.length === 0}
 			<EmptyState
 				title="Nothing queued"
 				description="Players are added automatically as they cross the reserve threshold during the silent auction."
 			/>
 		{:else}
-			<Table.Root>
-				<Table.Header>
-					<Table.Row>
-						<Table.Head class="w-12">#</Table.Head>
-						<Table.Head>Name</Table.Head>
-						<Table.Head>Flight</Table.Head>
-						<Table.Head>Handicap</Table.Head>
-						<Table.Head>Actions</Table.Head>
-					</Table.Row>
-				</Table.Header>
-				<Table.Body>
-					{#each data.queue as lot, index (lot.id)}
-						<Table.Row>
-							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
-							<Table.Cell class="font-medium text-ink">
-								{formatPlayerName(lot.player)}
-								<DivisionBadge division={lot.player.division} />
-								{#if lot.player.is_field}
-									<Badge variant="brass">Field lot</Badge>
-								{/if}
-							</Table.Cell>
-							<Table.Cell>{lot.player.flight || '—'}</Table.Cell>
-							<Table.Cell class="font-data"
-								>{formatHandicapIndex(lot.player.handicap_index)}</Table.Cell
-							>
-							<Table.Cell>
-								<div class="flex items-center gap-1">
-									<form
-										method="POST"
-										action="?/moveUp"
-										use:enhance={() => {
-											queuePending[lot.id] = true;
-											return async ({ update }) => {
-												await update();
-												queuePending[lot.id] = false;
-											};
-										}}
-									>
-										<input type="hidden" name="lotId" value={lot.id} />
-										<Button
-											type="submit"
-											variant="outline"
-											size="icon-sm"
-											disabled={index === 0 || queuePending[lot.id]}
-											aria-label="Move {formatPlayerName(lot.player)} up"
-										>
-											↑
-										</Button>
-									</form>
-									<form
-										method="POST"
-										action="?/moveDown"
-										use:enhance={() => {
-											queuePending[lot.id] = true;
-											return async ({ update }) => {
-												await update();
-												queuePending[lot.id] = false;
-											};
-										}}
-									>
-										<input type="hidden" name="lotId" value={lot.id} />
-										<Button
-											type="submit"
-											variant="outline"
-											size="icon-sm"
-											disabled={index === data.queue.length - 1 || queuePending[lot.id]}
-											aria-label="Move {formatPlayerName(lot.player)} down"
-										>
-											↓
-										</Button>
-									</form>
-									<form
-										method="POST"
-										action="?/remove"
-										use:enhance={() => {
-											queuePending[lot.id] = true;
-											return async ({ update }) => {
-												await update();
-												queuePending[lot.id] = false;
-											};
-										}}
-									>
-										<input type="hidden" name="lotId" value={lot.id} />
-										<Button
-											type="submit"
-											variant="destructive"
-											size="sm"
-											disabled={queuePending[lot.id]}
-										>
-											Remove
-										</Button>
-									</form>
-									{#if index === 0}
-										<form
-											method="POST"
-											action="?/advance"
-											use:enhance={() => {
-												advanceSubmitting = true;
-												return async ({ update }) => {
-													await update();
-													advanceSubmitting = false;
-												};
-											}}
-										>
-											<input type="hidden" name="lotId" value={lot.id} />
-											<Button
-												type="submit"
-												variant="brass"
-												size="sm"
-												disabled={!!currentLot || advanceSubmitting}
-											>
-												{advanceSubmitting ? 'Opening…' : 'Advance'}
-											</Button>
-										</form>
+			<div
+				class="flex flex-col gap-3"
+				use:dragHandleZone={{ items: queueItems, flipDurationMs, dragDisabled: reorderPending }}
+				onconsider={handleQueueConsider}
+				onfinalize={handleQueueFinalize}
+			>
+				{#each queueItems as lot, index (lot.id)}
+					<Card
+						class="flex-row items-stretch gap-0 overflow-hidden rounded-lg border-brass/30 bg-scorecard p-0 text-ink ring-0"
+					>
+						<div
+							use:dragHandle
+							aria-label="Reorder {formatPlayerName(lot.player)} in the queue"
+							class="flex w-11 shrink-0 touch-none flex-col items-center justify-center gap-1.5 border-r border-brass/30 bg-sand/30 py-3 text-ink/50 select-none active:cursor-grabbing"
+						>
+							<GripVerticalIcon class="size-4" />
+							<span class="font-data text-xs">{String(index + 1).padStart(2, '0')}</span>
+						</div>
+						<div class="flex flex-1 flex-wrap items-center justify-between gap-3 p-4">
+							<div class="flex flex-col gap-1">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="font-display text-lg font-semibold text-ink">
+										{formatPlayerName(lot.player)}
+									</span>
+									<DivisionBadge division={lot.player.division} />
+									{#if lot.player.is_field}
+										<Badge variant="brass">Field lot</Badge>
 									{/if}
 								</div>
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
+								<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+									{lot.player.flight ? `Flight ${lot.player.flight}` : 'No flight'} · HCP {formatHandicapIndex(
+										lot.player.handicap_index
+									)}
+								</span>
+							</div>
+							<div class="flex items-center gap-1">
+								<form
+									method="POST"
+									action="?/moveUp"
+									use:enhance={() => {
+										queuePending[lot.id] = true;
+										return async ({ update }) => {
+											await update();
+											queuePending[lot.id] = false;
+										};
+									}}
+								>
+									<input type="hidden" name="lotId" value={lot.id} />
+									<Button
+										type="submit"
+										variant="outline"
+										size="icon-sm"
+										disabled={index === 0 || queuePending[lot.id]}
+										aria-label="Move {formatPlayerName(lot.player)} up"
+									>
+										<ChevronUpIcon class="size-4" />
+									</Button>
+								</form>
+								<form
+									method="POST"
+									action="?/moveDown"
+									use:enhance={() => {
+										queuePending[lot.id] = true;
+										return async ({ update }) => {
+											await update();
+											queuePending[lot.id] = false;
+										};
+									}}
+								>
+									<input type="hidden" name="lotId" value={lot.id} />
+									<Button
+										type="submit"
+										variant="outline"
+										size="icon-sm"
+										disabled={index === queueItems.length - 1 || queuePending[lot.id]}
+										aria-label="Move {formatPlayerName(lot.player)} down"
+									>
+										<ChevronDownIcon class="size-4" />
+									</Button>
+								</form>
+								<form
+									method="POST"
+									action="?/remove"
+									use:enhance={() => {
+										queuePending[lot.id] = true;
+										return async ({ update }) => {
+											await update();
+											queuePending[lot.id] = false;
+										};
+									}}
+								>
+									<input type="hidden" name="lotId" value={lot.id} />
+									<Button
+										type="submit"
+										variant="destructive"
+										size="sm"
+										disabled={queuePending[lot.id]}
+									>
+										Remove
+									</Button>
+								</form>
+								{#if index === 0}
+									<form
+										method="POST"
+										action="?/advance"
+										use:enhance={() => {
+											advanceSubmitting = true;
+											return async ({ update }) => {
+												await update();
+												advanceSubmitting = false;
+											};
+										}}
+									>
+										<input type="hidden" name="lotId" value={lot.id} />
+										<Button
+											type="submit"
+											variant="brass"
+											size="sm"
+											disabled={!!currentLot || advanceSubmitting}
+										>
+											{advanceSubmitting ? 'Opening…' : 'Advance'}
+										</Button>
+									</form>
+								{/if}
+							</div>
+						</div>
+					</Card>
+				{/each}
+			</div>
 		{/if}
 	</div>
 </div>
