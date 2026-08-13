@@ -4,7 +4,8 @@ import type {
 	Database,
 	RealtimeBid,
 	RealtimeLiveLot,
-	RealtimePlayerEntry
+	RealtimePlayerEntry,
+	Tables
 } from '@emgc-calcutta/shared-types';
 
 // 'connecting' is the initial state before the channel has ever joined
@@ -200,6 +201,59 @@ export function createTournamentRealtime(
 		liveLots,
 		connectionStatus,
 		ready,
+		destroy: () => {
+			supabase.removeChannel(channel);
+		}
+	};
+}
+
+export interface TournamentStatusRealtime {
+	tournament: Readable<Tables<'tournaments'>>;
+	connectionStatus: Readable<RealtimeConnectionStatus>;
+	destroy: () => void;
+}
+
+// A separate, single-row channel for the tournaments row itself — deliberately
+// not folded into createTournamentRealtime above, since that channel is
+// created per-page (Auction board, admin auction screens, My Bids) while this
+// one is owned by the tournament layout, which wraps every tab and has no
+// need for that channel's bids/entries/live_lots queries. Exists so
+// tournamentPhase() (apps/web/src/lib/tournamentPhase.ts) picks up
+// live_auction_started_at flipping — the Admin starting the live auction —
+// live, instead of a participant who loaded the page before the auction
+// started staying stuck on the "waiting" view until they manually reload.
+export function createTournamentStatusRealtime(
+	supabase: SupabaseClient<Database>,
+	initialTournament: Tables<'tournaments'>
+): TournamentStatusRealtime {
+	const tournament = writable<Tables<'tournaments'>>(initialTournament);
+	const connectionStatus = writable<RealtimeConnectionStatus>('connecting');
+
+	const channel = supabase
+		.channel(`tournament-status:${initialTournament.id}`)
+		.on(
+			'postgres_changes',
+			{
+				event: 'UPDATE',
+				schema: 'public',
+				table: 'tournaments',
+				filter: `id=eq.${initialTournament.id}`
+			},
+			(payload) => {
+				tournament.set(payload.new as Tables<'tournaments'>);
+			}
+		)
+		.subscribe((status) => {
+			if (status === 'SUBSCRIBED') {
+				connectionStatus.set('connected');
+			} else if (status === 'TIMED_OUT' || status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+				connectionStatus.set('reconnecting');
+			}
+		});
+
+	return {
+		tournament,
+		connectionStatus,
 		destroy: () => {
 			supabase.removeChannel(channel);
 		}
