@@ -13,6 +13,7 @@ export const AUDIT_ACTIONS = [
 	'player_unlinked',
 	'lot_opened',
 	'lot_sold',
+	'lot_reopened',
 	'csv_import',
 	'role_change',
 	'settings_change',
