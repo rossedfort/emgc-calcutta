@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { SupabaseClient } from '@supabase/supabase-js';
 	import { FunctionsHttpError } from '@supabase/supabase-js';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { toast } from 'svelte-sonner';
 	import type {
 		Database,
 		ErrorResponse,
@@ -8,6 +10,7 @@
 		PlaceBidResponse,
 		RealtimeBid
 	} from '@emgc-calcutta/shared-types';
+	import StarIcon from '@lucide/svelte/icons/star';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
 	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
@@ -16,7 +19,9 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Switch } from '$lib/components/ui/switch';
 	import * as Table from '$lib/components/ui/table';
 	import { currencyChars, currentHighBid } from '$lib/bids';
 	import {
@@ -36,7 +41,8 @@
 		liveBids,
 		bidsReady,
 		currentUserId,
-		supabase
+		supabase,
+		favoriteEntryIds
 	}: {
 		tournament: {
 			slug: string;
@@ -56,6 +62,11 @@
 		bidsReady: boolean;
 		currentUserId: string;
 		supabase: SupabaseClient<Database>;
+		// Entry ids (player_entries.id) this Participant has favorited in
+		// this tournament (Phase 39) — an SSR snapshot, not Realtime-driven
+		// like liveBids; nobody but this user cares when it changes, so
+		// there's nothing to subscribe to.
+		favoriteEntryIds: string[];
 	} = $props();
 
 	function formatCurrency(amount: number): string {
@@ -84,6 +95,56 @@
 	let searchQuery = $state('');
 	let statusFilters = $state<string[]>([]);
 	let flightFilters = $state<string[]>([]);
+	let favoritesOnly = $state(false);
+
+	// Phase 39: writable $derived (Svelte 5.25+ override-then-resync
+	// pattern, same as Phase 38's drag-reorder queueItems) — toggleFavorite
+	// below reassigns this directly for optimistic updates, and any
+	// reassignment "sticks" until favoriteEntryIds itself changes again
+	// (a fresh page load; nothing else in this component invalidates it).
+	// SvelteSet rather than a plain Set per eslint-plugin-svelte's
+	// prefer-svelte-reactivity rule.
+	let favoritedIds = $derived(new SvelteSet(favoriteEntryIds));
+	let favoritePending = $state<Record<string, boolean>>({});
+
+	function setFavorited(entryId: string, favorited: boolean) {
+		const next = new SvelteSet(favoritedIds);
+		if (favorited) {
+			next.add(entryId);
+		} else {
+			next.delete(entryId);
+		}
+		favoritedIds = next;
+	}
+
+	async function toggleFavorite(entryId: string) {
+		if (favoritePending[entryId]) return;
+		const wasFavorited = favoritedIds.has(entryId);
+
+		favoritePending[entryId] = true;
+		setFavorited(entryId, !wasFavorited);
+
+		const { error: favoriteError } = wasFavorited
+			? await supabase
+					.from('player_favorites')
+					.delete()
+					.eq('user_id', currentUserId)
+					.eq('entry_id', entryId)
+			: await supabase
+					.from('player_favorites')
+					.insert({ user_id: currentUserId, entry_id: entryId });
+
+		favoritePending[entryId] = false;
+
+		if (favoriteError) {
+			setFavorited(entryId, wasFavorited);
+			toast.error(
+				wasFavorited
+					? "Couldn't remove favorite — try again."
+					: "Couldn't save favorite — try again."
+			);
+		}
+	}
 
 	let statusOptions = $derived(
 		PLAYER_STATUSES.map((status) => ({ value: status, label: playerStatusLabel(status) }))
@@ -94,6 +155,7 @@
 
 	let filteredPlayers = $derived(
 		players.filter((p) => {
+			if (favoritesOnly && !favoritedIds.has(p.id)) return false;
 			if (statusFilters.length > 0 && !statusFilters.includes(p.status)) return false;
 			if (flightFilters.length > 0 && !flightFilters.includes(p.flight)) return false;
 			if (
@@ -285,12 +347,34 @@
 </div>
 
 <div class="flex flex-wrap items-center gap-4 text-sm">
+	<div class="flex items-center gap-2">
+		<Switch id="favorites-only" bind:checked={favoritesOnly} />
+		<Label for="favorites-only">Favorites only</Label>
+	</div>
 	<Input type="search" placeholder="Search players…" bind:value={searchQuery} class="max-w-56" />
 	<MultiSelectFilter label="Status" options={statusOptions} bind:selected={statusFilters} />
 	{#if flightOptions.length > 0}
 		<MultiSelectFilter label="Flight" options={flightOptions} bind:selected={flightFilters} />
 	{/if}
 </div>
+
+{#snippet favoriteToggle(player: FieldPlayerRow)}
+	{@const favorited = favoritedIds.has(player.id)}
+	<Button
+		class="hover:bg-brass/50"
+		type="button"
+		variant="ghost"
+		size="icon-sm"
+		disabled={favoritePending[player.id]}
+		aria-pressed={favorited}
+		aria-label={favorited
+			? `Remove ${formatPlayerName(player)} from favorites`
+			: `Add ${formatPlayerName(player)} to favorites`}
+		onclick={() => toggleFavorite(player.id)}
+	>
+		<StarIcon class={favorited ? 'fill-brass text-brass' : 'text-ink/40'} />
+	</Button>
+{/snippet}
 
 {#snippet currentHigh(high: RealtimeBid | null, size: 'sm' | 'lg' = 'sm')}
 	{#if !bidsReady}
@@ -378,14 +462,17 @@
 						<Table.Row class={player.status === 'reserved' ? 'bg-flag/10' : ''}>
 							<Table.Cell class="font-data text-ink/60">{index + 1}</Table.Cell>
 							<Table.Cell class="font-medium text-ink">
-								<a
-									href={routes.tournamentPlayer(tournament.slug, player.slug)}
-									class="hover:underline">{formatPlayerName(player)}</a
-								>
-								<DivisionBadge division={player.division} />
-								{#if isYou}
-									<Badge variant="brass">This is you</Badge>
-								{/if}
+								<div class="flex flex-wrap items-center gap-1.5">
+									{@render favoriteToggle(player)}
+									<a
+										href={routes.tournamentPlayer(tournament.slug, player.slug)}
+										class="hover:underline">{formatPlayerName(player)}</a
+									>
+									<DivisionBadge division={player.division} />
+									{#if isYou}
+										<Badge variant="brass">This is you</Badge>
+									{/if}
+								</div>
 							</Table.Cell>
 							<Table.Cell class="font-data whitespace-nowrap"
 								>{formatHandicapIndex(player.handicap_index)}</Table.Cell
@@ -466,6 +553,9 @@
 							statusLabel={playerStatusLabel(player.status)}
 							statusVariant={playerStatusBadgeVariant(player.status)}
 							reserved={player.status === 'reserved'}
+							isFavorited={favoritedIds.has(player.id)}
+							favoritePending={!!favoritePending[player.id]}
+							onToggleFavorite={() => toggleFavorite(player.id)}
 						>
 							<div class="flex flex-col gap-3">
 								<div>

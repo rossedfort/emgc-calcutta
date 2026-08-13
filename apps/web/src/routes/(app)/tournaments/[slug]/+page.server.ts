@@ -17,7 +17,7 @@ export type UnlinkedPlayer = Pick<
 >;
 
 export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => {
-	const { tournament } = await parent();
+	const { tournament, currentUserId } = await parent();
 
 	const players = await loadFieldPlayers(supabase, tournament.id).catch((e: { message: string }) =>
 		error(500, e.message)
@@ -34,9 +34,24 @@ export const load: PageServerLoad = async ({ locals: { supabase }, parent }) => 
 		error(500, unlinkedPlayersError.message);
 	}
 
+	// Phase 39: entry ids (player_entries.id, matching FieldPlayerRow.id
+	// above) this Participant has favorited in this tournament — RLS
+	// (player_favorites_select_self) already scopes this to their own rows,
+	// the explicit .eq is just for clarity/defense in depth, matching how
+	// other tournament-scoped queries in this app filter explicitly rather
+	// than relying on RLS alone.
+	const { data: favoriteRows, error: favoritesError } = await supabase
+		.from('player_favorites')
+		.select('entry_id')
+		.eq('user_id', currentUserId);
+	if (favoritesError) {
+		error(500, favoritesError.message);
+	}
+
 	return {
 		players,
-		unlinkedPlayers: unlinkedPlayers ?? []
+		unlinkedPlayers: unlinkedPlayers ?? [],
+		favoriteEntryIds: (favoriteRows ?? []).map((row) => row.entry_id)
 	};
 };
 

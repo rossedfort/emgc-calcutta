@@ -435,6 +435,42 @@ export type Database = {
           },
         ];
       };
+      player_favorites: {
+        Row: {
+          created_at: string;
+          entry_id: string;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          entry_id: string;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          entry_id?: string;
+          id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "player_favorites_entry_id_fkey";
+            columns: ["entry_id"];
+            isOneToOne: false;
+            referencedRelation: "player_entries";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "player_favorites_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       players: {
         Row: {
           created_at: string;
