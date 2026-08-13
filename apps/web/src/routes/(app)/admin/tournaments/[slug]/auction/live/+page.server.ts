@@ -332,6 +332,88 @@ function sortByHandicap(
 		.map((lot) => lot.id);
 }
 
+// Shared by the "Reserved order" sort preset: fetches each queued entry's
+// effective reservation timestamp — the most recent player_reserved audit
+// event for that entry_id (an entry can be reserved more than once in its
+// lifetime, since the `remove` action above reverts status to 'open' and
+// deletes the live_lots row, letting a later bid cross the threshold and
+// reserve the same entry again — sorting must reflect the current
+// reservation, not a stale one from a since-removed cycle), falling back
+// to player_entries.created_at for entries with no such event at all
+// (only "The Field" pooled entries hit this: their row is only ever
+// created at the exact moment they're swept in by the
+// close_silent_auctions cron — see rework_close_silent_auctions_for_field.sql
+// — so created_at already equals their reservation moment).
+async function fetchReservedOrderQueue(
+	supabase: SupabaseClient<Database>,
+	tournamentId: string
+): Promise<{ id: string; reserved_at: string | null }[] | null> {
+	const { data: lots, error: lotsError } = await supabase
+		.from('live_lots')
+		.select('id, entry_id')
+		.eq('tournament_id', tournamentId)
+		.is('opened_at', null);
+	if (lotsError || !lots) {
+		return null;
+	}
+
+	const entryIds = lots.map((lot) => lot.entry_id);
+	if (entryIds.length === 0) {
+		return [];
+	}
+
+	const { data: entries, error: entriesError } = await supabase
+		.from('player_entries')
+		.select('id, created_at')
+		.in('id', entryIds);
+	if (entriesError || !entries) {
+		return null;
+	}
+
+	// Most-recent-first — the first (only) insertion per entry_id into the
+	// map below is therefore always the latest reservation.
+	const { data: reservedEvents, error: reservedEventsError } = await supabase
+		.from('audit_events')
+		.select('entry_id, created_at')
+		.eq('action', 'player_reserved')
+		.in('entry_id', entryIds)
+		.order('created_at', { ascending: false });
+	if (reservedEventsError) {
+		return null;
+	}
+
+	const reservedAtByEntryId = new Map<string, string>();
+	for (const event of reservedEvents ?? []) {
+		if (event.entry_id && !reservedAtByEntryId.has(event.entry_id)) {
+			reservedAtByEntryId.set(event.entry_id, event.created_at);
+		}
+	}
+
+	const createdAtByEntryId = new Map(entries.map((entry) => [entry.id, entry.created_at]));
+
+	return lots.map((lot) => ({
+		id: lot.id,
+		reserved_at:
+			reservedAtByEntryId.get(lot.entry_id) ?? createdAtByEntryId.get(lot.entry_id) ?? null
+	}));
+}
+
+// Same "unknown sorts last" convention as sortByHandicap — the null case
+// shouldn't happen (every live_lots.entry_id references an existing
+// player_entries row), but failing soft here is cheap insurance against a
+// future data inconsistency breaking the whole sort instead of just
+// misplacing one row. Only ascending (oldest-reserved-first) — unlike
+// Handicap, a newest-first direction has no real use case for this one.
+function sortByReservedAt(queue: { id: string; reserved_at: string | null }[]): string[] {
+	return [...queue]
+		.sort((a, b) => {
+			if (a.reserved_at === null) return 1;
+			if (b.reserved_at === null) return -1;
+			return new Date(a.reserved_at).getTime() - new Date(b.reserved_at).getTime();
+		})
+		.map((lot) => lot.id);
+}
+
 function shuffle<T>(items: T[]): T[] {
 	const result = [...items];
 	for (let i = result.length - 1; i > 0; i--) {
@@ -553,6 +635,30 @@ export const actions: Actions = {
 		const { error: sortError } = await supabase.rpc('resequence_queue', {
 			p_tournament_id: tournament.id,
 			p_ordered_lot_ids: shuffle(queue.map((lot) => lot.id))
+		});
+		if (sortError) {
+			return fail(400, { error: sortError.message });
+		}
+	},
+
+	sortReservedOrder: async ({ params, locals: { supabase } }) => {
+		const { data: tournament } = await supabase
+			.from('tournaments')
+			.select('id')
+			.eq('slug', params.slug)
+			.maybeSingle();
+		if (!tournament) {
+			return fail(404, { error: 'Tournament not found' });
+		}
+
+		const queue = await fetchReservedOrderQueue(supabase, tournament.id);
+		if (!queue) {
+			return fail(500, { error: 'Could not load the queue to sort it' });
+		}
+
+		const { error: sortError } = await supabase.rpc('resequence_queue', {
+			p_tournament_id: tournament.id,
+			p_ordered_lot_ids: sortByReservedAt(queue)
 		});
 		if (sortError) {
 			return fail(400, { error: sortError.message });

@@ -335,6 +335,21 @@
 							Shuffle
 						</Button>
 					</form>
+					<form
+						method="POST"
+						action="?/sortReservedOrder"
+						use:enhance={() => {
+							sortPending = true;
+							return async ({ update }) => {
+								await update();
+								sortPending = false;
+							};
+						}}
+					>
+						<Button type="submit" variant="outline" size="sm" disabled={sortPending}>
+							Reserved order
+						</Button>
+					</form>
 				</div>
 			{/if}
 		</div>
