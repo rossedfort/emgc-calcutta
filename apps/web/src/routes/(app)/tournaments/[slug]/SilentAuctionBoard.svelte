@@ -19,7 +19,9 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Label } from '$lib/components/ui/label';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { Switch } from '$lib/components/ui/switch';
 	import * as Table from '$lib/components/ui/table';
 	import { currencyChars, currentHighBid } from '$lib/bids';
 	import {
@@ -93,6 +95,7 @@
 	let searchQuery = $state('');
 	let statusFilters = $state<string[]>([]);
 	let flightFilters = $state<string[]>([]);
+	let favoritesOnly = $state(false);
 
 	// Phase 39: writable $derived (Svelte 5.25+ override-then-resync
 	// pattern, same as Phase 38's drag-reorder queueItems) — toggleFavorite
@@ -152,6 +155,7 @@
 
 	let filteredPlayers = $derived(
 		players.filter((p) => {
+			if (favoritesOnly && !favoritedIds.has(p.id)) return false;
 			if (statusFilters.length > 0 && !statusFilters.includes(p.status)) return false;
 			if (flightFilters.length > 0 && !flightFilters.includes(p.flight)) return false;
 			if (
@@ -343,6 +347,10 @@
 </div>
 
 <div class="flex flex-wrap items-center gap-4 text-sm">
+	<div class="flex items-center gap-2">
+		<Switch id="favorites-only" bind:checked={favoritesOnly} />
+		<Label for="favorites-only">Favorites only</Label>
+	</div>
 	<Input type="search" placeholder="Search players…" bind:value={searchQuery} class="max-w-56" />
 	<MultiSelectFilter label="Status" options={statusOptions} bind:selected={statusFilters} />
 	{#if flightOptions.length > 0}
