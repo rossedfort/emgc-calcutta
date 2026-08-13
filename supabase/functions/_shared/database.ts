@@ -193,6 +193,7 @@ export type Database = {
         Row: {
           closed_at: string | null;
           closes_at: string | null;
+          created_at: string;
           entry_id: string;
           id: string;
           opened_at: string | null;
@@ -203,6 +204,7 @@ export type Database = {
         Insert: {
           closed_at?: string | null;
           closes_at?: string | null;
+          created_at?: string;
           entry_id: string;
           id?: string;
           opened_at?: string | null;
@@ -213,6 +215,7 @@ export type Database = {
         Update: {
           closed_at?: string | null;
           closes_at?: string | null;
+          created_at?: string;
           entry_id?: string;
           id?: string;
           opened_at?: string | null;

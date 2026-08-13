@@ -1,0 +1,28 @@
+-- Phase 40 simplification: captures the moment this queue slot was
+-- created, which is exactly the entry's reservation moment —
+-- enqueue_player_for_live_auction (create_live_lots.sql) inserts a fresh
+-- live_lots row at the exact instant an entry is reserved, whether from a
+-- bid crossing the silent-auction threshold (place-bid) or a Field sweep
+-- (close_silent_auctions cron). Replaces the original "Reserved order"
+-- sort's join against audit_events' player_reserved events (plus a
+-- player_entries.created_at fallback for Field entries, which never got a
+-- player_reserved event) with a plain column on the table already being
+-- queried — no join, no fallback branch needed, since every live_lots row
+-- now carries this directly regardless of how the entry was reserved.
+--
+-- Also handles a removed-then-re-reserved entry correctly for free: the
+-- `remove` queue action (auction/live/+page.server.ts) deletes the old
+-- live_lots row entirely, so a later re-reservation creates a brand new
+-- row with a fresh created_at — unlike the audit_events approach, there's
+-- no need to pick the "most recent of several matching events," since
+-- there's only ever one row for a currently-queued entry to look at.
+--
+-- DEFAULT now() backfills every already-existing row to this migration's
+-- apply-time (a STABLE, not IMMUTABLE, default forces a real per-row
+-- rewrite, but now() is evaluated once per transaction — every existing
+-- row gets the same timestamp) rather than that entry's true original
+-- reservation moment. Acceptable: the queue is normally empty between
+-- live auctions, so this only affects whatever's already queued at the
+-- moment this ships, and only until the queue empties out again naturally.
+alter table public.live_lots
+  add column created_at timestamptz not null default now();
