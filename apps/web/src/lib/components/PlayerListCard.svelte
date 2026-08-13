@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import StarIcon from '@lucide/svelte/icons/star';
 	import { routes } from '$lib/routes';
 	import DivisionBadge from './DivisionBadge.svelte';
 	import { Badge, type BadgeVariant } from './ui/badge';
+	import { Button } from './ui/button';
 
 	// Mobile counterpart to a player row in a ui/table (SilentAuctionBoard,
 	// TournamentRoster) — below md, a 5-column table forces horizontal
@@ -27,6 +29,9 @@
 		statusLabel,
 		statusVariant,
 		reserved = false,
+		isFavorited = false,
+		favoritePending = false,
+		onToggleFavorite,
 		children
 	}: {
 		slug: string;
@@ -47,6 +52,12 @@
 		statusLabel?: string;
 		statusVariant?: BadgeVariant;
 		reserved?: boolean;
+		// Phase 39: onToggleFavorite left undefined is how a caller opts out
+		// of the favorite star entirely (TournamentRoster doesn't pass it) —
+		// SilentAuctionBoard is the only current caller that does.
+		isFavorited?: boolean;
+		favoritePending?: boolean;
+		onToggleFavorite?: () => void;
 		children: Snippet;
 	} = $props();
 </script>
@@ -72,9 +83,24 @@
 				<span class="font-data text-xs text-ink/60">HCP {handicap}</span>
 			</div>
 		</div>
-		{#if statusLabel && statusVariant}
-			<Badge variant={statusVariant} class="shrink-0">{statusLabel}</Badge>
-		{/if}
+		<div class="flex shrink-0 items-center gap-1.5">
+			{#if onToggleFavorite}
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-xs"
+					disabled={favoritePending}
+					aria-pressed={isFavorited}
+					aria-label={isFavorited ? `Remove ${name} from favorites` : `Add ${name} to favorites`}
+					onclick={onToggleFavorite}
+				>
+					<StarIcon class={isFavorited ? 'fill-brass text-brass' : 'text-ink/40'} />
+				</Button>
+			{/if}
+			{#if statusLabel && statusVariant}
+				<Badge variant={statusVariant}>{statusLabel}</Badge>
+			{/if}
+		</div>
 	</div>
 	<div class="mt-3 border-t border-brass/20 pt-3">
 		{@render children()}

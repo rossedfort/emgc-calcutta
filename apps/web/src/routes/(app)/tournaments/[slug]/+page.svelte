@@ -88,6 +88,7 @@
 			{bidsReady}
 			currentUserId={data.currentUserId}
 			supabase={data.supabase}
+			favoriteEntryIds={data.favoriteEntryIds}
 		/>
 	{:else if phase.phase === 'live'}
 		<LiveAuctionBoard
