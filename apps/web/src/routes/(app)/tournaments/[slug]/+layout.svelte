@@ -14,14 +14,21 @@
 	// never re-fetched on its own, so without this a participant who loaded
 	// the page before the Admin starts the live auction would stay stuck on
 	// the "waiting" phase forever, even once lots are open and being bid on.
-	let tournament = $state(untrack(() => data.tournament));
+	// Shared via context (same reasoning as `clock` below — a layout can't
+	// pass extra props into its children) so the Auction tab's own board
+	// switcher ({@render children()} → +page.svelte) reads this same live
+	// value instead of independently recomputing phase from its own frozen
+	// data.tournament.
+	let tournamentState = $state({ tournament: untrack(() => data.tournament) });
+	let tournament = $derived(tournamentState.tournament);
+	setContext('tournament-state', tournamentState);
 
 	$effect(() => {
-		tournament = data.tournament;
+		tournamentState.tournament = data.tournament;
 
 		const realtime = createTournamentStatusRealtime(data.supabase, data.tournament);
 		const unsubscribe = realtime.tournament.subscribe((value) => {
-			tournament = value;
+			tournamentState.tournament = value;
 		});
 
 		return () => {
