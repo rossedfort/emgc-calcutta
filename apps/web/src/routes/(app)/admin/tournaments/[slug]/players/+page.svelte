@@ -1,7 +1,7 @@
 <script lang="ts">
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import TableHeaderSelectFilter from '$lib/components/TableHeaderSelectFilter.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
@@ -50,16 +50,10 @@
 
 <div class="flex flex-col gap-4 pt-4">
 	<div class="flex flex-wrap items-center justify-between gap-3">
-		<div class="flex flex-wrap items-center gap-4 text-sm">
-			<p class="font-data text-ink/70">
-				{totalPlayerCount}
-				{totalPlayerCount === 1 ? 'player' : 'players'}
-			</p>
-			<MultiSelectFilter label="Status" options={statusOptions} bind:selected={statusFilters} />
-			{#if flightOptions.length > 0}
-				<MultiSelectFilter label="Flight" options={flightOptions} bind:selected={flightFilters} />
-			{/if}
-		</div>
+		<p class="font-data text-sm text-ink/70">
+			{totalPlayerCount}
+			{totalPlayerCount === 1 ? 'player' : 'players'}
+		</p>
 
 		<div class="flex flex-wrap items-center gap-2">
 			<Button
@@ -93,8 +87,31 @@
 			<Table.Header>
 				<Table.Row>
 					<Table.Head>Name</Table.Head>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Flight
+							{#if flightOptions.length > 0}
+								<TableHeaderSelectFilter
+									label="Flight"
+									options={flightOptions}
+									selected={flightFilters}
+									onApply={(values) => (flightFilters = values)}
+								/>
+							{/if}
+						</span>
+					</Table.Head>
 					<Table.Head>Handicap</Table.Head>
-					<Table.Head>Status</Table.Head>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Status
+							<TableHeaderSelectFilter
+								label="Status"
+								options={statusOptions}
+								selected={statusFilters}
+								onApply={(values) => (statusFilters = values)}
+							/>
+						</span>
+					</Table.Head>
 					<Table.Head>Linked</Table.Head>
 					<Table.Head>Actions</Table.Head>
 				</Table.Row>
@@ -103,7 +120,7 @@
 				{#each groupedPlayers as { group, players } (group.flight)}
 					<Table.Row class="bg-sand/20 hover:bg-sand/20">
 						<Table.Cell
-							colspan={5}
+							colspan={6}
 							class="font-data text-xs tracking-widest text-fairway uppercase"
 						>
 							{group.label}
@@ -116,6 +133,7 @@
 								{formatPlayerName(player)}
 								<DivisionBadge division={player.division} />
 							</Table.Cell>
+							<Table.Cell>{player.flight || '—'}</Table.Cell>
 							<Table.Cell class="font-data">{formatHandicapIndex(player.handicap_index)}</Table.Cell
 							>
 							<Table.Cell>
