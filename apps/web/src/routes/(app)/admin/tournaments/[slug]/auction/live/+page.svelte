@@ -10,6 +10,7 @@
 	} from '@emgc-calcutta/shared-types';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import GripVerticalIcon from '@lucide/svelte/icons/grip-vertical';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
@@ -117,6 +118,7 @@
 	// screen, not something that needs to react to bids landing elsewhere.
 	let queuePending = $state<Record<string, boolean>>({});
 	let sortPending = $state(false);
+	let reopenPending = $state<Record<string, boolean>>({});
 
 	// Phase 38: drag-and-drop reordering. queueItems is a writable $derived
 	// (Svelte 5.25+) mirroring data.queue — svelte-dnd-action freely
@@ -478,4 +480,65 @@
 			</div>
 		{/if}
 	</div>
+
+	{#if data.closedLots.length > 0}
+		<div class="flex flex-col gap-2">
+			<p class="font-data text-xs tracking-widest text-fairway uppercase">Closed lots</p>
+			<div class="flex flex-col gap-3">
+				{#each data.closedLots as lot (lot.id)}
+					<Card
+						class="flex-row items-stretch gap-0 overflow-hidden rounded-lg border-brass/20 bg-sand/30 p-0 text-ink ring-0"
+					>
+						<div
+							class="flex w-11 shrink-0 flex-col items-center justify-center border-r border-brass/20 bg-sand/40 py-3 text-ink/40"
+						>
+							<CircleCheckIcon class="size-4" />
+						</div>
+						<div class="flex flex-1 flex-wrap items-center justify-between gap-3 p-4">
+							<div class="flex flex-col gap-1">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="font-display text-lg font-semibold text-ink">
+										{formatPlayerName(lot.player)}
+									</span>
+									<DivisionBadge division={lot.player.division} />
+									{#if lot.player.is_field}
+										<Badge variant="brass">Field lot</Badge>
+									{/if}
+									<Badge variant={playerStatusBadgeVariant(lot.player.status)}>
+										{playerStatusLabel(lot.player.status)}
+									</Badge>
+								</div>
+								<span class="font-data text-xs tracking-wide text-ink/60 uppercase">
+									{lot.player.flight ? `Flight ${lot.player.flight}` : 'No flight'} · HCP {formatHandicapIndex(
+										lot.player.handicap_index
+									)}
+								</span>
+							</div>
+							<form
+								method="POST"
+								action="?/reopenLot"
+								use:enhance={() => {
+									reopenPending[lot.id] = true;
+									return async ({ update }) => {
+										await update();
+										reopenPending[lot.id] = false;
+									};
+								}}
+							>
+								<input type="hidden" name="lotId" value={lot.id} />
+								<Button
+									type="submit"
+									variant="outline"
+									size="sm"
+									disabled={!!currentLot || reopenPending[lot.id]}
+								>
+									{reopenPending[lot.id] ? 'Reopening…' : 'Re-open lot'}
+								</Button>
+							</form>
+						</div>
+					</Card>
+				{/each}
+			</div>
+		</div>
+	{/if}
 </div>

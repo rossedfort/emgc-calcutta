@@ -743,6 +743,7 @@ export type Database = {
         Returns: undefined;
       };
       open_live_lot: { Args: { lot_id: string }; Returns: undefined };
+      reopen_live_lot: { Args: { lot_id: string }; Returns: undefined };
       resequence_queue: {
         Args: { p_ordered_lot_ids: string[]; p_tournament_id: string };
         Returns: undefined;

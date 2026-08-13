@@ -44,6 +44,17 @@ export interface QueueLot {
 	player: QueuePlayer;
 }
 
+// One row per closed live_lots row (opened and since closed — sold or no
+// bid), most-recently-closed first. Reuses LiveAdminPlayer (already
+// carries `status`, needed here to show Sold/No bid) rather than a
+// separate query, since `players` below already covers every entry in
+// the tournament.
+export interface ClosedLot {
+	id: string;
+	closed_at: string;
+	player: LiveAdminPlayer;
+}
+
 // Phase 32: for the admin-on-behalf-of-participant bid panel embedded at
 // the top of this page (AdminBidForm) — every participant with a roster
 // entry in this tournament, since place-bid's own roster-membership check
@@ -152,6 +163,25 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		return player ? [{ id: lot.id, queue_position: lot.queue_position, player }] : [];
 	});
 
+	// Re-open lot (Phase 38 mid-phase addition): closed lots shown below the
+	// queue for the "in-person bid came in too late" recovery case. Reuses
+	// `players` (already carries status) instead of a second join query.
+	const { data: closedLotRows, error: closedLotsError } = await supabase
+		.from('live_lots')
+		.select('id, closed_at, entry_id')
+		.eq('tournament_id', tournament.id)
+		.not('closed_at', 'is', null)
+		.order('closed_at', { ascending: false });
+	if (closedLotsError) {
+		error(500, closedLotsError.message);
+	}
+
+	const playersById = new Map(players.map((player) => [player.id, player]));
+	const closedLots: ClosedLot[] = (closedLotRows ?? []).flatMap((lot) => {
+		const player = playersById.get(lot.entry_id);
+		return player && lot.closed_at ? [{ id: lot.id, closed_at: lot.closed_at, player }] : [];
+	});
+
 	const { data: rosterRows, error: rosterError } = await supabase
 		.from('players')
 		.select('user_id, users(id, first_name, last_name, email)')
@@ -177,6 +207,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 		tournament,
 		players,
 		queue,
+		closedLots,
 		participants,
 		title: `${tournament.name} · Live auction · EMGC Bet`,
 		description: `Run the live auction for ${tournament.name}.`
@@ -334,6 +365,24 @@ export const actions: Actions = {
 		const { error: closeError } = await supabase.rpc('close_live_lot', { lot_id: lotId });
 		if (closeError) {
 			return fail(400, { error: closeError.message });
+		}
+	},
+
+	// Re-opens a closed lot for further bidding — the "in-person bid came in
+	// but didn't get recorded before the anti-snipe timer hit 0s" recovery
+	// case. reopen_live_lot itself enforces the "no other lot currently
+	// open" guard server-side (same invariant open_live_lot enforces), so
+	// this is a thin passthrough like advance/close above.
+	reopenLot: async ({ request, locals: { supabase } }) => {
+		const formData = await request.formData();
+		const lotId = String(formData.get('lotId') ?? '');
+		if (!lotId) {
+			return fail(400, { error: 'Missing lot' });
+		}
+
+		const { error: reopenError } = await supabase.rpc('reopen_live_lot', { lot_id: lotId });
+		if (reopenError) {
+			return fail(400, { error: reopenError.message });
 		}
 	},
 
