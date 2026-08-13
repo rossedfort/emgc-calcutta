@@ -364,7 +364,7 @@
 			</Table.Header>
 			<Table.Body>
 				{#each groupedPlayers as { group, players } (`${group.flight}::${group.division}`)}
-					<Table.Row class="bg-sand/20 hover:bg-sand/20">
+					<Table.Row class="bg-sand/20 hover:bg-sand/20 h-12">
 						<Table.Cell
 							colspan={6}
 							class="sticky top-[5.625rem] z-10 bg-sand font-data text-xs tracking-widest text-fairway uppercase"
