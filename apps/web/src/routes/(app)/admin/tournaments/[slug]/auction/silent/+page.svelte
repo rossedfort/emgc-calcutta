@@ -3,10 +3,10 @@
 	import { navigating, page } from '$app/state';
 	import { goto, invalidateAll } from '$app/navigation';
 	import type { RealtimeBid, RealtimePlayerEntry } from '@emgc-calcutta/shared-types';
-	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import AdminBidForm from '$lib/components/AdminBidForm.svelte';
 	import Combobox from '$lib/components/Combobox.svelte';
 	import CursorPager from '$lib/components/CursorPager.svelte';
+	import TableHeaderTextFilter from '$lib/components/TableHeaderTextFilter.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip/index';
 	import { Info } from '@lucide/svelte';
 	import DivisionBadge from '$lib/components/DivisionBadge.svelte';
@@ -15,7 +15,6 @@
 	import VoidBidDialog from '$lib/components/VoidBidDialog.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
 	import { currentHighBid } from '$lib/bids';
 	import { formatPlayerName } from '$lib/players';
@@ -115,6 +114,14 @@
 		goto(pageUrl({ page_size: size, cursor: null, dir: null }));
 	}
 
+	// Phase 37: each column's own header filter applies independently via
+	// its own popover (Apply/Clear), not one shared "Apply filters" button
+	// — every apply is a real navigation, resetting pagination back to
+	// page 1 since the result set's boundaries just changed.
+	function applyFilter(updates: Record<string, string | null>) {
+		goto(pageUrl({ ...updates, cursor: null, dir: null }));
+	}
+
 	function formatCurrency(amount: number): string {
 		return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 	}
@@ -177,40 +184,11 @@
 	<RealtimeStatusBanner status={connectionStatus} />
 
 	<div class="flex flex-col gap-2">
-		<h2 class="font-display text-lg font-semibold text-ink">Recent silent auction bids</h2>
-		<p class="text-sm text-ink/60">Bids placed during the silent auction, newest first.</p>
-
-		<form
-			method="GET"
-			class="flex flex-wrap items-end gap-3 rounded-lg border border-brass/30 bg-scorecard p-4"
-		>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-muted-foreground">Player</span>
-				<Input
-					type="text"
-					name="player"
-					value={data.filters.player}
-					placeholder="Name"
-					disabled={isQuerying}
-				/>
-			</label>
-			<label class="flex flex-col gap-1 text-sm">
-				<span class="text-muted-foreground">Bidder</span>
-				<Input
-					type="text"
-					name="bidder"
-					value={data.filters.bidder}
-					placeholder="Name"
-					disabled={isQuerying}
-				/>
-			</label>
-			<input type="hidden" name="page_size" value={data.pageSize} />
-			<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
-				{#if isQuerying}
-					<LoaderCircleIcon class="size-3.5 animate-spin" />
-				{/if}
-				{isQuerying ? 'Applying…' : 'Apply filters'}
-			</Button>
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<div class="flex flex-col gap-1">
+				<h2 class="font-display text-lg font-semibold text-ink">Recent silent auction bids</h2>
+				<p class="text-sm text-ink/60">Bids placed during the silent auction, newest first.</p>
+			</div>
 			{#if filtersActive}
 				<Button
 					type="button"
@@ -219,10 +197,10 @@
 					disabled={isQuerying}
 					onclick={() => goto(routes.adminTournamentAuctionSilent(tournament.slug))}
 				>
-					Clear
+					Clear filters
 				</Button>
 			{/if}
-		</form>
+		</div>
 
 		{#if bids.length === 0}
 			<EmptyState
@@ -232,8 +210,28 @@
 			<Table.Root class={isQuerying ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
 				<Table.Header>
 					<Table.Row>
-						<Table.Head>Player</Table.Head>
-						<Table.Head>Bidder</Table.Head>
+						<Table.Head>
+							<span class="inline-flex items-center gap-1">
+								Player
+								<TableHeaderTextFilter
+									label="Player"
+									value={data.filters.player}
+									placeholder="Name"
+									onApply={(value) => applyFilter({ player: value || null })}
+								/>
+							</span>
+						</Table.Head>
+						<Table.Head>
+							<span class="inline-flex items-center gap-1">
+								Bidder
+								<TableHeaderTextFilter
+									label="Bidder"
+									value={data.filters.bidder}
+									placeholder="Name"
+									onApply={(value) => applyFilter({ bidder: value || null })}
+								/>
+							</span>
+						</Table.Head>
 						<Table.Head>Amount</Table.Head>
 						<Table.Head>Placed</Table.Head>
 						<Table.Head>Status</Table.Head>
