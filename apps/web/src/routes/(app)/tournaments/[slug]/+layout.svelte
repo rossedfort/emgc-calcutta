@@ -4,9 +4,38 @@
 	import { routes } from '$lib/routes';
 	import { formatCountdown } from '$lib/time';
 	import { tournamentPhase } from '$lib/tournamentPhase';
-	import { onMount, setContext } from 'svelte';
+	import { createTournamentStatusRealtime } from '$lib/stores/realtime';
+	import { onMount, setContext, untrack } from 'svelte';
 
 	let { data, children } = $props();
+
+	// Mirrors data.tournament, refreshed by the realtime effect below —
+	// data.tournament itself is frozen from this layout's own server load and
+	// never re-fetched on its own, so without this a participant who loaded
+	// the page before the Admin starts the live auction would stay stuck on
+	// the "waiting" phase forever, even once lots are open and being bid on.
+	// Shared via context (same reasoning as `clock` below — a layout can't
+	// pass extra props into its children) so the Auction tab's own board
+	// switcher ({@render children()} → +page.svelte) reads this same live
+	// value instead of independently recomputing phase from its own frozen
+	// data.tournament.
+	let tournamentState = $state({ tournament: untrack(() => data.tournament) });
+	let tournament = $derived(tournamentState.tournament);
+	setContext('tournament-state', tournamentState);
+
+	$effect(() => {
+		tournamentState.tournament = data.tournament;
+
+		const realtime = createTournamentStatusRealtime(data.supabase, data.tournament);
+		const unsubscribe = realtime.tournament.subscribe((value) => {
+			tournamentState.tournament = value;
+		});
+
+		return () => {
+			unsubscribe();
+			realtime.destroy();
+		};
+	});
 
 	// Ticks every second so the phase banner/countdown below — and, via
 	// context, whichever child board is active under {@render children()}
@@ -28,7 +57,7 @@
 		};
 	});
 
-	let phase = $derived(tournamentPhase(data.tournament, clock.now));
+	let phase = $derived(tournamentPhase(tournament, clock.now));
 	let countdownText = $derived(
 		phase.countdownTo ? formatCountdown(phase.countdownTo, clock.now) : null
 	);
@@ -45,7 +74,7 @@
 
 <div class="flex flex-col gap-4">
 	<div class="flex flex-row flex-wrap gap-2 justify-between items-end">
-		<PageHeader title={data.tournament.name} eyebrow="Tournament" />
+		<PageHeader title={tournament.name} eyebrow="Tournament" />
 		<div
 			class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-brass/30 bg-scorecard/40 px-4 py-2"
 		>
@@ -69,22 +98,21 @@
 
 	<nav class="flex gap-4 overflow-x-auto border-b border-brass/30">
 		<a
-			href={routes.tournament(data.tournament.slug)}
-			class={tabClass(routes.tournament(data.tournament.slug), true)}>Auction</a
+			href={routes.tournament(tournament.slug)}
+			class={tabClass(routes.tournament(tournament.slug), true)}>Auction</a
 		>
-		{#if data.tournament.status === 'complete'}
+		{#if tournament.status === 'complete'}
 			<a
-				href={routes.tournamentResults(data.tournament.slug)}
-				class={tabClass(routes.tournamentResults(data.tournament.slug), false)}>Results</a
+				href={routes.tournamentResults(tournament.slug)}
+				class={tabClass(routes.tournamentResults(tournament.slug), false)}>Results</a
 			>
 		{/if}
-		<a
-			href={routes.myBids(data.tournament.slug)}
-			class={tabClass(routes.myBids(data.tournament.slug), false)}>My Bids</a
+		<a href={routes.myBids(tournament.slug)} class={tabClass(routes.myBids(tournament.slug), false)}
+			>My Bids</a
 		>
 		<a
-			href={routes.myBalance(data.tournament.slug)}
-			class={tabClass(routes.myBalance(data.tournament.slug), false)}>My Balance</a
+			href={routes.myBalance(tournament.slug)}
+			class={tabClass(routes.myBalance(tournament.slug), false)}>My Balance</a
 		>
 	</nav>
 

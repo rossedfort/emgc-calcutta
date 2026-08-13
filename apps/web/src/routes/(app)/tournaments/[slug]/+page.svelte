@@ -29,6 +29,15 @@
 	const clock = getContext<{ now: Date }>('tournament-clock');
 	let now = $derived(clock.now);
 
+	// Same reasoning as the clock above: the layout mirrors data.tournament
+	// into a live, Realtime-refreshed value (data.tournament itself is
+	// frozen from this page's own server load) and shares it via context so
+	// phase — and which board renders below — updates the moment the Admin
+	// starts the live auction, instead of only the layout's own banner
+	// updating while this page stays stuck showing the pre-live board.
+	const tournamentState = getContext<{ tournament: typeof data.tournament }>('tournament-state');
+	let tournament = $derived(tournamentState.tournament);
+
 	onMount(() => {
 		const rt = createTournamentRealtime(
 			data.supabase,
@@ -59,7 +68,7 @@
 		})
 	);
 
-	let phase = $derived(tournamentPhase(data.tournament, now));
+	let phase = $derived(tournamentPhase(tournament, now));
 
 	let isLinkedToYou = $derived(players.some((p) => p.user_id === data.currentUserId));
 </script>
@@ -73,7 +82,7 @@
 
 	{#if phase.phase === 'silent'}
 		<SilentAuctionBoard
-			tournament={data.tournament}
+			{tournament}
 			{players}
 			{liveBids}
 			{bidsReady}
@@ -82,7 +91,7 @@
 		/>
 	{:else if phase.phase === 'live'}
 		<LiveAuctionBoard
-			tournament={data.tournament}
+			{tournament}
 			{players}
 			{liveBids}
 			{bidsReady}
@@ -92,12 +101,6 @@
 			{now}
 		/>
 	{:else}
-		<TournamentRoster
-			tournament={data.tournament}
-			{players}
-			{liveBids}
-			currentUserId={data.currentUserId}
-			{now}
-		/>
+		<TournamentRoster {tournament} {players} {liveBids} currentUserId={data.currentUserId} {now} />
 	{/if}
 </div>
