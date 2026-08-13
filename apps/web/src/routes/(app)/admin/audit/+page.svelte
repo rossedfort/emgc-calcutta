@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { navigating, page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
@@ -11,17 +10,21 @@
 	import RealtimeStatusBanner from '$lib/components/RealtimeStatusBanner.svelte';
 	import { AUDIT_ACTIONS, auditActionLabel, type AuditEventRow } from '$lib/auditActions';
 	import CursorPager from '$lib/components/CursorPager.svelte';
+	import TableHeaderFilterButton from '$lib/components/TableHeaderFilterButton.svelte';
+	import TableHeaderSelectFilter from '$lib/components/TableHeaderSelectFilter.svelte';
+	import TableHeaderTextFilter from '$lib/components/TableHeaderTextFilter.svelte';
 	import { routes } from '$lib/routes';
 	import { createAuditRealtime, type AuditRealtime } from '$lib/stores/auditRealtime';
 	import type { RealtimeConnectionStatus } from '$lib/stores/realtime';
 
 	let { data } = $props();
 
-	// The From/To datetime-local inputs below submit a raw "YYYY-MM-DDTHH:mm"
-	// string with no timezone of its own — parseAuditFilters/queryAuditEvents
-	// need this browser's own offset to convert it to the correct UTC
-	// instant (see $lib/time.ts's localDateTimeToUtcIso). Computed once, not
-	// reactively: the browser's own timezone doesn't change mid-session.
+	// The From/To datetime-local inputs in the Time column's own filter
+	// popover submit a raw "YYYY-MM-DDTHH:mm" string with no timezone of
+	// its own — parseAuditFilters/queryAuditEvents need this browser's own
+	// offset to convert it to the correct UTC instant (see
+	// $lib/time.ts's localDateTimeToUtcIso). Computed once, not reactively:
+	// the browser's own timezone doesn't change mid-session.
 	const tzOffsetMinutes = new Date().getTimezoneOffset();
 
 	// Whether we're anywhere but the very first page — used to keep Live
@@ -50,24 +53,46 @@
 		goto(pageUrl({ page_size: size, cursor: null, dir: null }));
 	}
 
+	// Phase 37: each column's own header filter applies independently
+	// (rather than one shared "Apply filters" button submitting every
+	// field at once) — every apply is a real navigation, resetting
+	// pagination back to page 1 since the result set's boundaries just
+	// changed. Supports repeated params (Tournament/Action, now
+	// multi-select) alongside plain single-value ones (Actor/Player/Time).
+	function applyFilter(updates: Record<string, string | string[] | null>) {
+		const url = new URL(page.url);
+		for (const [key, value] of Object.entries(updates)) {
+			url.searchParams.delete(key);
+			if (value === null) continue;
+			if (Array.isArray(value)) {
+				for (const v of value) url.searchParams.append(key, v);
+			} else {
+				url.searchParams.set(key, value);
+			}
+		}
+		url.searchParams.delete('cursor');
+		url.searchParams.delete('dir');
+		goto(`${url.pathname}${url.search}`);
+	}
+
 	// Carries whatever filters are currently applied — export reflects the
 	// current view, not just the 200 rows shown on screen (the export
 	// endpoint itself re-runs the same filtered query uncapped).
 	let exportHref = $derived(`${routes.adminAuditExport()}${page.url.search}`);
 
-	// The filter form is a plain GET, so re-querying is a real SvelteKit
-	// navigation (re-running this route's server `load`) rather than a
-	// fetch this component kicks off itself — `navigating` is the only
-	// signal available for it. Scoped to "navigating to this same route"
-	// so the indicator doesn't flash while leaving the page entirely.
+	// Each header filter's own navigation is a real SvelteKit navigation
+	// (re-running this route's server `load`), not a fetch this component
+	// kicks off itself — `navigating` is the only signal available for it.
+	// Scoped to "navigating to this same route" so the indicator doesn't
+	// flash while leaving the page entirely.
 	let isQuerying = $derived(navigating.to?.route.id === page.route.id);
 
 	let filtersActive = $derived(
 		Boolean(
 			data.filters.participant ||
 			data.filters.player ||
-			data.filters.tournament ||
-			data.filters.action ||
+			data.filters.tournaments.length > 0 ||
+			data.filters.actions.length > 0 ||
 			data.filters.start ||
 			data.filters.end
 		)
@@ -112,7 +137,7 @@
 		startLive();
 	}
 
-	// Submitting the filter form is a real navigation, not a client-side
+	// Applying a header filter is a real navigation, not a client-side
 	// state change this component controls — if live mode is on when that
 	// happens, turn it off rather than leaving a stale subscription running
 	// against what's now a filtered (or no-longer-first-page) view.
@@ -166,6 +191,37 @@
 	function formatDateTime(iso: string): string {
 		return dateTimeFormatter.format(new Date(iso));
 	}
+
+	// Time is the one column filter that doesn't fit either shared variant
+	// (two related datetime-local fields, not a single text value or a
+	// checkbox list) — only Audit needs a date range, so it's built inline
+	// on TableHeaderFilterButton directly rather than as a third generic
+	// $lib/components export.
+	let timeOpen = $state(false);
+	let startDraft = $state(untrack(() => data.filters.start));
+	let endDraft = $state(untrack(() => data.filters.end));
+	$effect(() => {
+		if (timeOpen) {
+			startDraft = data.filters.start;
+			endDraft = data.filters.end;
+		}
+	});
+
+	function applyTime() {
+		applyFilter({
+			start: startDraft || null,
+			end: endDraft || null,
+			tz_offset_minutes: startDraft || endDraft ? String(tzOffsetMinutes) : null
+		});
+		timeOpen = false;
+	}
+
+	function clearTime() {
+		startDraft = '';
+		endDraft = '';
+		applyFilter({ start: null, end: null, tz_offset_minutes: null });
+		timeOpen = false;
+	}
 </script>
 
 <div class="flex flex-col gap-4">
@@ -190,6 +246,17 @@
 				></span>
 				{liveEnabled ? 'Live' : 'Go live'}
 			</Button>
+			{#if filtersActive}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={isQuerying}
+					onclick={() => goto(routes.adminAudit())}
+				>
+					Clear filters
+				</Button>
+			{/if}
 			<Button variant="outline" size="sm" href={exportHref}>Export CSV</Button>
 		{/snippet}
 	</PageHeader>
@@ -198,111 +265,97 @@
 		<RealtimeStatusBanner status={connectionStatus} />
 	{/if}
 
-	<form
-		method="GET"
-		class="flex flex-wrap items-end gap-3 rounded-lg border border-brass/30 bg-scorecard p-4"
-	>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-muted-foreground">Actor</span>
-			<Input
-				type="text"
-				name="participant"
-				value={data.filters.participant}
-				placeholder="Email"
-				disabled={isQuerying}
-			/>
-		</label>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-muted-foreground">Player</span>
-			<Input
-				type="text"
-				name="player"
-				value={data.filters.player}
-				placeholder="Name"
-				disabled={isQuerying}
-			/>
-		</label>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-muted-foreground">Tournament</span>
-			<select
-				name="tournament"
-				value={data.filters.tournament}
-				disabled={isQuerying}
-				class="rounded-md border border-input bg-background px-2 py-1.5 text-sm disabled:opacity-50"
-			>
-				<option value="">All</option>
-				{#each data.tournaments as tournament (tournament.id)}
-					<option value={tournament.id}>{tournament.name}</option>
-				{/each}
-			</select>
-		</label>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-muted-foreground">Action</span>
-			<select
-				name="action"
-				value={data.filters.action}
-				disabled={isQuerying}
-				class="rounded-md border border-input bg-background px-2 py-1.5 text-sm disabled:opacity-50"
-			>
-				<option value="">All</option>
-				{#each AUDIT_ACTIONS as action (action)}
-					<option value={action}>{auditActionLabel(action)}</option>
-				{/each}
-			</select>
-		</label>
-		<div class="flex flex-col gap-1">
-			<div class="flex items-end gap-3">
-				<label class="flex flex-col gap-1 text-sm">
-					<span class="text-muted-foreground">From</span>
-					<Input
-						type="datetime-local"
-						name="start"
-						value={data.filters.start}
-						disabled={isQuerying}
-					/>
-				</label>
-				<label class="flex flex-col gap-1 text-sm">
-					<span class="text-muted-foreground">To</span>
-					<Input type="datetime-local" name="end" value={data.filters.end} disabled={isQuerying} />
-				</label>
-			</div>
-			<p class="text-xs text-muted-foreground">
-				Times are entered in your browser's local timezone.
-			</p>
-		</div>
-		<input type="hidden" name="tz_offset_minutes" value={tzOffsetMinutes} />
-		<input type="hidden" name="page_size" value={data.pageSize} />
-		<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
-			{#if isQuerying}
-				<LoaderCircleIcon class="size-3.5 animate-spin" />
-			{/if}
-			{isQuerying ? 'Applying…' : 'Apply filters'}
-		</Button>
-		{#if filtersActive}
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				disabled={isQuerying}
-				onclick={() => goto(routes.adminAudit())}
-			>
-				Clear
-			</Button>
-		{/if}
-	</form>
-
 	{#if displayedEvents.length === 0}
 		<EmptyState title="No audit events match these filters" />
 	{:else}
 		<Table.Root class={isQuerying ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
 			<Table.Header>
 				<Table.Row>
-					<Table.Head class="bg-brass/10">Actor</Table.Head>
-					<Table.Head>Time</Table.Head>
-					<Table.Head>Action</Table.Head>
+					<Table.Head class="bg-brass/10">
+						<span class="inline-flex items-center gap-1">
+							Actor
+							<TableHeaderTextFilter
+								label="Actor"
+								value={data.filters.participant}
+								placeholder="Email"
+								onApply={(value) => applyFilter({ participant: value || null })}
+							/>
+						</span>
+					</Table.Head>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Time
+							<TableHeaderFilterButton
+								label="Time"
+								active={Boolean(data.filters.start || data.filters.end)}
+								bind:open={timeOpen}
+							>
+								<div class="flex flex-col gap-2">
+									<label class="flex flex-col gap-1 text-sm">
+										<span class="text-muted-foreground">From</span>
+										<Input type="datetime-local" bind:value={startDraft} />
+									</label>
+									<label class="flex flex-col gap-1 text-sm">
+										<span class="text-muted-foreground">To</span>
+										<Input type="datetime-local" bind:value={endDraft} />
+									</label>
+									<p class="text-xs text-muted-foreground">
+										Times are entered in your browser's local timezone.
+									</p>
+									<div class="flex justify-end gap-2">
+										{#if data.filters.start || data.filters.end || startDraft || endDraft}
+											<Button type="button" variant="outline" size="sm" onclick={clearTime}>
+												Clear
+											</Button>
+										{/if}
+										<Button type="button" variant="brass" size="sm" onclick={applyTime}>
+											Apply
+										</Button>
+									</div>
+								</div>
+							</TableHeaderFilterButton>
+						</span>
+					</Table.Head>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Action
+							<TableHeaderSelectFilter
+								label="Action"
+								options={AUDIT_ACTIONS.map((action) => ({
+									value: action,
+									label: auditActionLabel(action)
+								}))}
+								selected={data.filters.actions}
+								onApply={(values) => applyFilter({ action: values })}
+							/>
+						</span>
+					</Table.Head>
 					<Table.Head>Entity</Table.Head>
-					<Table.Head>Player</Table.Head>
-					<Table.Head>Tournament</Table.Head>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Player
+							<TableHeaderTextFilter
+								label="Player"
+								value={data.filters.player}
+								placeholder="Name"
+								onApply={(value) => applyFilter({ player: value || null })}
+							/>
+						</span>
+					</Table.Head>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Tournament
+							<TableHeaderSelectFilter
+								label="Tournament"
+								options={data.tournaments.map((tournament) => ({
+									value: tournament.id,
+									label: tournament.name
+								}))}
+								selected={data.filters.tournaments}
+								onApply={(values) => applyFilter({ tournament: values })}
+							/>
+						</span>
+					</Table.Head>
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>

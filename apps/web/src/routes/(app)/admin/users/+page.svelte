@@ -4,10 +4,10 @@
 	import { goto, invalidateAll } from '$app/navigation';
 	import CursorPager from '$lib/components/CursorPager.svelte';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import MultiSelectFilter from '$lib/components/MultiSelectFilter.svelte';
+	import TableHeaderSelectFilter from '$lib/components/TableHeaderSelectFilter.svelte';
+	import TableHeaderTextFilter from '$lib/components/TableHeaderTextFilter.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
-	import { Input } from '$lib/components/ui/input';
 	import * as Table from '$lib/components/ui/table';
 	import { formatUserName } from '$lib/profile';
 	import { ROLES, roleBadgeVariant, roleLabel, type Role } from '$lib/roles';
@@ -22,14 +22,6 @@
 	let pendingId: string | null = $state(null);
 	let errorMessage = $state('');
 
-	// MultiSelectFilter is client-state-driven (no real form control of its
-	// own), unlike the plain text Input below — mirrored into hidden inputs
-	// so it still submits with the rest of the GET form. A writable
-	// $derived, not plain $state: it needs to reset to data.filters.roles
-	// after any navigation (Next/Prev, Clear, a filter submit elsewhere),
-	// not just seed once from the initial load, while still being directly
-	// assignable for MultiSelectFilter's own bind:selected.
-	let roleFilters = $derived(data.filters.roles);
 	let roleOptions = $derived(ROLES.map((role) => ({ value: role, label: roleLabel(role) })));
 
 	let isQuerying = $derived(navigating.to?.route.id === page.route.id);
@@ -45,6 +37,27 @@
 			}
 		}
 		return `${url.pathname}${url.search}`;
+	}
+
+	// Phase 37: each column's own header filter applies independently
+	// (rather than one shared "Apply filters" button submitting every field
+	// at once) — every apply is a real navigation, resetting pagination back
+	// to page 1 since the "everyone else" section's result set boundaries
+	// just changed. Supports repeated params (Role, multi-select) alongside
+	// the plain single-value Search filter, mirroring Audit's applyFilter.
+	function applyFilter(updates: Record<string, string | string[] | null>) {
+		const url = new URL(page.url);
+		for (const [key, value] of Object.entries(updates)) {
+			url.searchParams.delete(key);
+			if (value === null) continue;
+			if (Array.isArray(value)) {
+				for (const v of value) url.searchParams.append(key, v);
+			} else {
+				url.searchParams.set(key, value);
+			}
+		}
+		url.searchParams.delete('page');
+		goto(`${url.pathname}${url.search}`);
 	}
 
 	let hasNext = $derived(data.page * data.pageSize < data.othersTotal);
@@ -125,136 +138,135 @@
 </script>
 
 <div class="flex flex-col gap-4">
-	<PageHeader title="Users" eyebrow="Admin" />
+	<PageHeader title="Users" eyebrow="Admin">
+		{#snippet actions()}
+			{#if filtersActive}
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					disabled={isQuerying}
+					onclick={() => goto(routes.adminUsers())}
+				>
+					Clear filters
+				</Button>
+			{/if}
+		{/snippet}
+	</PageHeader>
 
 	{#if errorMessage}
 		<p class="text-sm text-destructive">{errorMessage}</p>
 	{/if}
 
-	<form
-		method="GET"
-		class="flex flex-wrap items-end gap-3 rounded-lg border border-brass/30 bg-scorecard p-4"
-	>
-		<label class="flex flex-col gap-1 text-sm">
-			<span class="text-muted-foreground">Search</span>
-			<Input
-				type="search"
-				name="search"
-				value={data.filters.search}
-				placeholder="Name or email…"
-				disabled={isQuerying}
-				class="max-w-56"
-			/>
-		</label>
-		<div class="flex flex-col gap-1">
-			<span class="text-sm text-muted-foreground">Role</span>
-			<MultiSelectFilter label="Role" options={roleOptions} bind:selected={roleFilters} />
-		</div>
-		{#each roleFilters as role (role)}
-			<input type="hidden" name="role" value={role} />
-		{/each}
-		<input type="hidden" name="page_size" value={data.pageSize} />
-		<Button type="submit" variant="brass" size="sm" disabled={isQuerying}>
-			{isQuerying ? 'Applying…' : 'Apply filters'}
-		</Button>
-		{#if filtersActive}
-			<Button
-				type="button"
-				variant="outline"
-				size="sm"
-				disabled={isQuerying}
-				onclick={() => goto(routes.adminUsers())}
-			>
-				Clear
-			</Button>
-		{/if}
-	</form>
-
-	{#snippet usersTable(rows: UserRow[])}
-		<Table.Root>
-			<Table.Header>
-				<Table.Row>
-					<Table.Head>Email</Table.Head>
-					<Table.Head>Name</Table.Head>
-					<Table.Head>Role</Table.Head>
-					<Table.Head>Actions</Table.Head>
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
-				{#each rows as user (user.id)}
-					<Table.Row>
-						<Table.Cell>{user.email}</Table.Cell>
-						<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
-						<Table.Cell class="whitespace-nowrap">
-							{#if user.role === 'unassigned' && user.rejected_at}
-								<Badge variant="destructive">Rejected</Badge>
-							{:else}
-								<Badge variant={roleBadgeVariant(user.role)}>{user.role}</Badge>
-							{/if}
-							{#if user.id === viewerId}
-								<span class="text-xs text-muted-foreground">(you)</span>
-							{/if}
-						</Table.Cell>
-						<Table.Cell>
-							<div class="flex gap-2">
-								{#each actionsFor(user) as action (action.label)}
-									<Button
-										variant="brass"
-										size="sm"
-										disabled={pendingId === user.id}
-										onclick={() => runAction(user.id, action)}
-									>
-										{action.label}
-									</Button>
-								{/each}
-							</div>
-						</Table.Cell>
-					</Table.Row>
-				{/each}
-			</Table.Body>
-		</Table.Root>
+	{#snippet userRow(user: UserRow)}
+		<Table.Row>
+			<Table.Cell>{user.email}</Table.Cell>
+			<Table.Cell>{formatUserName(user) ?? '—'}</Table.Cell>
+			<Table.Cell class="whitespace-nowrap">
+				{#if user.role === 'unassigned' && user.rejected_at}
+					<Badge variant="destructive">Rejected</Badge>
+				{:else}
+					<Badge variant={roleBadgeVariant(user.role)}>{user.role}</Badge>
+				{/if}
+				{#if user.id === viewerId}
+					<span class="text-xs text-muted-foreground">(you)</span>
+				{/if}
+			</Table.Cell>
+			<Table.Cell>
+				<div class="flex gap-2">
+					{#each actionsFor(user) as action (action.label)}
+						<Button
+							variant="brass"
+							size="sm"
+							disabled={pendingId === user.id}
+							onclick={() => runAction(user.id, action)}
+						>
+							{action.label}
+						</Button>
+					{/each}
+				</div>
+			</Table.Cell>
+		</Table.Row>
 	{/snippet}
 
 	{#if totalCount === 0}
 		<EmptyState title={filtersActive ? 'No users match these filters' : 'No users yet'} />
 	{:else}
-		<div class="flex flex-col gap-8">
-			{#if pendingUsers.length > 0}
-				<div class="flex flex-col gap-2">
-					<div class="flex items-center gap-2">
-						<h2 class="font-display text-lg font-semibold text-ink">Pending approval</h2>
-						<Badge variant="sand">{pendingUsers.length}</Badge>
-					</div>
-					{@render usersTable(pendingUsers)}
-				</div>
-			{/if}
-			{#if otherUsers.length > 0}
-				<div class="flex flex-col gap-2">
-					<div class="flex items-center gap-2">
-						<h2 class="font-display text-lg font-semibold text-ink">All users</h2>
-						<Badge variant="sand">{data.othersTotal}</Badge>
-					</div>
-					{@render usersTable(otherUsers)}
-					<CursorPager
-						pageSize={data.pageSize}
-						{hasNext}
-						{hasPrev}
-						{nextHref}
-						{prevHref}
-						disabled={isQuerying}
-						onPageSizeChange={changePageSize}
-					/>
-				</div>
-			{/if}
-			{#if rejectedUsers.length > 0}
-				<div class="flex flex-col gap-2">
-					<div class="flex items-center gap-2">
-						<h2 class="font-display text-lg font-semibold text-ink">Rejected</h2>
-						<Badge variant="outline">{rejectedUsers.length}</Badge>
-					</div>
-					{@render usersTable(rejectedUsers)}
-				</div>
-			{/if}
-		</div>
+		<Table.Root>
+			<Table.Header>
+				<Table.Row>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Email
+							<TableHeaderTextFilter
+								label="Search"
+								value={data.filters.search}
+								placeholder="Name or email…"
+								onApply={(value) => applyFilter({ search: value || null })}
+							/>
+						</span>
+					</Table.Head>
+					<Table.Head>Name</Table.Head>
+					<Table.Head>
+						<span class="inline-flex items-center gap-1">
+							Role
+							<TableHeaderSelectFilter
+								label="Role"
+								options={roleOptions}
+								selected={data.filters.roles}
+								onApply={(values) => applyFilter({ role: values })}
+							/>
+						</span>
+					</Table.Head>
+					<Table.Head>Actions</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#if pendingUsers.length > 0}
+					<Table.Row class="bg-sand/20 hover:bg-sand/20">
+						<Table.Cell colspan={4} class="text-sm text-fairway">
+							Pending approval
+							<span class="text-ink/50 text-xs font-data">· {pendingUsers.length}</span>
+						</Table.Cell>
+					</Table.Row>
+					{#each pendingUsers as user (user.id)}
+						{@render userRow(user)}
+					{/each}
+				{/if}
+				{#if otherUsers.length > 0}
+					<Table.Row class="bg-sand/20 hover:bg-sand/20">
+						<Table.Cell colspan={4} class="text-sm text-fairway">
+							All users
+							<span class="text-ink/50 text-xs font-data">· {data.othersTotal}</span>
+						</Table.Cell>
+					</Table.Row>
+					{#each otherUsers as user (user.id)}
+						{@render userRow(user)}
+					{/each}
+				{/if}
+				{#if rejectedUsers.length > 0}
+					<Table.Row class="bg-sand/20 hover:bg-sand/20">
+						<Table.Cell colspan={4} class="text-sm text-fairway">
+							Rejected
+							<span class="text-ink/50 text-xs font-data">· {rejectedUsers.length}</span>
+						</Table.Cell>
+					</Table.Row>
+					{#each rejectedUsers as user (user.id)}
+						{@render userRow(user)}
+					{/each}
+				{/if}
+			</Table.Body>
+		</Table.Root>
+		{#if otherUsers.length > 0}
+			<CursorPager
+				pageSize={data.pageSize}
+				{hasNext}
+				{hasPrev}
+				{nextHref}
+				{prevHref}
+				disabled={isQuerying}
+				onPageSizeChange={changePageSize}
+			/>
+		{/if}
 	{/if}
 </div>

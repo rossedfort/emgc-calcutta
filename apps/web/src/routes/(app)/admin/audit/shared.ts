@@ -10,8 +10,14 @@ import { localDateTimeToUtcIso } from '$lib/time';
 export interface AuditFilters {
 	participant: string;
 	player: string;
-	tournament: string;
-	action: string;
+	// Phase 37: upgraded from a single exact-match value to a list — the
+	// header-embedded checkbox-list control (TableHeaderSelectFilter) is
+	// inherently multi-select, and there's no reason to artificially
+	// restrict these two to one value each when the query change is a
+	// one-line .eq -> .in (an admin could always only pick one, matching
+	// today's behavior exactly, but now isn't limited to it).
+	tournaments: string[];
+	actions: string[];
 	start: string;
 	end: string;
 	// The browser's own Date.prototype.getTimezoneOffset(), submitted
@@ -26,8 +32,8 @@ export function parseAuditFilters(url: URL): AuditFilters {
 	return {
 		participant: url.searchParams.get('participant')?.trim() ?? '',
 		player: url.searchParams.get('player')?.trim() ?? '',
-		tournament: url.searchParams.get('tournament')?.trim() ?? '',
-		action: url.searchParams.get('action')?.trim() ?? '',
+		tournaments: url.searchParams.getAll('tournament'),
+		actions: url.searchParams.getAll('action'),
 		start: url.searchParams.get('start') ?? '',
 		end: url.searchParams.get('end') ?? '',
 		tzOffsetMinutes: Number.isFinite(tzOffsetRaw) ? tzOffsetRaw : 0
@@ -70,9 +76,10 @@ export async function queryAuditEvents(
 	if (filters.participant) {
 		query = query.ilike('actor_identity', `%${filters.participant}%`);
 	}
-	if (filters.action) {
-		// Exact match — action is a dropdown of known values, not free text.
-		query = query.eq('action', filters.action);
+	if (filters.actions.length > 0) {
+		// Exact match(es) — actions are a checkbox list of known values, not
+		// free text.
+		query = query.in('action', filters.actions);
 	}
 	const startIso = filters.start
 		? localDateTimeToUtcIso(filters.start, filters.tzOffsetMinutes)
@@ -99,10 +106,10 @@ export async function queryAuditEvents(
 		query = query.in('player_id', ids.length > 0 ? ids : ['00000000-0000-0000-0000-000000000000']);
 	}
 
-	if (filters.tournament) {
-		// A select of known tournaments, not free text — exact id match, same
-		// reasoning as the Action dropdown above, no name lookup needed.
-		query = query.eq('tournament_id', filters.tournament);
+	if (filters.tournaments.length > 0) {
+		// A checkbox list of known tournaments, not free text — exact id
+		// match(es), same reasoning as Action above, no name lookup needed.
+		query = query.in('tournament_id', filters.tournaments);
 	}
 
 	return query;
