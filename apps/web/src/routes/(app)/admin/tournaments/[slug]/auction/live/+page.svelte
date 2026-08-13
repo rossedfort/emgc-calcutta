@@ -166,32 +166,7 @@
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
-	<div class="flex flex-col gap-3 rounded-lg border border-brass/30 p-6 text-ink">
-		<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
-		<p class="text-sm text-ink/70">
-			{#if currentLot && currentPlayer}
-				Bidding on {formatPlayerName(currentPlayer)}.
-			{:else}
-				No lot is currently open for bidding — advance the queue below to open the next one.
-			{/if}
-		</p>
-		<AdminBidForm
-			supabase={data.supabase}
-			tournament={data.tournament}
-			participants={data.participants}
-			entryId={currentPlayer?.id ?? null}
-			entryLabel={currentPlayer ? formatPlayerName(currentPlayer) : null}
-			highBid={high}
-		/>
-	</div>
-
-	<RealtimeStatusBanner status={connectionStatus} />
-
-	{#if errorMessage}
-		<p class="text-sm text-destructive">{errorMessage}</p>
-	{/if}
-
-	<div class="rounded-lg border border-brass/30 bg-scorecard p-6 text-ink">
+	<Card class="gap-4 rounded-lg border-2 border-brass bg-scorecard p-6 text-ink ring-0">
 		<div class="flex items-start justify-between gap-2">
 			<div class="flex flex-col gap-1">
 				<p class="flex items-center gap-2 font-display text-xl font-semibold text-ink">
@@ -234,9 +209,21 @@
 			{/if}
 		</div>
 
-		<div
-			class="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40"
-		>
+		{#if currentPlayer}
+			<div class="flex flex-col gap-3 border-t border-brass/20 pt-4">
+				<p class="font-data text-xs tracking-widest text-fairway uppercase">Place a bid</p>
+				<AdminBidForm
+					supabase={data.supabase}
+					tournament={data.tournament}
+					participants={data.participants}
+					entryId={currentPlayer.id}
+					entryLabel={formatPlayerName(currentPlayer)}
+					highBid={high}
+				/>
+			</div>
+		{/if}
+
+		<div class="grid grid-cols-2 gap-px overflow-hidden rounded border border-brass/40 bg-brass/40">
 			<div class="flex flex-col gap-1 bg-scorecard p-3">
 				<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
 					Current high
@@ -267,7 +254,6 @@
 		<form
 			method="POST"
 			action="?/close"
-			class="mt-4"
 			bind:this={closeFormEl}
 			use:enhance={() => {
 				closeSubmitting = true;
@@ -288,7 +274,13 @@
 							: 'Close lot — no bid'}
 			</Button>
 		</form>
-	</div>
+	</Card>
+
+	<RealtimeStatusBanner status={connectionStatus} />
+
+	{#if errorMessage}
+		<p class="text-sm text-destructive">{errorMessage}</p>
+	{/if}
 
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center justify-between gap-2">
