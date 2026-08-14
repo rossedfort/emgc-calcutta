@@ -30,6 +30,20 @@
 	// empty, that's the page-level "nothing sold yet" state, not N
 	// individually-empty sections.
 	let nonEmptyResults = $derived(results.filter((r) => r.players.length > 0));
+
+	// Same per-(flight, division) pot table as the participant-facing
+	// results page (Phase 43) — sums each row's actual winning_bid.amount
+	// (a 'field' row's own winning_bid is always null, so it contributes 0
+	// for free; "The Field" lot's own row already carries the real amount).
+	// Computed from every configured group (`results`), not just
+	// `nonEmptyResults`, matching that page's own unfiltered total.
+	let potGroups = $derived(
+		results.map(({ group, players }) => ({
+			group,
+			total: players.reduce((sum, p) => sum + (p.winning_bid?.amount ?? 0), 0)
+		}))
+	);
+	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -59,6 +73,52 @@
 	{#if nonEmptyResults.length === 0}
 		<EmptyState title="No sold players yet" />
 	{:else}
+		<div class="flex flex-col gap-2">
+			{#if potGroups.length > 1}
+				<Table.Root class="table-fixed">
+					<Table.Header>
+						<Table.Row>
+							<Table.Head class="w-1/2">Flight</Table.Head>
+							<Table.Head>Pot</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each potGroups as { group, total } (`${group.flight}::${group.division}`)}
+							<Table.Row>
+								<Table.Cell
+									class="font-data text-xs tracking-widest text-fairway uppercase whitespace-nowrap"
+								>
+									{group.label}
+								</Table.Cell>
+								<Table.Cell class="font-data whitespace-nowrap">
+									{formatCurrency(total)}
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+					<Table.Footer>
+						<Table.Row>
+							<Table.Cell
+								class="font-data text-xs font-semibold tracking-widest text-fairway uppercase whitespace-nowrap"
+							>
+								Total
+							</Table.Cell>
+							<Table.Cell class="font-data font-semibold text-ink whitespace-nowrap">
+								{formatCurrency(totalPot)}
+							</Table.Cell>
+						</Table.Row>
+					</Table.Footer>
+				</Table.Root>
+			{:else}
+				<div class="flex items-baseline justify-between">
+					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+						Total pot
+					</span>
+					<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
+				</div>
+			{/if}
+		</div>
+
 		<div class="flex flex-col gap-6">
 			{#each nonEmptyResults as { group, players } (`${group.flight}::${group.division}`)}
 				<div class="flex flex-col gap-2">
