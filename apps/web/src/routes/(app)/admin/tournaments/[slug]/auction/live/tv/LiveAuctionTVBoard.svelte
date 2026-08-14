@@ -23,7 +23,7 @@
 		currentUserId,
 		now
 	}: {
-		tournament: { slug: string };
+		tournament: { slug: string; bid_anonymity_enabled: boolean };
 		players: FieldPlayerRow[];
 		liveBids: RealtimeBid[];
 		bidsReady: boolean;
@@ -142,6 +142,11 @@
 							No bids yet
 						{/if}
 					</span>
+					{#if currentLotHigh?.bidder_name && !tournament.bid_anonymity_enabled}
+						<span class="font-data text-sm text-ink/50 xl:text-base">
+							Bid by {currentLotHigh.bidder_name}
+						</span>
+					{/if}
 				</div>
 				<div class="flex flex-col gap-2 bg-scorecard p-6 xl:p-8">
 					<span class="font-data text-xs tracking-wider text-ink/60 uppercase xl:text-sm">
