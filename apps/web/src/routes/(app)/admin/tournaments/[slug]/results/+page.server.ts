@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import {
 	groupResultsByFlightDivision,
-	sortResultsByPlacement,
+	sortResultsByHandicap,
 	sumPayoutsByEntryId
 } from '$lib/results';
 import type { ResultsGroup as SharedResultsGroup } from '$lib/results';
@@ -18,6 +18,7 @@ export interface ResultsRow {
 	id: string;
 	first_name: string;
 	last_name: string;
+	handicap_index: number | null;
 	flight: string;
 	division: string;
 	status: 'sold_silent' | 'sold_live' | 'field';
@@ -47,16 +48,20 @@ export type ResultsGroup = SharedResultsGroup<ResultsRow>;
 // bids<->users each have two FK paths; see that page's load function for
 // the full explanation).
 //
-// Sorted by placement ascending (1st, 2nd, 3rd... in finishing order),
-// nulls last so not-yet-placed entries trail the list rather than
-// scattering among the placed ones; name is a secondary sort so the
-// not-yet-placed group has a stable order across reloads instead of
-// shuffling arbitrarily — done client-side (Phase 11) since the query
-// root is now player_entries, so first_name/last_name live on the
-// embedded `players` resource rather than the queried table itself.
-// Every successful set-placement call triggers invalidateAll() on the
-// client, so a row visibly moves to its new position in the list the
-// moment a placement is saved.
+// Sorted by handicap ascending, nulls last (Phase 43) — not placement, on
+// purpose: most rows have no placement yet while an Admin is still working
+// through this screen, so placement order isn't a useful way to find a
+// given player here the way it is on the participant-facing "final
+// standings" results page (which keeps sortResultsByPlacement). Handicap
+// order matches every other player-list view in the app (roster, silent
+// auction board) instead. Name is a secondary sort so the no-handicap group
+// has a stable order across reloads instead of shuffling arbitrarily — done
+// client-side (Phase 11) since the query root is now player_entries, so
+// first_name/last_name/handicap_index live on the embedded `players`
+// resource rather than the queried table itself. Every successful
+// set-placement call triggers invalidateAll() on the client, so a row's
+// Placement column still visibly updates the moment it's saved, just
+// without reordering the list.
 //
 // Phase 7.5: grouped by (flight, division) — one placement list per
 // group (in tournaments.flights order, Championship expanding into
@@ -68,7 +73,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	const { data: entries, error: entriesError } = await supabase
 		.from('player_entries')
 		.select(
-			'id, flight, division, status, placement, field_entry_id, players(first_name, last_name), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users!bids_bidder_id_fkey(id, first_name, last_name, email))'
+			'id, flight, division, status, placement, field_entry_id, players(first_name, last_name, handicap_index), winning_bid:bids!player_entries_winning_bid_id_fkey(amount, bidder:users!bids_bidder_id_fkey(id, first_name, last_name, email))'
 		)
 		.eq('tournament_id', tournament.id)
 		.in('status', ['sold_silent', 'sold_live', 'field']);
@@ -129,7 +134,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 	}
 	const payoutByEntryId = sumPayoutsByEntryId(payouts ?? []);
 
-	const rows: ResultsRow[] = sortResultsByPlacement(
+	const rows: ResultsRow[] = sortResultsByHandicap(
 		(entries ?? []).flatMap((entry) =>
 			entry.players
 				? [
@@ -137,6 +142,7 @@ export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => 
 							id: entry.id,
 							first_name: entry.players.first_name,
 							last_name: entry.players.last_name,
+							handicap_index: entry.players.handicap_index,
 							flight: entry.flight,
 							division: entry.division,
 							// The .in('status', [...]) filter above already guarantees this

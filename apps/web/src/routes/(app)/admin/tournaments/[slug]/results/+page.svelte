@@ -6,7 +6,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Table from '$lib/components/ui/table';
 	import EnterResultsModal from '$lib/components/EnterResultsModal.svelte';
-	import { formatPlayerName } from '$lib/players';
+	import { formatHandicapIndex, formatPlayerName } from '$lib/players';
 	import { formatUserName } from '$lib/profile';
 	import { routes } from '$lib/routes';
 
@@ -70,6 +70,7 @@
 							<Table.Row>
 								<Table.Head>Placement</Table.Head>
 								<Table.Head>Player</Table.Head>
+								<Table.Head>Handicap</Table.Head>
 								<Table.Head>Buyer</Table.Head>
 								<Table.Head>Winning bid</Table.Head>
 								<Table.Head>Payout</Table.Head>
@@ -82,6 +83,9 @@
 									<Table.Cell class="font-medium text-ink">
 										{formatPlayerName(player)}
 										<DivisionBadge division={player.division} />
+									</Table.Cell>
+									<Table.Cell class="font-data whitespace-nowrap">
+										{formatHandicapIndex(player.handicap_index)}
 									</Table.Cell>
 									<Table.Cell>
 										{#if player.winning_bid?.bidder}

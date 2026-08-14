@@ -49,6 +49,26 @@ export function sortResultsByPlacement<
 	});
 }
 
+// Handicap ascending, nulls last (an unrecorded handicap isn't "lowest",
+// it's unknown) — same convention groupPlayersByFlightAndDivision already
+// uses for the participant-facing player lists (silent auction board).
+// Used by the admin results page instead of sortResultsByPlacement: most
+// rows have no placement yet while an Admin is still entering them, so
+// placement order isn't a useful way to find a specific player on that
+// screen the way it is on the participant-facing "final standings" view.
+export function sortResultsByHandicap<
+	T extends { handicap_index: number | null; first_name: string; last_name: string }
+>(rows: readonly T[]): T[] {
+	return [...rows].sort((a, b) => {
+		if (a.handicap_index === null && b.handicap_index === null) {
+			return a.first_name.localeCompare(b.first_name) || a.last_name.localeCompare(b.last_name);
+		}
+		if (a.handicap_index === null) return 1;
+		if (b.handicap_index === null) return -1;
+		return a.handicap_index - b.handicap_index;
+	});
+}
+
 export interface ResultsGroup<T> {
 	group: FlightDivisionGroup;
 	players: T[];
