@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	groupResultsByFlightDivision,
+	sortResultsByHandicap,
 	sortResultsByPlacement,
 	sumPayoutsByEntryId
 } from './results';
@@ -59,6 +60,39 @@ describe('sortResultsByPlacement', () => {
 		const rows = [row(2, 'B', 'B'), row(1, 'A', 'A')];
 		sortResultsByPlacement(rows);
 		expect(rows.map((r) => r.placement)).toEqual([2, 1]);
+	});
+});
+
+describe('sortResultsByHandicap', () => {
+	interface Row {
+		handicap_index: number | null;
+		first_name: string;
+		last_name: string;
+	}
+
+	function row(handicap_index: number | null, first_name: string, last_name: string): Row {
+		return { handicap_index, first_name, last_name };
+	}
+
+	it('sorts rows ascending by handicap', () => {
+		const rows = [row(12.4, 'C', 'C'), row(0.1, 'A', 'A'), row(5.2, 'B', 'B')];
+		expect(sortResultsByHandicap(rows).map((r) => r.handicap_index)).toEqual([0.1, 5.2, 12.4]);
+	});
+
+	it('sorts rows with no handicap after every row with one', () => {
+		const rows = [row(null, 'Z', 'Z'), row(1.5, 'A', 'A')];
+		expect(sortResultsByHandicap(rows).map((r) => r.handicap_index)).toEqual([1.5, null]);
+	});
+
+	it('sorts no-handicap rows among themselves by name, for a stable order', () => {
+		const rows = [row(null, 'Zeb', 'Zed'), row(null, 'Amy', 'Adams')];
+		expect(sortResultsByHandicap(rows).map((r) => r.first_name)).toEqual(['Amy', 'Zeb']);
+	});
+
+	it('does not mutate the input array', () => {
+		const rows = [row(5.2, 'B', 'B'), row(0.1, 'A', 'A')];
+		sortResultsByHandicap(rows);
+		expect(rows.map((r) => r.handicap_index)).toEqual([5.2, 0.1]);
 	});
 });
 

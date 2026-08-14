@@ -22,6 +22,23 @@
 	// Same "skip individually-empty groups, but treat all-empty as the
 	// page-level empty state" behavior as the admin results page.
 	let nonEmptyResults = $derived(results.filter((r) => r.players.length > 0));
+
+	// Same per-(flight, division) pot table as SilentAuctionBoard.svelte's
+	// (Phase 30), but the settled version rather than the "in progress" one:
+	// this sums each row's actual winning_bid.amount rather than the current
+	// highest *live* bid, since every entry here is already sold. A 'field'
+	// row's own winning_bid is always null (the pooled sale is attributed to
+	// "The Field" lot's own row instead, which already carries the real
+	// amount), so it contributes 0 here for free — no separate exclusion
+	// needed. Computed from every configured group (`results`), not just
+	// `nonEmptyResults`, matching SilentAuctionBoard's own unfiltered total.
+	let potGroups = $derived(
+		results.map(({ group, players }) => ({
+			group,
+			total: players.reduce((sum, p) => sum + (p.winning_bid?.amount ?? 0), 0)
+		}))
+	);
+	let totalPot = $derived(potGroups.reduce((sum, g) => sum + g.total, 0));
 </script>
 
 <div class="flex flex-col gap-4 pt-4">
@@ -43,6 +60,52 @@
 	{#if nonEmptyResults.length === 0}
 		<EmptyState title="No results to show" description="Nothing was sold in this tournament." />
 	{:else}
+		<div class="flex flex-col gap-2">
+			{#if potGroups.length > 1}
+				<Table.Root class="table-fixed">
+					<Table.Header>
+						<Table.Row>
+							<Table.Head class="w-1/2">Flight</Table.Head>
+							<Table.Head>Pot</Table.Head>
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each potGroups as { group, total } (`${group.flight}::${group.division}`)}
+							<Table.Row>
+								<Table.Cell
+									class="font-data text-xs tracking-widest text-fairway uppercase whitespace-nowrap"
+								>
+									{group.label}
+								</Table.Cell>
+								<Table.Cell class="font-data whitespace-nowrap">
+									{formatCurrency(total)}
+								</Table.Cell>
+							</Table.Row>
+						{/each}
+					</Table.Body>
+					<Table.Footer>
+						<Table.Row>
+							<Table.Cell
+								class="font-data text-xs font-semibold tracking-widest text-fairway uppercase whitespace-nowrap"
+							>
+								Total
+							</Table.Cell>
+							<Table.Cell class="font-data font-semibold text-ink whitespace-nowrap">
+								{formatCurrency(totalPot)}
+							</Table.Cell>
+						</Table.Row>
+					</Table.Footer>
+				</Table.Root>
+			{:else}
+				<div class="flex items-baseline justify-between">
+					<span class="font-data text-[0.65rem] tracking-wider text-ink/60 uppercase">
+						Total pot
+					</span>
+					<span class="font-data text-lg text-ink">{formatCurrency(totalPot)}</span>
+				</div>
+			{/if}
+		</div>
+
 		<div class="flex flex-col gap-6">
 			{#each nonEmptyResults as { group, players } (`${group.flight}::${group.division}`)}
 				<div class="flex flex-col gap-2">
